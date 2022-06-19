@@ -1,0 +1,32 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "1.0",
+	"FriendlyName": "AnimVerlet",
+	"Description": "Simple cloth anim dynamics(by verlet integration)",
+	"Category": "Animation",
+	"CreatedBy": "chonjay21",
+	"CreatedByURL": "https://github.com/chonjay21",
+	"DocsURL": "https://github.com/chonjay21/AnimVerlet",
+	"MarketplaceURL": "",
+	"SupportURL": "https://github.com/chonjay21/AnimVerlet",
+	"CanContainContent": false,
+	"IsBetaVersion": false,
+	"IsExperimentalVersion": false,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "AnimVerlet",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		},
+		{
+			"Name": "AnimVerletEditor",
+			"Type": "UncookedOnly",
+			"LoadingPhase": "PreDefault",
+			"WhitelistPlatforms": [
+				"Win64"
+			]
+		}
+	]
+}
