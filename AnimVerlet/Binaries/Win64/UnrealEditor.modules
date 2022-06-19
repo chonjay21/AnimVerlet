@@ -1,0 +1,8 @@
+{
+	"BuildId": "19505902",
+	"Modules": 
+	{
+		"AnimVerlet": "UnrealEditor-AnimVerlet.dll",
+		"AnimVerletEditor": "UnrealEditor-AnimVerletEditor.dll"
+	}
+}

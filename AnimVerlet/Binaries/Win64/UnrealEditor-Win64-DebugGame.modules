@@ -1,0 +1,8 @@
+{
+	"BuildId": "19505902",
+	"Modules": 
+	{
+		"AnimVerlet": "UnrealEditor-AnimVerlet-Win64-DebugGame.dll",
+		"AnimVerletEditor": "UnrealEditor-AnimVerletEditor-Win64-DebugGame.dll"
+	}
+}
