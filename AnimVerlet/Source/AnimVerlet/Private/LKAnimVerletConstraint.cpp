@@ -52,9 +52,10 @@ void FLKAnimVerletConstraint_Distance::Update(float DeltaTime)
 ///=========================================================================================================================================
 /// FLKAnimVerletConstraint_FixedDistance
 ///=========================================================================================================================================
-FLKAnimVerletConstraint_FixedDistance::FLKAnimVerletConstraint_FixedDistance(FLKAnimVerletBone* InBoneA, FLKAnimVerletBone* InBoneB, float InLengthMargin)
+FLKAnimVerletConstraint_FixedDistance::FLKAnimVerletConstraint_FixedDistance(FLKAnimVerletBone* InBoneA, FLKAnimVerletBone* InBoneB, bool bInAwayFromEachOther, float InLengthMargin)
 	: BoneA(InBoneA)
 	, BoneB(InBoneB)
+	, bAwayFromEachOther(bInAwayFromEachOther)
 {
 	verify(BoneA != nullptr);
 	verify(BoneB != nullptr);
@@ -79,9 +80,33 @@ void FLKAnimVerletConstraint_FixedDistance::Update(float DeltaTime)
 
 	/// Adjust distance constraint
 	if (Distance > Length + LengthMargin)
-		BoneB->Location = BoneA->Location + Direction * (Length + LengthMargin);
+	{
+		const float LengthWithMargin = Length + LengthMargin;
+		if (bAwayFromEachOther)
+		{
+			const FVector Center = BoneA->Location + Direction * Distance * 0.5f;
+			BoneB->Location = Center + Direction * LengthWithMargin * 0.5f;
+			BoneA->Location = Center - Direction * LengthWithMargin * 0.5f;
+		}
+		else
+		{
+			BoneB->Location = BoneA->Location + Direction * LengthWithMargin;
+		}
+	}
 	else if (Distance < Length - LengthMargin)
-		BoneB->Location = BoneA->Location + Direction * (Length - LengthMargin);
+	{
+		const float LengthWithMargin = Length - LengthMargin;
+		if (bAwayFromEachOther)
+		{
+			const FVector Center = BoneA->Location + Direction * Distance * 0.5f;
+			BoneB->Location = Center + Direction * LengthWithMargin * 0.5f;
+			BoneA->Location = Center - Direction * LengthWithMargin * 0.5f;
+		}
+		else
+		{
+			BoneB->Location = BoneA->Location + Direction * LengthWithMargin;
+		}
+	}
 }
 ///=========================================================================================================================================
 

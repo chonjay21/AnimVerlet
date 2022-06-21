@@ -94,21 +94,27 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Solve", meta = (ClampMin = "0.0"))
 	float Stiffness = 0.8f;
 
+	/** Adjust distance constraint to diagonal directions. (This is helpful when using the bIgnoreReferencePose option) */
+	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve")
+	bool bConstrainRightDiagonalDistance = false;
+	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve")
+	bool bConstrainLeftDiagonalDistance = false;
+
 	/** The option to keep the distance between parent and child bones in the bone chain helps to keep SolveIteration small. */
 	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve")
-	bool bKeepLengthFromParent = true;
-	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve", meta = (EditCondition = "bKeepLengthFromParent", ClampMin = "0.0", ForceUnits = "cm"))
+	bool bPreserveLengthFromParent = true;
+	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve", meta = (EditCondition = "bPreserveLengthFromParent", ClampMin = "0.0", ForceUnits = "cm"))
 	float LengthFromParentMargin = 0.1f;
 	/** The option to keep the distance between side bones helps to keep SolveIteration small. */
 	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve")
-	bool bKeepSideLength = true;
-	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve", meta = (EditCondition = "bKeepSideLength", ClampMin = "0.0", ForceUnits = "cm"))
-	float SideLengthMargin = 3.0f;
+	bool bPreserveSideLength = true;
+	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve", meta = (EditCondition = "bPreserveSideLength", ClampMin = "0.0", ForceUnits = "cm"))
+	float SideLengthMargin = 0.1f;
 
 	/** 
 		It is the number of iterations to solve Verlet Integraion. 
 		As there are more Collisions or Constraints, the larger the SolveIteration the more accurate the result. 
-		SolveIteration of 1 can be fine thanks to the bKeepLengthFromParent and bKeepSideLength options.
+		SolveIteration of 1 can be fine thanks to the bPreserveLengthFromParent and bPreserveSideLength options.
 	*/
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = "Solve", meta = (ClampMin = "1"))
 	int32 SolveIteration = 1;
@@ -203,4 +209,5 @@ private:
 	TArray<FLKAnimVerletConstraint_Plane> PlaneCollisionConstraints;
 	TArray<FLKAnimVerletConstraint_World> WorldCollisionConstraints;
 	TArray<TArray<int32>> BoneChainIndexes;
+	int32 MaxBoneChainLength = 0;
 };

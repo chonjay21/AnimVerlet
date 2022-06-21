@@ -129,9 +129,9 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 			const FLKAnimVerletConstraint_Distance DistanceConstraint(&ParentSimulateBone, &CurSimulateBone, Stiffness);
 			DistanceConstraints.Emplace(DistanceConstraint);
 
-			if (bKeepLengthFromParent)
+			if (bPreserveLengthFromParent)
 			{
-				const FLKAnimVerletConstraint_FixedDistance FixedDistanceConstraint(&ParentSimulateBone, &CurSimulateBone, LengthFromParentMargin);
+				const FLKAnimVerletConstraint_FixedDistance FixedDistanceConstraint(&ParentSimulateBone, &CurSimulateBone, false, LengthFromParentMargin);
 				FixedDistanceConstraints.Emplace(FixedDistanceConstraint);
 			}
 
@@ -144,26 +144,96 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 	}
 
 	/// Side bone constraints for cloth
-	for (int32 i = 0; i < BoneChainIndexes.Num(); ++i)
+	if (BoneChainIndexes.Num() > 0)
 	{
-		const TArray<int32>& SimulateBoneChains = BoneChainIndexes[i];
-		const int32 NextChainPos = (i + 1);
-		if (NextChainPos < BoneChainIndexes.Num())
+		for (int32 i = 0; i < MaxBoneChainLength; ++i)
 		{
-			const TArray<int32>& NextSimulateBoneChains = BoneChainIndexes[NextChainPos];
-			const int32 NumMinChain = FMath::Min(SimulateBoneChains.Num(), NextSimulateBoneChains.Num());
-			for (int32 j = 0; j < NumMinChain; ++j)
-			{
-				verify(SimulateBones.IsValidIndex(SimulateBoneChains[j]));
-				verify(SimulateBones.IsValidIndex(NextSimulateBoneChains[j]));
+			/// Solve order is important. Make a heuristic order from the center to the outside so that the cloth is stretched out as much as possible.
+			const int32 NumBoneChainIndexes = BoneChainIndexes.Num();
+			const int32 MidIndex = NumBoneChainIndexes / 2;
+			int32 LeftCurIndex = MidIndex;
+			int32 LeftIndex = LeftCurIndex - 1;
+			int32 RightCurIndex = MidIndex;
+			int32 RightIndex = RightCurIndex + 1;
 
-				const FLKAnimVerletConstraint_Distance DistanceConstraint(&SimulateBones[SimulateBoneChains[j]], &SimulateBones[NextSimulateBoneChains[j]], Stiffness);
-				DistanceConstraints.Emplace(DistanceConstraint);
-				
-				if (bKeepSideLength)
+			while (BoneChainIndexes.IsValidIndex(RightIndex) || BoneChainIndexes.IsValidIndex(LeftIndex))
+			{
+				if (BoneChainIndexes.IsValidIndex(LeftIndex))
 				{
-					const FLKAnimVerletConstraint_FixedDistance FixedDistanceConstraint(&SimulateBones[SimulateBoneChains[j]], &SimulateBones[NextSimulateBoneChains[j]], SideLengthMargin);
-					FixedDistanceConstraints.Emplace(FixedDistanceConstraint);
+					const TArray<int32>& CurBoneChain = BoneChainIndexes[LeftCurIndex];
+					const TArray<int32>& LeftBoneChain = BoneChainIndexes[LeftIndex];
+					if (i < CurBoneChain.Num() && i < LeftBoneChain.Num())
+					{
+						verify(SimulateBones.IsValidIndex(CurBoneChain[i]));
+						verify(SimulateBones.IsValidIndex(LeftBoneChain[i]));
+
+						const FLKAnimVerletConstraint_Distance DistanceConstraint(&SimulateBones[CurBoneChain[i]], &SimulateBones[LeftBoneChain[i]], Stiffness);
+						DistanceConstraints.Emplace(DistanceConstraint);
+
+						if (bPreserveSideLength)
+						{
+							const FLKAnimVerletConstraint_FixedDistance FixedDistanceConstraint(&SimulateBones[CurBoneChain[i]], &SimulateBones[LeftBoneChain[i]], false, SideLengthMargin);
+							FixedDistanceConstraints.Emplace(FixedDistanceConstraint);
+						}
+
+						if (bConstrainRightDiagonalDistance)
+						{
+							if (i + 1 < CurBoneChain.Num())
+							{
+								const FLKAnimVerletConstraint_Distance LeftDiagonalConstraint(&SimulateBones[CurBoneChain[i + 1]], &SimulateBones[LeftBoneChain[i]], Stiffness);
+								DistanceConstraints.Emplace(LeftDiagonalConstraint);
+							}
+						}
+						if (bConstrainLeftDiagonalDistance)
+						{
+							if (i + 1 < LeftBoneChain.Num())
+							{
+								const FLKAnimVerletConstraint_Distance RightDiagonalConstraint(&SimulateBones[CurBoneChain[i]], &SimulateBones[LeftBoneChain[i + 1]], Stiffness);
+								DistanceConstraints.Emplace(RightDiagonalConstraint);
+							}
+						}
+					}
+					LeftCurIndex = LeftIndex;
+					--LeftIndex;
+				}
+
+				if (BoneChainIndexes.IsValidIndex(RightIndex))
+				{
+					const TArray<int32>& CurBoneChain = BoneChainIndexes[RightCurIndex];
+					const TArray<int32>& RightBoneChain = BoneChainIndexes[RightIndex];
+					if (i < CurBoneChain.Num() && i < RightBoneChain.Num())
+					{
+						verify(SimulateBones.IsValidIndex(CurBoneChain[i]));
+						verify(SimulateBones.IsValidIndex(RightBoneChain[i]));
+
+						const FLKAnimVerletConstraint_Distance DistanceConstraint(&SimulateBones[CurBoneChain[i]], &SimulateBones[RightBoneChain[i]], Stiffness);
+						DistanceConstraints.Emplace(DistanceConstraint);
+
+						if (bPreserveSideLength)
+						{
+							const FLKAnimVerletConstraint_FixedDistance FixedDistanceConstraint(&SimulateBones[CurBoneChain[i]], &SimulateBones[RightBoneChain[i]], false, SideLengthMargin);
+							FixedDistanceConstraints.Emplace(FixedDistanceConstraint);
+						}
+
+						if (bConstrainRightDiagonalDistance)
+						{
+							if (i + 1 < RightBoneChain.Num())
+							{
+								const FLKAnimVerletConstraint_Distance RightDiagonalConstraint(&SimulateBones[CurBoneChain[i]], &SimulateBones[RightBoneChain[i + 1]], Stiffness);
+								DistanceConstraints.Emplace(RightDiagonalConstraint);
+							}
+						}
+						if (bConstrainLeftDiagonalDistance)
+						{
+							if (i + 1 < CurBoneChain.Num())
+							{
+								const FLKAnimVerletConstraint_Distance LeftDiagonalConstraint(&SimulateBones[CurBoneChain[i + 1]], &SimulateBones[RightBoneChain[i]], Stiffness);
+								DistanceConstraints.Emplace(LeftDiagonalConstraint);
+							}
+						}
+					}
+					RightCurIndex = RightIndex;
+					++RightIndex;
 				}
 			}
 		}
@@ -285,7 +355,8 @@ bool FLKAnimNode_AnimVerlet::MakeSimulateBones(FComponentSpacePoseContext& PoseC
 			const FTransform SubDividedBonePoseT = SubDividedSimulateBone.MakeFakeBonePoseTransform(ReferenceBonePoseT);
 			SubDividedSimulateBone.InitializeTransform(SubDividedBonePoseT);
 			const int32 SubDividedSimulateBoneIndex = SimulateBones.Emplace(SubDividedSimulateBone);
-			BoneChainIndexes[RootSimulateBoneIndex].Add(SubDividedSimulateBoneIndex);
+			const int32 CurAddedBoneChainLength = BoneChainIndexes[RootSimulateBoneIndex].Add(SubDividedSimulateBoneIndex) + 1;
+			MaxBoneChainLength = FMath::Max(MaxBoneChainLength, CurAddedBoneChainLength);
 
 			SubDividedParentSimulateBoneIndex = SubDividedSimulateBoneIndex;
 		}
@@ -301,7 +372,8 @@ bool FLKAnimNode_AnimVerlet::MakeSimulateBones(FComponentSpacePoseContext& PoseC
 	{
 		verify(RootSimulateBoneIndex != INDEX_NONE);
 	}
-	BoneChainIndexes[RootSimulateBoneIndex].Add(SimulateBoneIndex);
+	const int32 CurAddedBoneChainLength = BoneChainIndexes[RootSimulateBoneIndex].Add(SimulateBoneIndex) + 1;
+	MaxBoneChainLength = FMath::Max(MaxBoneChainLength, CurAddedBoneChainLength);
 	const bool bTipBone = (WalkChildsAndMakeSimulateBones(PoseContext, BoneContainer, ReferenceSkeleton, BoneIndex, SimulateBoneIndex, RootSimulateBoneIndex, BoneSetting) == false);
 
 	if (bMakeFakeTipBone && bTipBone && FakeTipBoneLength > 0.0f)
@@ -315,7 +387,8 @@ bool FLKAnimNode_AnimVerlet::MakeSimulateBones(FComponentSpacePoseContext& PoseC
 		FakeSimulateBone.InitializeTransform(FakeBoneT);
 		
 		const int32 FakeBoneIndex = SimulateBones.Emplace(FakeSimulateBone);
-		BoneChainIndexes[RootSimulateBoneIndex].Add(FakeBoneIndex);
+		const int32 AddedFakeBoneChainLength = BoneChainIndexes[RootSimulateBoneIndex].Add(FakeBoneIndex) + 1;
+		MaxBoneChainLength = FMath::Max(MaxBoneChainLength, AddedFakeBoneChainLength);
 	}
 	return true;
 }
@@ -543,6 +616,7 @@ void FLKAnimNode_AnimVerlet::SimulateVerlet(const UWorld* World, float InDeltaTi
 	for (int32 Iteration = 0; Iteration < SolveIteration; ++Iteration)
 	{
 		/// Simulate each constraints
+		/// Solve order is important. Make a heuristic order by constraint priority.
 		/*for (int32 i = 0; i < Constraints.Num(); ++i)
 		{
 			verify(Constraints[i] != nullptr);
@@ -650,6 +724,7 @@ void FLKAnimNode_AnimVerlet::ClearSimulateBones()
 	WorldCollisionConstraints.Reset();
 
 	BoneChainIndexes.Reset();
+	MaxBoneChainLength = 0;
 	SimulateBones.Reset();
 }
 

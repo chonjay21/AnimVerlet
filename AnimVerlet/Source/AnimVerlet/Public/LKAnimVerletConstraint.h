@@ -2,7 +2,7 @@
 #include <CoreMinimal.h>
 #include <UObject/WeakObjectPtrTemplates.h>
 
-using TExcludeBoneBits = TBitArray<TInlineAllocator<16>>;
+using TExcludeBoneBits = TBitArray<TInlineAllocator<64>>;
 
 ///=========================================================================================================================================
 /// FLKAnimVerletConstraint
@@ -54,11 +54,12 @@ public:
 	struct FLKAnimVerletBone* BoneA = nullptr;
 	struct FLKAnimVerletBone* BoneB = nullptr;
 
+	bool bAwayFromEachOther = false;
 	float Length = 0.0f;
 	float LengthMargin = 0.0f;
 
 public:
-	FLKAnimVerletConstraint_FixedDistance(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, float InLengthMargin = 0.0f);
+	FLKAnimVerletConstraint_FixedDistance(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, bool bInAwayFromEachOther, float InLengthMargin = 0.0f);
 	virtual void Update(float DeltaTime) override;
 };
 ///=========================================================================================================================================
