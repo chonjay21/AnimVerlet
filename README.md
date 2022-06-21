@@ -12,6 +12,13 @@
 
 <br />
 
+# Screenshots
+![](https://github.com/chonjay21/Screenshots/blob/main/AnimVerlet.png)
+![](https://github.com/chonjay21/Screenshots/blob/main/AnimVerlet_Short.gif)
+![](https://github.com/chonjay21/Screenshots/blob/main/AnimVerlet_Graph.gif)
+
+<br />
+
 # Who I am
 
 Find me at:
