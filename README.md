@@ -19,11 +19,6 @@
 
 <br />
 
-# Youtube
-![](https://youtu.be/3p2-tD12Z5A)
-
-<br />
-
 # Who I am
 
 Find me at:
@@ -54,6 +49,7 @@ The UnrealEngine versions supported by this plugin are:
 
 * UE4: [UE4 Example project](https://github.com/chonjay21/AnimVerletExample_UE4)
 * UE5: [UE5 Example project](https://github.com/chonjay21/AnimVerletExample_UE5)
+* Youtube: [Youtube Example](https://youtu.be/3p2-tD12Z5A)
 
 <br />
 
