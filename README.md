@@ -23,6 +23,7 @@
 
 Find me at:
 * [GitHub](https://github.com/chonjay21)
+* [Youtube](https://www.youtube.com/channel/UCIwbmzMBsIJ0FVHlbyOGPDg/featured)
 
 <br />
 
