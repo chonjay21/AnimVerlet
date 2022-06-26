@@ -2,12 +2,13 @@
 ![GitHub](https://img.shields.io/github/license/chonjay21/AnimVerlet)
 ![GitHub stars](https://img.shields.io/github/stars/chonjay21/AnimVerlet?style=social)
 ## AnimVerlet. Yet another anim dynamics plugin for cloth, string, blob simulation in UE4, UE5 (Unreal Engine)
-* Support Cloth(Cape) simulation while respecting the animation pose.
+* Support Cloth(cloak, cape, flag) simulation while respecting the animation pose.
 * Support String(hair, skirt)(one chain cloth) simulation while respecting the animation pose.
 * Support Blob, fluid like simulation while respecting the animation pose.
 * Support custom collision(Sphere, Capsule, Box, Plain)
 * Support ball socket constraints(Cone angle constraints)
-* Use a simple position based physics simulation(by Verlet Integration).
+* Use simple position based physics simulation(by Verlet Integration).
+* Minimize solve iterations by using a heuristic solve order.(1 iteration is usually sufficient)
 * Easy readable source code
 
 <br />
