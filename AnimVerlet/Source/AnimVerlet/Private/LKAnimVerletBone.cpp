@@ -72,24 +72,24 @@ void FLKAnimVerletBone::Update(float DeltaTime, const FLKAnimVerletUpdateParam& 
 }
 
 void FLKAnimVerletBone::AdjustPoseTransform(float DeltaTime, const FVector& ParentLocation, const FVector& ParentPoseLocation,
-											float ReferencePoseInertia, float ReferencePoseDeltaInertia, bool bClampReferencePoseDeltaInertia, float ReferencePoseDeltaInertiaClampMax)
+											float AnimationPoseInertia, float AnimationPoseDeltaInertia, bool bClampAnimationPoseDeltaInertia, float AnimationPoseDeltaInertiaClampMax)
 {
 	/// To Pose
 	const FVector PoseDirFromParent = PoseLocation - ParentPoseLocation;
-	Location += (ParentLocation + PoseDirFromParent - Location) * ReferencePoseInertia;
+	Location += (ParentLocation + PoseDirFromParent - Location) * AnimationPoseInertia;
 
 	/// Pose delta from last frame
 	const FVector PoseDiff = PoseLocation - PrevPoseLocation;
-	if (bClampReferencePoseDeltaInertia)
+	if (bClampAnimationPoseDeltaInertia)
 	{
 		FVector PoseDiffDir = FVector::ZeroVector;
 		float PoseDiffSize = 0.0f;
 		PoseDiff.ToDirectionAndLength(OUT PoseDiffDir, OUT PoseDiffSize);
-		Location += PoseDiffDir * FMath::Min(PoseDiffSize * ReferencePoseDeltaInertia, ReferencePoseDeltaInertiaClampMax);
+		Location += PoseDiffDir * FMath::Min(PoseDiffSize * AnimationPoseDeltaInertia, AnimationPoseDeltaInertiaClampMax);
 	}
 	else
 	{
-		Location += PoseDiff * ReferencePoseDeltaInertia;
+		Location += PoseDiff * AnimationPoseDeltaInertia;
 	}
 }
 

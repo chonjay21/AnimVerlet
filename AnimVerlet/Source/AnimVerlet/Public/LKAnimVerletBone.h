@@ -9,6 +9,7 @@ struct FLKAnimVerletBone
 public:
 	FBoneReference BoneReference;
 	int32 ParentVerletBoneIndex = INDEX_NONE;
+	bool bTipBone = false;
 	bool bFakeBone = false;
 	FVector FakeBoneLocationOffset = FVector::ZeroVector;
 
@@ -30,6 +31,7 @@ public:
 	bool IsFakeBone() const { return bFakeBone; }
 	bool HasBoneSetup() const { return BoneReference.HasValidSetup(); }
 	bool HasParentBone() const { return ParentVerletBoneIndex != INDEX_NONE; }
+	bool IsTipBone() const { return bTipBone; }
 	FTransform MakeCurrentTransform() const { return FTransform(Rotation, Location, PoseScale); }
 	FTransform MakePoseTransform() const { return FTransform(PoseRotation, PoseLocation, PoseScale); }
 	FVector MakeFakeBonePoseLocation(const FTransform& PoseT) const;
@@ -41,7 +43,7 @@ public:
 	void PrepareSimulation(const FTransform& PoseT);
 	void Update(float DeltaTime, const struct FLKAnimVerletUpdateParam& InParam);
 	void AdjustPoseTransform(float DeltaTime, const FVector& ParentLocation, const FVector& ParentPoseLocation,
-							 float ReferencePoseInertia, float ReferencePoseDeltaInertia, bool bClampReferencePoseDeltaInertia, float ReferencePoseDeltaInertiaClampMax);
+							 float AnimationPoseInertia, float AnimationPoseDeltaInertia, bool bClampAnimationPoseDeltaInertia, float AnimationPoseDeltaInertiaClampMax);
 	void ResetSimulation();
 };
 

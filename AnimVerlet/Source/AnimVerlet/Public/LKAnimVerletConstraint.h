@@ -12,6 +12,7 @@ struct FLKAnimVerletConstraint
 public:
 	virtual ~FLKAnimVerletConstraint() {}
 	virtual void Update(float DeltaTime) = 0;
+	virtual void BackwardUpdate(float DeltaTime) { Update(DeltaTime); }
 };
 
 ///=========================================================================================================================================
@@ -21,9 +22,10 @@ struct FLKAnimVerletConstraint_Pin : public FLKAnimVerletConstraint
 {
 public:
 	struct FLKAnimVerletBone* Bone = nullptr;
+	float PinMargin = 0.0f;
 
 public:
-	FLKAnimVerletConstraint_Pin(struct FLKAnimVerletBone* InBone) : Bone(InBone) { verify(Bone != nullptr); }
+	FLKAnimVerletConstraint_Pin(struct FLKAnimVerletBone* InBone, float InPinMargin = 0.0f) : Bone(InBone), PinMargin(InPinMargin) { verify(Bone != nullptr); }
 	virtual void Update(float DeltaTime) override;
 };
 
@@ -61,6 +63,7 @@ public:
 public:
 	FLKAnimVerletConstraint_FixedDistance(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, bool bInAwayFromEachOther, float InLengthMargin = 0.0f);
 	virtual void Update(float DeltaTime) override;
+	virtual void BackwardUpdate(float DeltaTime) override;
 };
 ///=========================================================================================================================================
 

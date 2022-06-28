@@ -9,7 +9,23 @@ void FLKAnimVerletConstraint_Pin::Update(float DeltaTime)
 {
 	verify(Bone != nullptr);
 
-	Bone->Location = Bone->PoseLocation;
+	if (FMath::IsNearlyZero(PinMargin))
+	{
+		Bone->Location = Bone->PoseLocation;
+	}
+	else
+	{
+		/// Calculate the distance
+		FVector Direction = FVector::ZeroVector;
+		float Distance = 0.0f;
+		(Bone->Location - Bone->PoseLocation).ToDirectionAndLength(OUT Direction, OUT Distance);
+
+		/// Adjust distance constraint
+		if (Distance > PinMargin)
+		{
+			Bone->Location = Bone->PoseLocation + Direction * PinMargin;
+		}
+	}
 }
 
 ///=========================================================================================================================================
@@ -105,6 +121,50 @@ void FLKAnimVerletConstraint_FixedDistance::Update(float DeltaTime)
 		else
 		{
 			BoneB->Location = BoneA->Location + Direction * LengthWithMargin;
+		}
+	}
+}
+
+void FLKAnimVerletConstraint_FixedDistance::BackwardUpdate(float DeltaTime)
+{
+	verify(BoneA != nullptr);
+	verify(BoneB != nullptr);
+
+	/// Update length
+	Length = (BoneA->PoseLocation - BoneB->PoseLocation).Size();
+
+	/// Calculate the distance
+	FVector Direction = FVector::ZeroVector;
+	float Distance = 0.0f;
+	(BoneA->Location - BoneB->Location).ToDirectionAndLength(OUT Direction, OUT Distance);
+
+	/// Adjust distance constraint
+	if (Distance > Length + LengthMargin)
+	{
+		const float LengthWithMargin = Length + LengthMargin;
+		if (bAwayFromEachOther)
+		{
+			const FVector Center = BoneB->Location + Direction * Distance * 0.5f;
+			BoneA->Location = Center + Direction * LengthWithMargin * 0.5f;
+			BoneB->Location = Center - Direction * LengthWithMargin * 0.5f;
+		}
+		else
+		{
+			BoneA->Location = BoneB->Location + Direction * LengthWithMargin;
+		}
+	}
+	else if (Distance < Length - LengthMargin)
+	{
+		const float LengthWithMargin = Length - LengthMargin;
+		if (bAwayFromEachOther)
+		{
+			const FVector Center = BoneB->Location + Direction * Distance * 0.5f;
+			BoneA->Location = Center + Direction * LengthWithMargin * 0.5f;
+			BoneB->Location = Center - Direction * LengthWithMargin * 0.5f;
+		}
+		else
+		{
+			BoneA->Location = BoneB->Location + Direction * LengthWithMargin;
 		}
 	}
 }

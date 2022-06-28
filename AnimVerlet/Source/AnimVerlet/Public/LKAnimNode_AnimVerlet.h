@@ -63,29 +63,37 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Setup", meta = (EditCondition = "SubDivideBones", EditConditionHides, ClampMin = "0"))
 	uint8 NumSubDividedBone = 1;
 
+	/** Adds an fake(virtual) bone to the end of the body.(may affect the rotation or collision of the end bone) */
+	UPROPERTY(EditAnywhere, Category = "Setup", meta = (EditCondition = "bLockTipBone == false"))
+	bool bMakeFakeTipBone = true;
+	UPROPERTY(EditAnywhere, Category = "Setup", meta = (EditCondition = "bLockTipBone == false && bMakeFakeTipBone", ClampMin = "0.1", ForceUnits = "cm"))
+	float FakeTipBoneLength = 10.0f;
+	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Setup")
+	bool bLockTipBone = false;
+	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Setup", meta = (EditCondition = "bLockTipBone", ClampMin = "0.0", ForceUnits = "cm"))
+	float TipBoneLockMargin = 0.0f;
+	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Setup", meta = (ClampMin = "0.0", ForceUnits = "cm"))
+	float StartBoneLockMargin = 0.0f;
+
+
 	/** Magnitude of inertia due to animation pose change. */
-	UPROPERTY(EditAnywhere, Category = "Settings", meta = (EditCondition = "bIgnoreReferencePose == false", EditConditionHides, ClampMin = "0.0", ClampMax = "1.0"))
-	float ReferencePoseDeltaInertia = 0.03f;
+	UPROPERTY(EditAnywhere, Category = "Settings", meta = (EditCondition = "bIgnoreAnimationPose == false", EditConditionHides, ClampMin = "0.0", ClampMax = "1.0"))
+	float AnimationPoseDeltaInertia = 0.03f;
 	/** Magnitude of inertia scale due to animation pose change. */
-	UPROPERTY(EditAnywhere, Category = "Settings", meta = (EditCondition = "bIgnoreReferencePose == false", EditConditionHides, ClampMin = "0.0"))
-	float ReferencePoseDeltaInertiaScale = 1.0f;
+	UPROPERTY(EditAnywhere, Category = "Settings", meta = (EditCondition = "bIgnoreAnimationPose == false", EditConditionHides, ClampMin = "0.0"))
+	float AnimationPoseDeltaInertiaScale = 1.0f;
 	/** Limits the amount of inertia caused by animation pose changes. */
-	UPROPERTY(EditAnywhere, Category = "Settings", meta = (EditCondition = "bIgnoreReferencePose == false", EditConditionHides))
-	bool bClampReferencePoseDeltaInertia = true;
-	UPROPERTY(EditAnywhere, Category = "Settings", meta = (EditCondition = "bIgnoreReferencePose == false && bClampReferencePoseDeltaInertia", EditConditionHides, ClampMin = "0.0"))
-	float ReferencePoseDeltaInertiaClampMax = 0.1f;
+	UPROPERTY(EditAnywhere, Category = "Settings", meta = (EditCondition = "bIgnoreAnimationPose == false", EditConditionHides))
+	bool bClampAnimationPoseDeltaInertia = true;
+	UPROPERTY(EditAnywhere, Category = "Settings", meta = (EditCondition = "bIgnoreAnimationPose == false && bClampAnimationPoseDeltaInertia", EditConditionHides, ClampMin = "0.0"))
+	float AnimationPoseDeltaInertiaClampMax = 0.1f;
 	/** Ignores animation poses and only applies cloth simulation results. */
 	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Settings")
-	bool bIgnoreReferencePose = false;
+	bool bIgnoreAnimationPose = false;
 	/** The magnitude of inertia to the animation pose position.(Pulls the cloth simulation result into the animation pose position) */
-	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Settings", meta = (EditCondition = "bIgnoreReferencePose == false", EditConditionHides, ClampMin = "0.0", ClampMax = "1.0"))
-	float ReferencePoseInertia = 0.03f;
+	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Settings", meta = (EditCondition = "bIgnoreAnimationPose == false", EditConditionHides, ClampMin = "0.0", ClampMax = "1.0"))
+	float AnimationPoseInertia = 0.03f;
 
-	/** Adds an fake(virtual) bone to the end of the body.(may affect the rotation or collision of the end bone) */
-	UPROPERTY(EditAnywhere, Category = "Settings")
-	bool bMakeFakeTipBone = true;
-	UPROPERTY(EditAnywhere, Category = "Settings", meta = (EditCondition = "bMakeFakeTipBone", ClampMin = "0.1", ForceUnits = "cm"))
-	float FakeTipBoneLength = 10.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Solve", meta = (ClampMin = "0.0", ClampMax = "1.0"))
 	float Damping = 0.9f;
@@ -94,7 +102,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Solve", meta = (ClampMin = "0.0"))
 	float Stiffness = 0.8f;
 
-	/** Adjust distance constraint to diagonal directions. (This is helpful when using the bIgnoreReferencePose option) */
+	/** Adjust distance constraint to diagonal directions. (This is helpful when using the bIgnoreAnimationPose option) */
 	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve")
 	bool bConstrainRightDiagonalDistance = false;
 	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve")
