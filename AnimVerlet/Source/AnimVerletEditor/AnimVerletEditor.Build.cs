@@ -13,7 +13,11 @@ public class AnimVerletEditor : ModuleRules
         if (BuildVersion.TryRead(BuildVersion.GetDefaultFileName(), out Version))
         {
             if (Version.MajorVersion == 5)
+			{
 				PrivateDependencyModuleNames.AddRange(new string[] { "EditorFramework" });
+				if (Version.MinorVersion >= 1) 
+					PrivateDependencyModuleNames.AddRange(new string[] { "AnimationEditMode" });
+			}
         }
 	}
 }

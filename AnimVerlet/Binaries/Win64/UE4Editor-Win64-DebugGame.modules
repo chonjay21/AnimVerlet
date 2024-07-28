@@ -1,8 +1,0 @@
-{
-	"BuildId": "17155196",
-	"Modules": 
-	{
-		"AnimVerlet": "UE4Editor-AnimVerlet-Win64-DebugGame.dll",
-		"AnimVerletEditor": "UE4Editor-AnimVerletEditor-Win64-DebugGame.dll"
-	}
-}

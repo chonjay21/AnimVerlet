@@ -11,18 +11,6 @@
 ///#include "CanvasTypes.h"
 ///#include "Materials/MaterialInstanceDynamic.h"
 
-void FLKAnimVerletEditMode::EnterMode(UAnimGraphNode_Base* InEditorNode, FAnimNode_Base* InRuntimeNode)
-{
-	AnimNode = InEditorNode;
-	RuntimeAnimNode = InRuntimeNode;
-}
-
-void FLKAnimVerletEditMode::ExitMode()
-{
-	AnimNode = nullptr;
-	RuntimeAnimNode = nullptr;
-}
-
 void FLKAnimVerletEditMode::Render(const FSceneView* View, FViewport* Viewport, FPrimitiveDrawInterface* PDI)
 {
 	if (AnimNode != nullptr)
@@ -50,4 +38,16 @@ void FLKAnimVerletEditMode::GetOnScreenDebugInfo(TArray<FText>& OutDebugInfo) co
 	{
 		AnimNode->GetOnScreenDebugInfo(OutDebugInfo, RuntimeAnimNode, GetAnimPreviewScene().GetPreviewMeshComponent());
 	}
+}
+
+void FLKAnimVerletEditMode::EnterMode(UAnimGraphNode_Base* InEditorNode, FAnimNode_Base* InRuntimeNode)
+{
+	AnimNode = InEditorNode;
+	RuntimeAnimNode = InRuntimeNode;
+}
+
+void FLKAnimVerletEditMode::ExitMode()
+{
+	AnimNode = nullptr;
+	RuntimeAnimNode = nullptr;
 }
