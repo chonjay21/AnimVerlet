@@ -1,7 +1,6 @@
 # perform LF normalization
 * text eol=lf
+
 # Denote all files that are truly binary and should not be modified.
-*.pdb filter=lfs diff=lfs merge=lfs -text
-*.PDB filter=lfs diff=lfs merge=lfs -text
-*.dll filter=lfs diff=lfs merge=lfs -text
-*.DLL filter=lfs diff=lfs merge=lfs -text
+*.dll binary
+*.pdb binary
