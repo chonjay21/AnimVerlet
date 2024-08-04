@@ -31,15 +31,17 @@ void FLKAnimVerletConstraint_Pin::Update(float DeltaTime)
 ///=========================================================================================================================================
 /// FLKAnimVerletConstraint_Distance
 ///=========================================================================================================================================
-FLKAnimVerletConstraint_Distance::FLKAnimVerletConstraint_Distance(FLKAnimVerletBone* InBoneA, FLKAnimVerletBone* InBoneB, float InStiffness)
+FLKAnimVerletConstraint_Distance::FLKAnimVerletConstraint_Distance(FLKAnimVerletBone* InBoneA, FLKAnimVerletBone* InBoneB, float InStiffness, bool bInStretchEachBone, float InStretchStrength)
 	: BoneA(InBoneA)
 	, BoneB(InBoneB)
+	, bStretchEachBone(bInStretchEachBone)
+	, StretchStrength(InStretchStrength)
 	, Stiffness(InStiffness)
 {
 	verify(BoneA != nullptr);
 	verify(BoneB != nullptr);
 
-	Length = (BoneA->PoseLocation - BoneB->PoseLocation).Size();
+	Length = (BoneB->PoseLocation - BoneA->PoseLocation).Size();
 }
 
 void FLKAnimVerletConstraint_Distance::Update(float DeltaTime)
@@ -48,7 +50,8 @@ void FLKAnimVerletConstraint_Distance::Update(float DeltaTime)
 	verify(BoneB != nullptr);
 
 	/// Update length
-	Length = (BoneA->PoseLocation - BoneB->PoseLocation).Size();
+	FVector PoseDirection = FVector::ZeroVector;
+	(BoneB->PoseLocation - BoneA->PoseLocation).ToDirectionAndLength(OUT PoseDirection, OUT Length);
 
 	/// Calculate the distance
 	FVector Direction = FVector::ZeroVector;
@@ -57,6 +60,9 @@ void FLKAnimVerletConstraint_Distance::Update(float DeltaTime)
 
 	/// Calculate the resting distance
 	const float Diff = ((Length - Distance) / Distance) * Stiffness;
+
+	if (bStretchEachBone)
+		Direction = (Direction + PoseDirection * StretchStrength).GetSafeNormal();
 
 	/// Adjust distance constraint
 	const FVector DiffDir = Direction * Diff * 0.5f;
@@ -68,16 +74,18 @@ void FLKAnimVerletConstraint_Distance::Update(float DeltaTime)
 ///=========================================================================================================================================
 /// FLKAnimVerletConstraint_FixedDistance
 ///=========================================================================================================================================
-FLKAnimVerletConstraint_FixedDistance::FLKAnimVerletConstraint_FixedDistance(FLKAnimVerletBone* InBoneA, FLKAnimVerletBone* InBoneB, bool bInAwayFromEachOther, float InLengthMargin)
+FLKAnimVerletConstraint_FixedDistance::FLKAnimVerletConstraint_FixedDistance(FLKAnimVerletBone* InBoneA, FLKAnimVerletBone* InBoneB, bool bInStretchEachBone, float InStretchStrength, bool bInAwayFromEachOther, float InLengthMargin)
 	: BoneA(InBoneA)
 	, BoneB(InBoneB)
+	, bStretchEachBone(bInStretchEachBone)
 	, bAwayFromEachOther(bInAwayFromEachOther)
+	, StretchStrength(InStretchStrength)
 {
 	verify(BoneA != nullptr);
 	verify(BoneB != nullptr);
 	verify(InLengthMargin >= 0.0f);
 
-	Length = (BoneA->PoseLocation - BoneB->PoseLocation).Size();
+	Length = (BoneB->PoseLocation - BoneA->PoseLocation).Size();
 	LengthMargin = InLengthMargin;
 }
 
@@ -87,12 +95,16 @@ void FLKAnimVerletConstraint_FixedDistance::Update(float DeltaTime)
 	verify(BoneB != nullptr);
 
 	/// Update length
-	Length = (BoneA->PoseLocation - BoneB->PoseLocation).Size();
+	FVector PoseDirection = FVector::ZeroVector;
+	(BoneB->PoseLocation - BoneA->PoseLocation).ToDirectionAndLength(OUT PoseDirection, OUT Length);
 
 	/// Calculate the distance
 	FVector Direction = FVector::ZeroVector;
 	float Distance = 0.0f;
 	(BoneB->Location - BoneA->Location).ToDirectionAndLength(OUT Direction, OUT Distance);
+
+	///if (bStretchEachBone)
+	///	Direction = (Direction + PoseDirection * StretchStrength).GetSafeNormal();
 
 	/// Adjust distance constraint
 	if (Distance > Length + LengthMargin)
@@ -131,12 +143,17 @@ void FLKAnimVerletConstraint_FixedDistance::BackwardUpdate(float DeltaTime)
 	verify(BoneB != nullptr);
 
 	/// Update length
-	Length = (BoneA->PoseLocation - BoneB->PoseLocation).Size();
+	FVector PoseDirection = FVector::ZeroVector;
+	(BoneA->PoseLocation - BoneB->PoseLocation).ToDirectionAndLength(OUT PoseDirection, OUT Length);
+
 
 	/// Calculate the distance
 	FVector Direction = FVector::ZeroVector;
 	float Distance = 0.0f;
 	(BoneA->Location - BoneB->Location).ToDirectionAndLength(OUT Direction, OUT Distance);
+
+	///if (bStretchEachBone)
+	///	Direction = (Direction + PoseDirection * StretchStrength).GetSafeNormal();
 
 	/// Adjust distance constraint
 	if (Distance > Length + LengthMargin)

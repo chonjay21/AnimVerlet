@@ -62,6 +62,8 @@ public:
 	bool bSubDivideBones = false;
 	UPROPERTY(EditAnywhere, Category = "Setup", meta = (EditCondition = "SubDivideBones", EditConditionHides, ClampMin = "0"))
 	uint8 NumSubDividedBone = 1;
+	UPROPERTY(EditAnywhere, Category = "Setup")
+	bool bSkipUpdateOnDedicatedServer = false;
 
 	/** Adds an fake(virtual) bone to the end of the body.(may affect the rotation or collision of the end bone) */
 	UPROPERTY(EditAnywhere, Category = "Setup", meta = (EditCondition = "bLockTipBone == false"))
@@ -118,6 +120,12 @@ public:
 	bool bPreserveSideLength = true;
 	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve", meta = (EditCondition = "bPreserveSideLength", ClampMin = "0.0", ForceUnits = "cm"))
 	float SideLengthMargin = 0.1f;
+	/** Stretch each bone by referencing it`s animation pose */
+	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve")
+	bool bStretchEachBone = false;
+	/** Use a fixed DeltaTime instead of real delta time if > 0. (It can help to obtain a consistent result regardless of the frame rate.) */
+	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve", meta = (EditCondition = "bStretchEachBone", ClampMin = "0.0"))
+	float StretchStrength = 1.0f;
 
 	/** 
 		It is the number of iterations to solve Verlet Integraion. 
@@ -135,6 +143,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = "Solve", meta = (ClampMin = "0.0", ForceUnits = "s"))
 	float MaxDeltaTime = 0.05f;
 
+	/** Calculate forces via real verlet integration */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = "Solve")
+	bool bUseSquaredDeltaTime = false;
 
 	/** Angle to use when constraining using a cone.(Ball - Socket joint constraints) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Constraint", meta = (PinHiddenByDefault, ClampMin = "0.0", ClampMax = "90.0", ForceUnits = "deg"))
@@ -163,6 +174,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Gravity", meta = (PinHiddenByDefault))
 	bool bGravityInWorldSpace = true;
 
+	/** Adjust force to stretch the cloth from it`s parent */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Forces", meta = (PinHiddenByDefault, ForceUnits = "cm/s"))
+	float StretchForce = 0.0f;
+	/** Adjust force to return to the original animation pose(different from below inertia factor) */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Forces", meta = (PinHiddenByDefault, ForceUnits = "cm/s"))
+	float ShapeMemoryForce = 0.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Forces", meta = (PinHiddenByDefault, ForceUnits = "cm/s"))
 	FVector ExternalForce = FVector::ZeroVector;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Forces", meta = (PinHiddenByDefault))

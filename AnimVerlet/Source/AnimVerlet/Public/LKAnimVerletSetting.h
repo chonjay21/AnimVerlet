@@ -27,9 +27,12 @@ public:
 
 struct FLKAnimVerletUpdateParam
 {
+	bool bUseSquaredDeltaTime = false;
 	float Damping = 0.0f;
 	FVector ComponentMoveDiff = FVector::ZeroVector;
 	FQuat ComponentRotDiff = FQuat::Identity;
+	float StretchForce = 0.0f;
+	float ShapeMemoryForce = 0.0f;
 	FVector Gravity = FVector::ZeroVector;
 	FVector ExternalForce = FVector::ZeroVector;
 	FVector RandomWindDir = FVector::ZeroVector;

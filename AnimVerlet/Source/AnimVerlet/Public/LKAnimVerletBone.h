@@ -23,6 +23,7 @@ public:
 	FQuat Rotation = FQuat::Identity;
 	FQuat PrevRotation = FQuat::Identity;
 
+	FVector PoseDirFromParent = FVector::ZeroVector;
 	FVector PoseScale = FVector::ZeroVector;
 
 	FVector MoveDelta = FVector::ZeroVector;
@@ -40,7 +41,7 @@ public:
 public:
 	void InitializeTransform(const FTransform& InitialT);
 	void SetFakeBoneOffset(const FVector& InLocationOffset);
-	void PrepareSimulation(const FTransform& PoseT);
+	void PrepareSimulation(const FTransform& PoseT, const FVector& InPoseDirFromParent);
 	void Update(float DeltaTime, const struct FLKAnimVerletUpdateParam& InParam);
 	void AdjustPoseTransform(float DeltaTime, const FVector& ParentLocation, const FVector& ParentPoseLocation,
 							 float AnimationPoseInertia, float AnimationPoseDeltaInertia, bool bClampAnimationPoseDeltaInertia, float AnimationPoseDeltaInertiaClampMax);

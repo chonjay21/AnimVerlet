@@ -4,6 +4,7 @@
 #include <Animation/AnimInstanceProxy.h>
 #include <Animation/AnimTypes.h>
 #include <DrawDebugHelpers.h>
+#include <Kismet/KismetSystemLibrary.h>
 
 FLKAnimNode_AnimVerlet::FLKAnimNode_AnimVerlet()
 	: FAnimNode_SkeletalControlBase()
@@ -35,6 +36,8 @@ void FLKAnimNode_AnimVerlet::EvaluateSkeletalControl_AnyThread(FComponentSpacePo
 	if (Output.AnimInstanceProxy == nullptr || Output.AnimInstanceProxy->GetSkelMeshComponent() == nullptr)
 		return;
 	if (Output.AnimInstanceProxy->GetSkelMeshComponent()->GetWorld() == nullptr)
+		return;
+	if (bSkipUpdateOnDedicatedServer && UKismetSystemLibrary::IsDedicatedServer(Output.AnimInstanceProxy->GetSkelMeshComponent()))
 		return;
 
 	const FBoneContainer& BoneContainer = Output.Pose.GetPose().GetBoneContainer();
@@ -126,12 +129,12 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 		else
 		{
 			FLKAnimVerletBone& ParentSimulateBone = SimulateBones[CurSimulateBone.ParentVerletBoneIndex];
-			const FLKAnimVerletConstraint_Distance DistanceConstraint(&ParentSimulateBone, &CurSimulateBone, Stiffness);
+			const FLKAnimVerletConstraint_Distance DistanceConstraint(&ParentSimulateBone, &CurSimulateBone, Stiffness, bStretchEachBone, StretchStrength);
 			DistanceConstraints.Emplace(DistanceConstraint);
 
 			if (bPreserveLengthFromParent)
 			{
-				const FLKAnimVerletConstraint_FixedDistance FixedDistanceConstraint(&ParentSimulateBone, &CurSimulateBone, false, LengthFromParentMargin);
+				const FLKAnimVerletConstraint_FixedDistance FixedDistanceConstraint(&ParentSimulateBone, &CurSimulateBone, bStretchEachBone, StretchStrength, false, LengthFromParentMargin);
 				FixedDistanceConstraints.Emplace(FixedDistanceConstraint);
 			}
 
@@ -176,12 +179,12 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 						verify(SimulateBones.IsValidIndex(CurBoneChain[i]));
 						verify(SimulateBones.IsValidIndex(LeftBoneChain[i]));
 
-						const FLKAnimVerletConstraint_Distance DistanceConstraint(&SimulateBones[CurBoneChain[i]], &SimulateBones[LeftBoneChain[i]], Stiffness);
+						const FLKAnimVerletConstraint_Distance DistanceConstraint(&SimulateBones[CurBoneChain[i]], &SimulateBones[LeftBoneChain[i]], Stiffness, bStretchEachBone, StretchStrength);
 						DistanceConstraints.Emplace(DistanceConstraint);
 
 						if (bPreserveSideLength)
 						{
-							const FLKAnimVerletConstraint_FixedDistance FixedDistanceConstraint(&SimulateBones[CurBoneChain[i]], &SimulateBones[LeftBoneChain[i]], false, SideLengthMargin);
+							const FLKAnimVerletConstraint_FixedDistance FixedDistanceConstraint(&SimulateBones[CurBoneChain[i]], &SimulateBones[LeftBoneChain[i]], bStretchEachBone, StretchStrength, false, SideLengthMargin);
 							FixedDistanceConstraints.Emplace(FixedDistanceConstraint);
 						}
 
@@ -189,7 +192,7 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 						{
 							if (i + 1 < CurBoneChain.Num())
 							{
-								const FLKAnimVerletConstraint_Distance LeftDiagonalConstraint(&SimulateBones[CurBoneChain[i + 1]], &SimulateBones[LeftBoneChain[i]], Stiffness);
+								const FLKAnimVerletConstraint_Distance LeftDiagonalConstraint(&SimulateBones[CurBoneChain[i + 1]], &SimulateBones[LeftBoneChain[i]], Stiffness, bStretchEachBone, StretchStrength);
 								DistanceConstraints.Emplace(LeftDiagonalConstraint);
 							}
 						}
@@ -197,7 +200,7 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 						{
 							if (i + 1 < LeftBoneChain.Num())
 							{
-								const FLKAnimVerletConstraint_Distance RightDiagonalConstraint(&SimulateBones[CurBoneChain[i]], &SimulateBones[LeftBoneChain[i + 1]], Stiffness);
+								const FLKAnimVerletConstraint_Distance RightDiagonalConstraint(&SimulateBones[CurBoneChain[i]], &SimulateBones[LeftBoneChain[i + 1]], Stiffness, bStretchEachBone, StretchStrength);
 								DistanceConstraints.Emplace(RightDiagonalConstraint);
 							}
 						}
@@ -215,12 +218,12 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 						verify(SimulateBones.IsValidIndex(CurBoneChain[i]));
 						verify(SimulateBones.IsValidIndex(RightBoneChain[i]));
 
-						const FLKAnimVerletConstraint_Distance DistanceConstraint(&SimulateBones[CurBoneChain[i]], &SimulateBones[RightBoneChain[i]], Stiffness);
+						const FLKAnimVerletConstraint_Distance DistanceConstraint(&SimulateBones[CurBoneChain[i]], &SimulateBones[RightBoneChain[i]], Stiffness, bStretchEachBone, StretchStrength);
 						DistanceConstraints.Emplace(DistanceConstraint);
 
 						if (bPreserveSideLength)
 						{
-							const FLKAnimVerletConstraint_FixedDistance FixedDistanceConstraint(&SimulateBones[CurBoneChain[i]], &SimulateBones[RightBoneChain[i]], false, SideLengthMargin);
+							const FLKAnimVerletConstraint_FixedDistance FixedDistanceConstraint(&SimulateBones[CurBoneChain[i]], &SimulateBones[RightBoneChain[i]], bStretchEachBone, StretchStrength, false, SideLengthMargin);
 							FixedDistanceConstraints.Emplace(FixedDistanceConstraint);
 						}
 
@@ -228,7 +231,7 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 						{
 							if (i + 1 < RightBoneChain.Num())
 							{
-								const FLKAnimVerletConstraint_Distance RightDiagonalConstraint(&SimulateBones[CurBoneChain[i]], &SimulateBones[RightBoneChain[i + 1]], Stiffness);
+								const FLKAnimVerletConstraint_Distance RightDiagonalConstraint(&SimulateBones[CurBoneChain[i]], &SimulateBones[RightBoneChain[i + 1]], Stiffness, bStretchEachBone, StretchStrength);
 								DistanceConstraints.Emplace(RightDiagonalConstraint);
 							}
 						}
@@ -236,7 +239,7 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 						{
 							if (i + 1 < CurBoneChain.Num())
 							{
-								const FLKAnimVerletConstraint_Distance LeftDiagonalConstraint(&SimulateBones[CurBoneChain[i + 1]], &SimulateBones[RightBoneChain[i]], Stiffness);
+								const FLKAnimVerletConstraint_Distance LeftDiagonalConstraint(&SimulateBones[CurBoneChain[i + 1]], &SimulateBones[RightBoneChain[i]], Stiffness, bStretchEachBone, StretchStrength);
 								DistanceConstraints.Emplace(LeftDiagonalConstraint);
 							}
 						}
@@ -461,7 +464,9 @@ void FLKAnimNode_AnimVerlet::PrepareSimulation(FComponentSpacePoseContext& PoseC
 			if (CurSimulateBone.bFakeBone)
 				CurBonePoseT.SetLocation(CurSimulateBone.MakeFakeBonePoseLocation(CurBonePoseT));
 		}
-		CurSimulateBone.PrepareSimulation(CurBonePoseT);
+
+		const FVector PoseDirFromParent = CurSimulateBone.HasParentBone() ? (CurBonePoseT.GetLocation() - SimulateBones[CurSimulateBone.ParentVerletBoneIndex].PoseLocation).GetSafeNormal() : FVector::ZeroVector;
+		CurSimulateBone.PrepareSimulation(CurBonePoseT, PoseDirFromParent);
 	}
 
 	PrepareLocalCollisionConstraints(PoseContext, BoneContainer);
@@ -594,6 +599,9 @@ void FLKAnimNode_AnimVerlet::SimulateVerlet(const UWorld* World, float InDeltaTi
 			VerletUpdateParam.ComponentRotDiff = FQuat(RotDiffAxis, FMath::DegreesToRadians(DiffAngeDegrees * RotationInertiaScale));
 		}
 
+		VerletUpdateParam.bUseSquaredDeltaTime = bUseSquaredDeltaTime;
+		VerletUpdateParam.StretchForce = StretchForce;
+		VerletUpdateParam.ShapeMemoryForce = ShapeMemoryForce;
 		VerletUpdateParam.Gravity = (bGravityInWorldSpace == false || Gravity.IsNearlyZero(KINDA_SMALL_NUMBER)) ? Gravity : ComponentTransform.InverseTransformVector(Gravity);
 		VerletUpdateParam.ExternalForce = (bExternalForceInWorldSpace == false || ExternalForce.IsNearlyZero(KINDA_SMALL_NUMBER)) ? ExternalForce : ComponentTransform.InverseTransformVector(ExternalForce);
 		VerletUpdateParam.RandomWindDir = (bRandomWindDirectionInWorldSpace == false && bUseRandomWind) ? RandomWindDirection : ComponentTransform.InverseTransformVector(RandomWindDirection);
@@ -674,7 +682,7 @@ void FLKAnimNode_AnimVerlet::SimulateVerlet(const UWorld* World, float InDeltaTi
 		for (int32 i = 0; i < PinConstraints.Num(); ++i)
 		{
 			PinConstraints[i].Update(SubStepDeltaTime);
-		}		
+		}
 		for (int32 i = 0; i < FixedDistanceConstraints.Num(); ++i)
 		{
 			FixedDistanceConstraints[i].Update(SubStepDeltaTime);

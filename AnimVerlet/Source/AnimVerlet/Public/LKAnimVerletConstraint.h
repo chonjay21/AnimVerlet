@@ -38,11 +38,13 @@ public:
 	struct FLKAnimVerletBone* BoneA = nullptr;
 	struct FLKAnimVerletBone* BoneB = nullptr;
 
+	bool bStretchEachBone = false;
+	float StretchStrength = 0.0f;
 	float Stiffness = 0.0f;
 	float Length = 0.0f;
 
 public:
-	FLKAnimVerletConstraint_Distance(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, float InStiffness);
+	FLKAnimVerletConstraint_Distance(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, float InStiffness, bool bInStretchEachBone, float InStretchStrength);
 	virtual void Update(float DeltaTime) override;
 };
 ///=========================================================================================================================================
@@ -56,12 +58,14 @@ public:
 	struct FLKAnimVerletBone* BoneA = nullptr;
 	struct FLKAnimVerletBone* BoneB = nullptr;
 
+	bool bStretchEachBone = false;
 	bool bAwayFromEachOther = false;
+	float StretchStrength = 0.0f;
 	float Length = 0.0f;
 	float LengthMargin = 0.0f;
 
 public:
-	FLKAnimVerletConstraint_FixedDistance(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, bool bInAwayFromEachOther, float InLengthMargin = 0.0f);
+	FLKAnimVerletConstraint_FixedDistance(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, bool bInStretchEachBone, float InStretchStrength, bool bInAwayFromEachOther, float InLengthMargin = 0.0f);
 	virtual void Update(float DeltaTime) override;
 	virtual void BackwardUpdate(float DeltaTime) override;
 };

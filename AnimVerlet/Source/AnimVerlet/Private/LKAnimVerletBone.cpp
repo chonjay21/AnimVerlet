@@ -36,7 +36,7 @@ FTransform FLKAnimVerletBone::MakeFakeBonePoseTransform(const FTransform& PoseT)
 	return (PoseT * LocationOffsetT);
 }
 
-void FLKAnimVerletBone::PrepareSimulation(const FTransform& PoseT)
+void FLKAnimVerletBone::PrepareSimulation(const FTransform& PoseT, const FVector& InPoseDirFromParent)
 {
 	MoveDelta = (Location - PrevLocation);
 
@@ -48,6 +48,7 @@ void FLKAnimVerletBone::PrepareSimulation(const FTransform& PoseT)
 	PrevRotation = Rotation;
 	PoseRotation = PoseT.GetRotation();
 
+	PoseDirFromParent = InPoseDirFromParent;
 	PoseScale = PoseT.GetScale3D();
 }
 
@@ -56,27 +57,35 @@ void FLKAnimVerletBone::Update(float DeltaTime, const FLKAnimVerletUpdateParam& 
 	/// VerletIntegration and Damping
 	Location += MoveDelta * InParam.Damping;
 
+	const float CurDeltaTime = InParam.bUseSquaredDeltaTime ? DeltaTime * DeltaTime : DeltaTime;
+
 	/// Component movement
-	Location += InParam.ComponentMoveDiff * DeltaTime;
-	Location += (InParam.ComponentRotDiff.RotateVector(PrevLocation) - PrevLocation) * DeltaTime;
+	Location += InParam.ComponentMoveDiff * CurDeltaTime;
+	Location += (InParam.ComponentRotDiff.RotateVector(PrevLocation) - PrevLocation) * CurDeltaTime;
 
 	/// Gravity
-	Location += InParam.Gravity * DeltaTime;
+	Location += InParam.Gravity * CurDeltaTime;
+
+	/// StretchForce
+	Location += (PoseDirFromParent * InParam.StretchForce) * CurDeltaTime;
 
 	/// ExternalForce
-	Location += InParam.ExternalForce * DeltaTime;
+	Location += InParam.ExternalForce * CurDeltaTime;
 
 	/// RandomWind
 	if (InParam.RandomWindDir.IsNearlyZero(KINDA_SMALL_NUMBER) == false)
-		Location += InParam.RandomWindDir * DeltaTime * FMath::RandRange(InParam.RandomWindSizeMin, InParam.RandomWindSizeMax);
+		Location += InParam.RandomWindDir * FMath::RandRange(InParam.RandomWindSizeMin, InParam.RandomWindSizeMax) * CurDeltaTime;
+
+	/// ShapeMemoryForce
+	Location += ((PoseLocation - Location).GetSafeNormal() * InParam.ShapeMemoryForce) * CurDeltaTime;
 }
 
 void FLKAnimVerletBone::AdjustPoseTransform(float DeltaTime, const FVector& ParentLocation, const FVector& ParentPoseLocation,
 											float AnimationPoseInertia, float AnimationPoseDeltaInertia, bool bClampAnimationPoseDeltaInertia, float AnimationPoseDeltaInertiaClampMax)
 {
 	/// To Pose
-	const FVector PoseDirFromParent = PoseLocation - ParentPoseLocation;
-	Location += (ParentLocation + PoseDirFromParent - Location) * AnimationPoseInertia;
+	const FVector CurPoseVecFromParent = PoseLocation - ParentPoseLocation;
+	Location += (ParentLocation + CurPoseVecFromParent - Location) * AnimationPoseInertia;
 
 	/// Pose delta from last frame
 	const FVector PoseDiff = PoseLocation - PrevPoseLocation;
