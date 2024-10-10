@@ -34,8 +34,9 @@ The UnrealEngine versions supported by this plugin are:
 
 | Engine | Version |
 | :----: | --- |
-| UE4 | 4.27 or later  |
-| UE5 | 5.4.3 or later |
+| UE4 | 4.27 or later (v.220628)  |
+| UE5 | 5.0.2 ~ 5.2.1 (v.220628) |
+| UE5 | 5.3.0 ~ 5.4.3 or later (latest) |
 
 <br />
 
