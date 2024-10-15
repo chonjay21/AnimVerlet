@@ -31,17 +31,23 @@ void FLKAnimVerletConstraint_Pin::Update(float DeltaTime)
 ///=========================================================================================================================================
 /// FLKAnimVerletConstraint_Distance
 ///=========================================================================================================================================
-FLKAnimVerletConstraint_Distance::FLKAnimVerletConstraint_Distance(FLKAnimVerletBone* InBoneA, FLKAnimVerletBone* InBoneB, float InStiffness, bool bInStretchEachBone, float InStretchStrength)
+FLKAnimVerletConstraint_Distance::FLKAnimVerletConstraint_Distance(FLKAnimVerletBone* InBoneA, FLKAnimVerletBone* InBoneB, bool bInUseXPBDSolver, double InStiffness, bool bInStretchEachBone, float InStretchStrength)
 	: BoneA(InBoneA)
 	, BoneB(InBoneB)
 	, bStretchEachBone(bInStretchEachBone)
 	, StretchStrength(InStretchStrength)
-	, Stiffness(InStiffness)
 {
 	verify(BoneA != nullptr);
 	verify(BoneB != nullptr);
 
 	Length = (BoneB->PoseLocation - BoneA->PoseLocation).Size();
+	Lambda = 0.0f;
+
+	bUseXPBDSolver = bInUseXPBDSolver;
+	if (bUseXPBDSolver)
+		Compliance = InStiffness;
+	else
+		Stiffness = static_cast<float>(InStiffness);
 }
 
 void FLKAnimVerletConstraint_Distance::Update(float DeltaTime)
@@ -58,16 +64,46 @@ void FLKAnimVerletConstraint_Distance::Update(float DeltaTime)
 	float Distance = 0.0f;
 	(BoneB->Location - BoneA->Location).ToDirectionAndLength(OUT Direction, OUT Distance);
 
-	/// Calculate the resting distance
-	const float Diff = ((Length - Distance) / Distance) * Stiffness;
+	/// XPBD
+	if (bUseXPBDSolver)
+	{
+		const float C = Distance - Length;
+		const double Alpha = Compliance / (DeltaTime * DeltaTime);
+		const double DeltaLambda = -(C + Alpha * Lambda) / (BoneA->InvMass + BoneB->InvMass + Alpha);
+		Lambda += DeltaLambda;
 
-	if (bStretchEachBone)
-		Direction = (Direction + PoseDirection * StretchStrength).GetSafeNormal();
+		if (bStretchEachBone)
+			Direction = (Direction + PoseDirection * StretchStrength).GetSafeNormal();
 
-	/// Adjust distance constraint
-	const FVector DiffDir = Direction * Diff * 0.5f;
-	BoneA->Location -= DiffDir;
-	BoneB->Location += DiffDir;
+		/// Adjust distance constraint
+		const FVector DiffDir = (Direction * DeltaLambda);
+		BoneA->Location -= (DiffDir * BoneA->InvMass);
+		BoneB->Location += (DiffDir * BoneB->InvMass);
+	}
+	/// PBD
+	else
+	{
+		/// Calculate the resting distance
+		const float Diff = ((Length - Distance) / Distance) * Stiffness;
+		
+		if (bStretchEachBone)
+			Direction = (Direction + PoseDirection * StretchStrength).GetSafeNormal();
+		
+		/// Adjust distance constraint
+		const FVector DiffDir = Direction * Diff * 0.5f;
+		BoneA->Location -= (DiffDir * BoneA->InvMass);
+		BoneB->Location += (DiffDir * BoneB->InvMass);
+	}
+}
+
+void FLKAnimVerletConstraint_Distance::PostUpdate(float DeltaTime)
+{
+	Lambda = 0.0f;
+}
+
+void FLKAnimVerletConstraint_Distance::ResetSimulation()
+{
+	Lambda = 0.0f;
 }
 ///=========================================================================================================================================
 

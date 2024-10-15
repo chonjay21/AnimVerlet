@@ -118,6 +118,7 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 	}
 
 	/// Create constraints
+	const double Compliance = static_cast<double>(1.0 / InvCompliance);
 	for (int32 i = 0; i < SimulateBones.Num(); ++i)
 	{
 		FLKAnimVerletBone& CurSimulateBone = SimulateBones[i];
@@ -129,7 +130,7 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 		else
 		{
 			FLKAnimVerletBone& ParentSimulateBone = SimulateBones[CurSimulateBone.ParentVerletBoneIndex];
-			const FLKAnimVerletConstraint_Distance DistanceConstraint(&ParentSimulateBone, &CurSimulateBone, Stiffness, bStretchEachBone, StretchStrength);
+			const FLKAnimVerletConstraint_Distance DistanceConstraint(&ParentSimulateBone, &CurSimulateBone, bUseXPBDSolver, (bUseXPBDSolver ? Compliance : static_cast<double>(Stiffness)), bStretchEachBone, StretchStrength);
 			DistanceConstraints.Emplace(DistanceConstraint);
 
 			if (bPreserveLengthFromParent)
@@ -179,7 +180,7 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 						verify(SimulateBones.IsValidIndex(CurBoneChain[i]));
 						verify(SimulateBones.IsValidIndex(LeftBoneChain[i]));
 
-						const FLKAnimVerletConstraint_Distance DistanceConstraint(&SimulateBones[CurBoneChain[i]], &SimulateBones[LeftBoneChain[i]], Stiffness, bStretchEachBone, StretchStrength);
+						const FLKAnimVerletConstraint_Distance DistanceConstraint(&SimulateBones[CurBoneChain[i]], &SimulateBones[LeftBoneChain[i]], bUseXPBDSolver, (bUseXPBDSolver ? Compliance : static_cast<double>(Stiffness)), bStretchEachBone, StretchStrength);
 						DistanceConstraints.Emplace(DistanceConstraint);
 
 						if (bPreserveSideLength)
@@ -192,7 +193,7 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 						{
 							if (i + 1 < CurBoneChain.Num())
 							{
-								const FLKAnimVerletConstraint_Distance LeftDiagonalConstraint(&SimulateBones[CurBoneChain[i + 1]], &SimulateBones[LeftBoneChain[i]], Stiffness, bStretchEachBone, StretchStrength);
+								const FLKAnimVerletConstraint_Distance LeftDiagonalConstraint(&SimulateBones[CurBoneChain[i + 1]], &SimulateBones[LeftBoneChain[i]], bUseXPBDSolver, (bUseXPBDSolver ? Compliance : static_cast<double>(Stiffness)), bStretchEachBone, StretchStrength);
 								DistanceConstraints.Emplace(LeftDiagonalConstraint);
 							}
 						}
@@ -200,7 +201,7 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 						{
 							if (i + 1 < LeftBoneChain.Num())
 							{
-								const FLKAnimVerletConstraint_Distance RightDiagonalConstraint(&SimulateBones[CurBoneChain[i]], &SimulateBones[LeftBoneChain[i + 1]], Stiffness, bStretchEachBone, StretchStrength);
+								const FLKAnimVerletConstraint_Distance RightDiagonalConstraint(&SimulateBones[CurBoneChain[i]], &SimulateBones[LeftBoneChain[i + 1]], bUseXPBDSolver, (bUseXPBDSolver ? Compliance : static_cast<double>(Stiffness)), bStretchEachBone, StretchStrength);
 								DistanceConstraints.Emplace(RightDiagonalConstraint);
 							}
 						}
@@ -218,7 +219,7 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 						verify(SimulateBones.IsValidIndex(CurBoneChain[i]));
 						verify(SimulateBones.IsValidIndex(RightBoneChain[i]));
 
-						const FLKAnimVerletConstraint_Distance DistanceConstraint(&SimulateBones[CurBoneChain[i]], &SimulateBones[RightBoneChain[i]], Stiffness, bStretchEachBone, StretchStrength);
+						const FLKAnimVerletConstraint_Distance DistanceConstraint(&SimulateBones[CurBoneChain[i]], &SimulateBones[RightBoneChain[i]], bUseXPBDSolver, (bUseXPBDSolver ? Compliance : static_cast<double>(Stiffness)), bStretchEachBone, StretchStrength);
 						DistanceConstraints.Emplace(DistanceConstraint);
 
 						if (bPreserveSideLength)
@@ -231,7 +232,7 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 						{
 							if (i + 1 < RightBoneChain.Num())
 							{
-								const FLKAnimVerletConstraint_Distance RightDiagonalConstraint(&SimulateBones[CurBoneChain[i]], &SimulateBones[RightBoneChain[i + 1]], Stiffness, bStretchEachBone, StretchStrength);
+								const FLKAnimVerletConstraint_Distance RightDiagonalConstraint(&SimulateBones[CurBoneChain[i]], &SimulateBones[RightBoneChain[i + 1]], bUseXPBDSolver, (bUseXPBDSolver ? Compliance : static_cast<double>(Stiffness)), bStretchEachBone, StretchStrength);
 								DistanceConstraints.Emplace(RightDiagonalConstraint);
 							}
 						}
@@ -239,7 +240,7 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 						{
 							if (i + 1 < CurBoneChain.Num())
 							{
-								const FLKAnimVerletConstraint_Distance LeftDiagonalConstraint(&SimulateBones[CurBoneChain[i + 1]], &SimulateBones[RightBoneChain[i]], Stiffness, bStretchEachBone, StretchStrength);
+								const FLKAnimVerletConstraint_Distance LeftDiagonalConstraint(&SimulateBones[CurBoneChain[i + 1]], &SimulateBones[RightBoneChain[i]], bUseXPBDSolver, (bUseXPBDSolver ? Compliance : static_cast<double>(Stiffness)), bStretchEachBone, StretchStrength);
 								DistanceConstraints.Emplace(LeftDiagonalConstraint);
 							}
 						}
@@ -343,6 +344,8 @@ bool FLKAnimNode_AnimVerlet::MakeSimulateBones(FComponentSpacePoseContext& PoseC
 
 		FTransform ReferenceBonePoseT = PoseContext.Pose.GetComponentSpaceTransform(NewSimulateBone.BoneReference.CachedCompactPoseIndex);
 		NewSimulateBone.bFakeBone = BoneSetting.bFakeBone;
+		NewSimulateBone.bUseXPBDSolver = bUseXPBDSolver;
+		NewSimulateBone.InvMass = FMath::IsNearlyZero(BoneSetting.Mass, KINDA_SMALL_NUMBER) ? 1.0f : 1.0f / BoneSetting.Mass;
 		if (NewSimulateBone.bFakeBone)
 		{
 			NewSimulateBone.SetFakeBoneOffset(BoneSetting.FakeBoneOffsetDir.GetSafeNormal() * BoneSetting.FakeBoneOffsetSize);
@@ -640,76 +643,8 @@ void FLKAnimNode_AnimVerlet::SimulateVerlet(const UWorld* World, float InDeltaTi
 		}
 	}
 
-	const float SubStepDeltaTime = InDeltaTime / SolveIteration;
-	for (int32 Iteration = 0; Iteration < SolveIteration; ++Iteration)
-	{
-		/// Simulate each constraints
-		/// Solve order is important. Make a heuristic order by constraint priority.
-		/*for (int32 i = 0; i < Constraints.Num(); ++i)
-		{
-			verify(Constraints[i] != nullptr);
-			Constraints[i]->Update(SubStepDeltaTime);
-		}*/
-		for (int32 i = 0; i < DistanceConstraints.Num(); ++i)
-		{
-			DistanceConstraints[i].Update(SubStepDeltaTime);
-		}
-		for (int32 i = 0; i < BallSocketConstraints.Num(); ++i)
-		{
-			BallSocketConstraints[i].Update(SubStepDeltaTime);
-		}
-		for (int32 i = 0; i < SphereCollisionConstraints.Num(); ++i)
-		{
-			SphereCollisionConstraints[i].Update(SubStepDeltaTime);
-		}
-		for (int32 i = 0; i < CapsuleCollisionConstraints.Num(); ++i)
-		{
-			CapsuleCollisionConstraints[i].Update(SubStepDeltaTime);
-		}
-		for (int32 i = 0; i < BoxCollisionConstraints.Num(); ++i)
-		{
-			BoxCollisionConstraints[i].Update(SubStepDeltaTime);
-		}
-		for (int32 i = 0; i < PlaneCollisionConstraints.Num(); ++i)
-		{
-			PlaneCollisionConstraints[i].Update(SubStepDeltaTime);
-		}
-		for (int32 i = 0; i < WorldCollisionConstraints.Num(); ++i)
-		{
-			WorldCollisionConstraints[i].Update(SubStepDeltaTime);
-		}
-
-		for (int32 i = 0; i < PinConstraints.Num(); ++i)
-		{
-			PinConstraints[i].Update(SubStepDeltaTime);
-		}
-		for (int32 i = 0; i < FixedDistanceConstraints.Num(); ++i)
-		{
-			FixedDistanceConstraints[i].Update(SubStepDeltaTime);
-		}
-
-		if (bLockTipBone)
-		{
-			/// Backward Update
-			for (int32 i = PinConstraints.Num() - 1; i >= 0; --i)
-			{
-				PinConstraints[i].BackwardUpdate(SubStepDeltaTime);
-			}
-			for (int32 i = FixedDistanceConstraints.Num() - 1; i >= 0; --i)
-			{
-				FixedDistanceConstraints[i].BackwardUpdate(SubStepDeltaTime);
-			}
-
-			for (int32 i = 0; i < PinConstraints.Num(); ++i)
-			{
-				PinConstraints[i].Update(SubStepDeltaTime);
-			}
-			for (int32 i = 0; i < FixedDistanceConstraints.Num(); ++i)
-			{
-				FixedDistanceConstraints[i].Update(SubStepDeltaTime);
-			}
-		}
-	}
+	/// Solve
+	SolveConstraints(InDeltaTime);
 
 	/// Calculate rotations and fix length
 	for (int32 i = SimulateBones.Num() - 1; i >= 0; --i)
@@ -737,6 +672,127 @@ void FLKAnimNode_AnimVerlet::SimulateVerlet(const UWorld* World, float InDeltaTi
 		ParentVerletBone.Rotation = DeltaRotation * ParentVerletBone.PoseRotation;
 		ParentVerletBone.Rotation.Normalize();
 	}
+}
+
+void FLKAnimNode_AnimVerlet::SolveConstraints(float InDeltaTime)
+{
+	/// Solve Constraints
+	///const float SubStepDeltaTime = InDeltaTime / SolveIteration;
+	const float SubStepDeltaTime = InDeltaTime;
+	for (int32 Iteration = 0; Iteration < SolveIteration; ++Iteration)
+	{
+		/// Simulate each constraints
+		/// Solve order is important. Make a heuristic order by constraint priority.
+		/*for (int32 i = 0; i < Constraints.Num(); ++i)
+		{
+			verify(Constraints[i] != nullptr);
+			Constraints[i]->Update(SubStepDeltaTime);
+		}*/
+		for (int32 i = 0; i < PinConstraints.Num(); ++i)
+		{
+			PinConstraints[i].Update(SubStepDeltaTime);
+		}
+		for (int32 i = 0; i < DistanceConstraints.Num(); ++i)
+		{
+			DistanceConstraints[i].Update(SubStepDeltaTime);
+		}
+		for (int32 i = 0; i < BallSocketConstraints.Num(); ++i)
+		{
+			BallSocketConstraints[i].Update(SubStepDeltaTime);
+		}
+		for (int32 i = 0; i < SphereCollisionConstraints.Num(); ++i)
+		{
+			SphereCollisionConstraints[i].Update(SubStepDeltaTime);
+		}
+		for (int32 i = 0; i < CapsuleCollisionConstraints.Num(); ++i)
+		{
+			CapsuleCollisionConstraints[i].Update(SubStepDeltaTime);
+		}
+		for (int32 i = 0; i < BoxCollisionConstraints.Num(); ++i)
+		{
+			BoxCollisionConstraints[i].Update(SubStepDeltaTime);
+		}
+		for (int32 i = 0; i < PlaneCollisionConstraints.Num(); ++i)
+		{
+			PlaneCollisionConstraints[i].Update(SubStepDeltaTime);
+		}
+		/*for (int32 i = 0; i < WorldCollisionConstraints.Num(); ++i)
+		{
+			WorldCollisionConstraints[i].Update(SubStepDeltaTime);
+		}*/
+
+		/*for (int32 i = 0; i < PinConstraints.Num(); ++i)
+		{
+			PinConstraints[i].Update(SubStepDeltaTime);
+		}
+		for (int32 i = 0; i < FixedDistanceConstraints.Num(); ++i)
+		{
+			FixedDistanceConstraints[i].Update(SubStepDeltaTime);
+		}*/
+
+		/*if (bLockTipBone)
+		{
+			/// Backward Update
+			for (int32 i = PinConstraints.Num() - 1; i >= 0; --i)
+			{
+				PinConstraints[i].BackwardUpdate(SubStepDeltaTime);
+			}
+			for (int32 i = FixedDistanceConstraints.Num() - 1; i >= 0; --i)
+			{
+				FixedDistanceConstraints[i].BackwardUpdate(SubStepDeltaTime);
+			}
+
+			for (int32 i = 0; i < PinConstraints.Num(); ++i)
+			{
+				PinConstraints[i].Update(SubStepDeltaTime);
+			}
+			for (int32 i = 0; i < FixedDistanceConstraints.Num(); ++i)
+			{
+				FixedDistanceConstraints[i].Update(SubStepDeltaTime);
+			}
+		}*/
+	}
+
+	/// Finalize special constraints
+	for (int32 i = 0; i < WorldCollisionConstraints.Num(); ++i)
+	{
+		WorldCollisionConstraints[i].Update(InDeltaTime);
+	}
+	for (int32 i = 0; i < PinConstraints.Num(); ++i)
+	{
+		PinConstraints[i].Update(InDeltaTime);
+	}
+	for (int32 i = 0; i < FixedDistanceConstraints.Num(); ++i)
+	{
+		FixedDistanceConstraints[i].Update(InDeltaTime);
+	}
+
+	if (bLockTipBone)
+	{
+		/// Backward Update
+		for (int32 i = PinConstraints.Num() - 1; i >= 0; --i)
+		{
+			PinConstraints[i].BackwardUpdate(InDeltaTime);
+		}
+		for (int32 i = FixedDistanceConstraints.Num() - 1; i >= 0; --i)
+		{
+			FixedDistanceConstraints[i].BackwardUpdate(InDeltaTime);
+		}
+
+		for (int32 i = 0; i < PinConstraints.Num(); ++i)
+		{
+			PinConstraints[i].Update(InDeltaTime);
+		}
+		for (int32 i = 0; i < FixedDistanceConstraints.Num(); ++i)
+		{
+			FixedDistanceConstraints[i].Update(InDeltaTime);
+		}
+	}
+
+	/// PostUpdate each bones
+	ForEachConstraints([InDeltaTime](FLKAnimVerletConstraint& CurConstraint) {
+		CurConstraint.PostUpdate(InDeltaTime);
+	});
 }
 
 void FLKAnimNode_AnimVerlet::ApplyResult(OUT TArray<FBoneTransform>& OutBoneTransforms, const FBoneContainer& BoneContainer)
@@ -784,5 +840,50 @@ void FLKAnimNode_AnimVerlet::ResetSimulation()
 	{
 		FLKAnimVerletBone& CurVerletBone = SimulateBones[i];
 		CurVerletBone.ResetSimulation();
+	}
+
+	ForEachConstraints([](FLKAnimVerletConstraint& CurConstraint) {
+		CurConstraint.ResetSimulation();
+	});
+}
+
+template <typename Predicate>
+void FLKAnimNode_AnimVerlet::ForEachConstraints(Predicate Pred)
+{
+	for (FLKAnimVerletConstraint_Pin& CurConstraint : PinConstraints)
+	{
+		Pred(CurConstraint);
+	}
+	for (FLKAnimVerletConstraint_Distance& CurConstraint : DistanceConstraints)
+	{
+		Pred(CurConstraint);
+	}
+	for (FLKAnimVerletConstraint_FixedDistance& CurConstraint : FixedDistanceConstraints)
+	{
+		Pred(CurConstraint);
+	}
+	for (FLKAnimVerletConstraint_BallSocket& CurConstraint : BallSocketConstraints)
+	{
+		Pred(CurConstraint);
+	}
+	for (FLKAnimVerletConstraint_Sphere& CurConstraint : SphereCollisionConstraints)
+	{
+		Pred(CurConstraint);
+	}
+	for (FLKAnimVerletConstraint_Capsule& CurConstraint : CapsuleCollisionConstraints)
+	{
+		Pred(CurConstraint);
+	}
+	for (FLKAnimVerletConstraint_Box& CurConstraint : BoxCollisionConstraints)
+	{
+		Pred(CurConstraint);
+	}
+	for (FLKAnimVerletConstraint_Plane& CurConstraint : PlaneCollisionConstraints)
+	{
+		Pred(CurConstraint);
+	}
+	for (FLKAnimVerletConstraint_World& CurConstraint : WorldCollisionConstraints)
+	{
+		Pred(CurConstraint);
 	}
 }

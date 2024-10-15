@@ -23,6 +23,9 @@ public:
 
 	UPROPERTY(EditAnywhere, Category = "BoneChain", meta = (EditCondition = "bFakeBone", EditConditionHides, ClampMin = "0.1", ForceUnits = "cm"))
 	float FakeBoneOffsetSize = 3.0f;
+
+	UPROPERTY(EditAnywhere, Category = "BoneChain", meta = (ClampMin = "0.01"))
+	float Mass = 1.0f;
 };
 
 struct FLKAnimVerletUpdateParam

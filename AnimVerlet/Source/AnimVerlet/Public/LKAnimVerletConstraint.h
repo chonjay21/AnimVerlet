@@ -13,6 +13,8 @@ public:
 	virtual ~FLKAnimVerletConstraint() {}
 	virtual void Update(float DeltaTime) = 0;
 	virtual void BackwardUpdate(float DeltaTime) { Update(DeltaTime); }
+	virtual void PostUpdate(float DeltaTime) = 0;
+	virtual void ResetSimulation() = 0;
 };
 
 ///=========================================================================================================================================
@@ -27,6 +29,8 @@ public:
 public:
 	FLKAnimVerletConstraint_Pin(struct FLKAnimVerletBone* InBone, float InPinMargin = 0.0f) : Bone(InBone), PinMargin(InPinMargin) { verify(Bone != nullptr); }
 	virtual void Update(float DeltaTime) override;
+	virtual void PostUpdate(float DeltaTime) override {}
+	virtual void ResetSimulation() override {}
 };
 
 ///=========================================================================================================================================
@@ -38,14 +42,19 @@ public:
 	struct FLKAnimVerletBone* BoneA = nullptr;
 	struct FLKAnimVerletBone* BoneB = nullptr;
 
+	bool bUseXPBDSolver = false;
 	bool bStretchEachBone = false;
 	float StretchStrength = 0.0f;
 	float Stiffness = 0.0f;
 	float Length = 0.0f;
+	double Lambda = 0.0;		///for XPBD
+	double Compliance = 0.0;	///for XPBD
 
 public:
-	FLKAnimVerletConstraint_Distance(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, float InStiffness, bool bInStretchEachBone, float InStretchStrength);
+	FLKAnimVerletConstraint_Distance(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, bool bInUseXPBDSolver, double InStiffness, bool bInStretchEachBone, float InStretchStrength);
 	virtual void Update(float DeltaTime) override;
+	virtual void PostUpdate(float DeltaTime) override;
+	virtual void ResetSimulation() override;
 };
 ///=========================================================================================================================================
 
@@ -68,6 +77,8 @@ public:
 	FLKAnimVerletConstraint_FixedDistance(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, bool bInStretchEachBone, float InStretchStrength, bool bInAwayFromEachOther, float InLengthMargin = 0.0f);
 	virtual void Update(float DeltaTime) override;
 	virtual void BackwardUpdate(float DeltaTime) override;
+	virtual void PostUpdate(float DeltaTime) override {}
+	virtual void ResetSimulation() override {}
 };
 ///=========================================================================================================================================
 
@@ -85,6 +96,8 @@ public:
 public:
 	FLKAnimVerletConstraint_BallSocket(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, float InAngleDegrees);
 	virtual void Update(float DeltaTime) override;
+	virtual void PostUpdate(float DeltaTime) override {}
+	virtual void ResetSimulation() override {}
 };
 ///=========================================================================================================================================
 
@@ -106,6 +119,8 @@ public:
 	FLKAnimVerletConstraint_Sphere(const FVector& InLocation, float InRadius, float InThickness,
 								   TArray<FLKAnimVerletBone>* InBones, const TExcludeBoneBits& InExcludeBones);
 	virtual void Update(float DeltaTime) override;
+	virtual void PostUpdate(float DeltaTime) override {}
+	virtual void ResetSimulation() override {}
 };
 ///=========================================================================================================================================
 
@@ -128,6 +143,8 @@ public:
 	FLKAnimVerletConstraint_Capsule(const FVector& InLocation, const FQuat& InRot, float InRadius, float InHalfHeight, float InThickness, 
 									TArray<FLKAnimVerletBone>* InBones, const TExcludeBoneBits& InExcludeBones);
 	virtual void Update(float DeltaTime) override;
+	virtual void PostUpdate(float DeltaTime) override {}
+	virtual void ResetSimulation() override {}
 };
 ///=========================================================================================================================================
 
@@ -149,6 +166,8 @@ public:
 	FLKAnimVerletConstraint_Box(const FVector& InLocation, const FQuat& InRot, const FVector& InHalfExtents, float InThickness, 
 								TArray<FLKAnimVerletBone>* InBones, const TExcludeBoneBits& InExcludeBones);
 	virtual void Update(float DeltaTime) override;
+	virtual void PostUpdate(float DeltaTime) override {}
+	virtual void ResetSimulation() override {}
 };
 ///=========================================================================================================================================
 
@@ -171,6 +190,8 @@ public:
 	FLKAnimVerletConstraint_Plane(const FVector& InPlaneBase, const FVector& InPlaneNormal, const FQuat& InRotation, const FVector2D& InPlaneHalfExtents, 
 								  float InThickness, TArray<FLKAnimVerletBone>* InBones, const TExcludeBoneBits& InExcludeBones);
 	virtual void Update(float DeltaTime) override;
+	virtual void PostUpdate(float DeltaTime) override {}
+	virtual void ResetSimulation() override {}
 };
 ///=========================================================================================================================================
 
@@ -192,5 +213,7 @@ public:
 	FLKAnimVerletConstraint_World(const class UWorld* InWorld, class UPrimitiveComponent* InSelfComponent, const FName& InCollisionProfileName,
 								  float InThickness, TArray<FLKAnimVerletBone>* InBones, const TExcludeBoneBits& InExcludeBones);
 	virtual void Update(float DeltaTime) override;
+	virtual void PostUpdate(float DeltaTime) override {}
+	virtual void ResetSimulation() override {}
 };
 ///=========================================================================================================================================

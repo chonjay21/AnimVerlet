@@ -38,9 +38,13 @@ private:
 	void PrepareSimulation(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer);
 	void PrepareLocalCollisionConstraints(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer);
 	void SimulateVerlet(const UWorld* World, float InDeltaTime, const FTransform& ComponentTransform, const FTransform& PrevComponentTransform);
+	void SolveConstraints(float InDeltaTime);
 	void ApplyResult(OUT TArray<FBoneTransform>& OutBoneTransforms, const FBoneContainer& BoneContainer);
 	void ClearSimulateBones();
 	void ResetSimulation();
+
+	template <typename Predicate>
+	void ForEachConstraints(Predicate Pred);
 
 public:
 	const TArray<FLKAnimVerletBone>& GetSimulateBones() const { return SimulateBones; }
@@ -100,8 +104,14 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Solve", meta = (ClampMin = "0.0", ClampMax = "1.0"))
 	float Damping = 0.9f;
 
+	/** Use XPBD(Extended Position Based Dynamics) or PBD(Position Based Dynamics) solving constraints */
+	UPROPERTY(EditAnywhere, Category = "Solve")
+	bool bUseXPBDSolver = false;
+	/** Compliance is the inverse of physical stiffness when use XPBD(Extended Position Based Dynamics). Unlike stiffness in PBD, compliance in XPBD has a direct correspondence to engineering stiffness, i.e.: Young's modulus. Most real-world materials have a Young's modulus of several GPa, and because compliance is simply inverse stiffness it must be correspondingly small. (Leather = 1.0 x 10^-8) */
+	UPROPERTY(EditAnywhere, Category = "Solve", meta = (EditCondition = "bUseXPBDSolver", ClampMin = "0.0"))
+	uint32 InvCompliance = 100000000;
 	/** Stiffness applied to bone to bone distance when calculating verlet integration. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Solve", meta = (ClampMin = "0.0"))
+	UPROPERTY(EditAnywhere, Category = "Solve", meta = (EditCondition = "bUseXPBDSolver == false", ClampMin = "0.0"))
 	float Stiffness = 0.8f;
 
 	/** Adjust distance constraint to diagonal directions. (This is helpful when using the bIgnoreAnimationPose option) */
@@ -123,7 +133,6 @@ public:
 	/** Stretch each bone by referencing it`s animation pose */
 	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve")
 	bool bStretchEachBone = false;
-	/** Use a fixed DeltaTime instead of real delta time if > 0. (It can help to obtain a consistent result regardless of the frame rate.) */
 	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve", meta = (EditCondition = "bStretchEachBone", ClampMin = "0.0"))
 	float StretchStrength = 1.0f;
 
@@ -133,7 +142,7 @@ public:
 		SolveIteration of 1 can be fine thanks to the bPreserveLengthFromParent and bPreserveSideLength options.
 	*/
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = "Solve", meta = (ClampMin = "1"))
-	int32 SolveIteration = 1;
+	int32 SolveIteration = 4;
 
 	/** Use a fixed DeltaTime instead of real delta time if > 0. (It can help to obtain a consistent result regardless of the frame rate.) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = "Solve", meta = (ClampMin = "0.0", ForceUnits = "s"))

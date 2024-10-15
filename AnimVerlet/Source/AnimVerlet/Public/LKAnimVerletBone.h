@@ -11,6 +11,8 @@ public:
 	int32 ParentVerletBoneIndex = INDEX_NONE;
 	bool bTipBone = false;
 	bool bFakeBone = false;
+	bool bUseXPBDSolver = false;
+	float InvMass = 1.0f;
 	FVector FakeBoneLocationOffset = FVector::ZeroVector;
 
 	FVector PrevPoseLocation = FVector::ZeroVector;
@@ -27,6 +29,7 @@ public:
 	FVector PoseScale = FVector::ZeroVector;
 
 	FVector MoveDelta = FVector::ZeroVector;
+	FVector Velocity = FVector::ZeroVector;		///for XPBD
 
 public:
 	bool IsFakeBone() const { return bFakeBone; }
@@ -43,6 +46,7 @@ public:
 	void SetFakeBoneOffset(const FVector& InLocationOffset);
 	void PrepareSimulation(const FTransform& PoseT, const FVector& InPoseDirFromParent);
 	void Update(float DeltaTime, const struct FLKAnimVerletUpdateParam& InParam);
+	void PostUpdate(float DeltaTime);
 	void AdjustPoseTransform(float DeltaTime, const FVector& ParentLocation, const FVector& ParentPoseLocation,
 							 float AnimationPoseInertia, float AnimationPoseDeltaInertia, bool bClampAnimationPoseDeltaInertia, float AnimationPoseDeltaInertiaClampMax);
 	void ResetSimulation();
