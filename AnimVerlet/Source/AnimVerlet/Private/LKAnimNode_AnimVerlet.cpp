@@ -31,8 +31,6 @@ void FLKAnimNode_AnimVerlet::ResetDynamics(ETeleportType InTeleportType)
 void FLKAnimNode_AnimVerlet::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseContext& Output, TArray<FBoneTransform>& OutBoneTransforms)
 {
 	/// Validity check
-	if (DeltaTime <= 0.0f)
-		return;
 	if (Output.AnimInstanceProxy == nullptr || Output.AnimInstanceProxy->GetSkelMeshComponent() == nullptr)
 		return;
 	if (Output.AnimInstanceProxy->GetSkelMeshComponent()->GetWorld() == nullptr)
@@ -60,9 +58,12 @@ void FLKAnimNode_AnimVerlet::EvaluateSkeletalControl_AnyThread(FComponentSpacePo
 	PrepareSimulation(Output, BoneContainer);
 
 	/// Simulate verlet integration
-	const USkeletalMeshComponent* SkeletalMeshComponent = Output.AnimInstanceProxy->GetSkelMeshComponent();
-	const UWorld* World = SkeletalMeshComponent->GetWorld();
-	SimulateVerlet(World, DeltaTime, CurComponentT, PrevComponentT);
+	if (DeltaTime > 0.0f)
+	{
+		const USkeletalMeshComponent* SkeletalMeshComponent = Output.AnimInstanceProxy->GetSkelMeshComponent();
+		const UWorld* World = SkeletalMeshComponent->GetWorld();
+		SimulateVerlet(World, DeltaTime, CurComponentT, PrevComponentT);
+	}
 
 	/// Apply simulation to bone
 	ApplyResult(OutBoneTransforms, BoneContainer);
@@ -99,7 +100,7 @@ void FLKAnimNode_AnimVerlet::UpdateInternal(const FAnimationUpdateContext& Conte
 {
 	FAnimNode_SkeletalControlBase::UpdateInternal(Context);
 
-	DeltaTime = FMath::IsNearlyZero(FixedDeltaTime, KINDA_SMALL_NUMBER) ? FMath::Clamp(Context.GetDeltaTime(), 0.0f, MaxDeltaTime) : FixedDeltaTime;
+	DeltaTime = FMath::IsNearlyZero(FixedDeltaTime, KINDA_SMALL_NUMBER) ? FMath::Clamp(Context.GetDeltaTime(), 0.0f, MaxDeltaTime) : (Context.AnimInstanceProxy != nullptr ? FixedDeltaTime * Context.AnimInstanceProxy->GetTimeDilation() : FixedDeltaTime);
 }
 
 void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer)
@@ -153,6 +154,16 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 					PinConstraints.Emplace(PinConstraint);
 				}
 			}
+
+			if (bStraightenBendedBone)
+			{
+				if (ParentSimulateBone.HasParentBone())
+				{
+					FLKAnimVerletBone& GrandParentSimulateBone = SimulateBones[ParentSimulateBone.ParentVerletBoneIndex];
+					const FLKAnimVerletConstraint_Straighten StraightenConstraint(&GrandParentSimulateBone, &ParentSimulateBone, &CurSimulateBone, StraightenBendedBoneStrength, false);
+					StraightenConstraints.Emplace(StraightenConstraint);
+				}
+			}
 		}
 	}
 
@@ -171,6 +182,25 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 
 			while (BoneChainIndexes.IsValidIndex(RightIndex) || BoneChainIndexes.IsValidIndex(LeftIndex))
 			{
+				if (bStraightenBendedBone)
+				{
+					if (BoneChainIndexes.IsValidIndex(LeftIndex) && BoneChainIndexes.IsValidIndex(RightIndex))
+					{
+						const TArray<int32>& CurBoneChain = BoneChainIndexes[LeftCurIndex];
+						const TArray<int32>& LeftBoneChain = BoneChainIndexes[LeftIndex];
+						const TArray<int32>& RightBoneChain = BoneChainIndexes[RightIndex];
+						if (i < CurBoneChain.Num() && i < LeftBoneChain.Num() && i < RightBoneChain.Num())
+						{
+							verify(SimulateBones.IsValidIndex(CurBoneChain[i]));
+							verify(SimulateBones.IsValidIndex(LeftBoneChain[i]));
+							verify(SimulateBones.IsValidIndex(RightBoneChain[i]));
+
+							const FLKAnimVerletConstraint_Straighten StraightenConstraint(&SimulateBones[LeftBoneChain[i]], &SimulateBones[CurBoneChain[i]], &SimulateBones[RightBoneChain[i]], StraightenBendedBoneStrength, true);
+							StraightenConstraints.Emplace(StraightenConstraint);
+						}
+					}
+				}
+
 				if (BoneChainIndexes.IsValidIndex(LeftIndex))
 				{
 					const TArray<int32>& CurBoneChain = BoneChainIndexes[LeftCurIndex];
@@ -182,6 +212,14 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 
 						const FLKAnimVerletConstraint_Distance DistanceConstraint(&SimulateBones[CurBoneChain[i]], &SimulateBones[LeftBoneChain[i]], bUseXPBDSolver, (bUseXPBDSolver ? Compliance : static_cast<double>(Stiffness)), bStretchEachBone, StretchStrength);
 						DistanceConstraints.Emplace(DistanceConstraint);
+
+						if (FMath::IsNearlyZero(SideStraightenForce, KINDA_SMALL_NUMBER) == false)
+						{
+							const FVector SideStraightenDir = (SimulateBones[LeftBoneChain[i]].PoseLocation - SimulateBones[CurBoneChain[i]].PoseLocation).GetSafeNormal();
+							const FQuat InvRot = SimulateBones[LeftBoneChain[i]].PoseRotation.Inverse();
+							const FVector LocalSideStraightenDir = InvRot.RotateVector(SideStraightenDir);
+							SimulateBones[LeftBoneChain[i]].SetSideStraightenDirInLocal(LocalSideStraightenDir);
+						}
 
 						if (bPreserveSideLength)
 						{
@@ -205,6 +243,15 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 								DistanceConstraints.Emplace(RightDiagonalConstraint);
 							}
 						}
+
+						if (bUseIsometricBendingConstraint)
+						{
+							if (i + 1 < LeftBoneChain.Num() && i + 1 < CurBoneChain.Num())
+							{
+								const FLKAnimVerletConstraint_IsometricBending BendingConstraint(&SimulateBones[CurBoneChain[i]], &SimulateBones[LeftBoneChain[i]], &SimulateBones[CurBoneChain[i + 1]], &SimulateBones[LeftBoneChain[i + 1]], bUseXPBDSolver, (bUseXPBDSolver ? BendingCompliance : BendingStiffness));
+								BendingConstraints.Emplace(BendingConstraint);
+							}
+						}
 					}
 					LeftCurIndex = LeftIndex;
 					--LeftIndex;
@@ -221,6 +268,14 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 
 						const FLKAnimVerletConstraint_Distance DistanceConstraint(&SimulateBones[CurBoneChain[i]], &SimulateBones[RightBoneChain[i]], bUseXPBDSolver, (bUseXPBDSolver ? Compliance : static_cast<double>(Stiffness)), bStretchEachBone, StretchStrength);
 						DistanceConstraints.Emplace(DistanceConstraint);
+
+						if (FMath::IsNearlyZero(SideStraightenForce, KINDA_SMALL_NUMBER) == false)
+						{
+							const FVector SideStraightenDir = (SimulateBones[RightBoneChain[i]].PoseLocation - SimulateBones[CurBoneChain[i]].PoseLocation).GetSafeNormal();
+							const FQuat InvRot = SimulateBones[RightBoneChain[i]].PoseRotation.Inverse();
+							const FVector LocalSideStraightenDir = InvRot.RotateVector(SideStraightenDir);
+							SimulateBones[RightBoneChain[i]].SetSideStraightenDirInLocal(LocalSideStraightenDir);
+						}
 
 						if (bPreserveSideLength)
 						{
@@ -242,6 +297,15 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 							{
 								const FLKAnimVerletConstraint_Distance LeftDiagonalConstraint(&SimulateBones[CurBoneChain[i + 1]], &SimulateBones[RightBoneChain[i]], bUseXPBDSolver, (bUseXPBDSolver ? Compliance : static_cast<double>(Stiffness)), bStretchEachBone, StretchStrength);
 								DistanceConstraints.Emplace(LeftDiagonalConstraint);
+							}
+						}
+
+						if (bUseIsometricBendingConstraint)
+						{
+							if (i + 1 < RightBoneChain.Num() && i + 1 < CurBoneChain.Num())
+							{
+								const FLKAnimVerletConstraint_IsometricBending BendingConstraint(&SimulateBones[CurBoneChain[i]], &SimulateBones[RightBoneChain[i]], &SimulateBones[CurBoneChain[i + 1]], &SimulateBones[RightBoneChain[i + 1]], bUseXPBDSolver, (bUseXPBDSolver ? BendingCompliance : BendingStiffness));
+								BendingConstraints.Emplace(BendingConstraint);
 							}
 						}
 					}
@@ -572,6 +636,19 @@ void FLKAnimNode_AnimVerlet::SimulateVerlet(const UWorld* World, float InDeltaTi
 {
 	verify(World != nullptr);
 
+	PreUpdateBones(World, InDeltaTime, ComponentTransform, PrevComponentTransform);
+
+	/// Solve
+	SolveConstraints(InDeltaTime);
+	
+	if (bUseSleep)
+		UpdateSleep(InDeltaTime);
+
+	PostUpdateBones(InDeltaTime);
+}
+
+void FLKAnimNode_AnimVerlet::PreUpdateBones(const UWorld* World, float InDeltaTime, const FTransform& ComponentTransform, const FTransform& PrevComponentTransform)
+{
 	const bool bUseRandomWind = (RandomWindDirection.IsNearlyZero(KINDA_SMALL_NUMBER) == false);
 	const bool bUseWindComponentInWorld = (bAdjustWindComponent && World->Scene != nullptr);
 	FLKAnimVerletUpdateParam VerletUpdateParam;
@@ -604,6 +681,7 @@ void FLKAnimNode_AnimVerlet::SimulateVerlet(const UWorld* World, float InDeltaTi
 
 		VerletUpdateParam.bUseSquaredDeltaTime = bUseSquaredDeltaTime;
 		VerletUpdateParam.StretchForce = StretchForce;
+		VerletUpdateParam.SideStraightenForce = SideStraightenForce;
 		VerletUpdateParam.ShapeMemoryForce = ShapeMemoryForce;
 		VerletUpdateParam.Gravity = (bGravityInWorldSpace == false || Gravity.IsNearlyZero(KINDA_SMALL_NUMBER)) ? Gravity : ComponentTransform.InverseTransformVector(Gravity);
 		VerletUpdateParam.ExternalForce = (bExternalForceInWorldSpace == false || ExternalForce.IsNearlyZero(KINDA_SMALL_NUMBER)) ? ExternalForce : ComponentTransform.InverseTransformVector(ExternalForce);
@@ -612,11 +690,11 @@ void FLKAnimNode_AnimVerlet::SimulateVerlet(const UWorld* World, float InDeltaTi
 		VerletUpdateParam.RandomWindSizeMax = RandomWindSizeMax;
 		VerletUpdateParam.Damping = Damping;
 	}
-	
+
 	/// Simulate each bones	
 	for (int32 i = 0; i < SimulateBones.Num(); ++i)
 	{
-		FLKAnimVerletBone& CurVerletBone = SimulateBones[i];	
+		FLKAnimVerletBone& CurVerletBone = SimulateBones[i];
 		CurVerletBone.Update(InDeltaTime, VerletUpdateParam);
 
 		/// UWindDirectionalSourceComponent
@@ -642,36 +720,6 @@ void FLKAnimNode_AnimVerlet::SimulateVerlet(const UWorld* World, float InDeltaTi
 			CurVerletBone.AdjustPoseTransform(InDeltaTime, ParentVerletBone.Location, ParentVerletBone.PoseLocation, AnimationPoseInertia, AnimPoseDeltaInertiaScaled, bClampAnimationPoseDeltaInertia, AnimationPoseDeltaInertiaClampMax);
 		}
 	}
-
-	/// Solve
-	SolveConstraints(InDeltaTime);
-
-	/// Calculate rotations and fix length
-	for (int32 i = SimulateBones.Num() - 1; i >= 0; --i)
-	{
-		FLKAnimVerletBone& CurVerletBone = SimulateBones[i];
-		if (CurVerletBone.HasParentBone() == false)
-			continue;
-
-		FLKAnimVerletBone& ParentVerletBone = SimulateBones[CurVerletBone.ParentVerletBoneIndex];	
-		const FVector ParentToCurPose = CurVerletBone.PoseLocation - ParentVerletBone.PoseLocation;
-		const FVector ParentToCurVerlet = CurVerletBone.Location - ParentVerletBone.Location;
-		
-		FVector ParentToCurVerletDir = FVector::ZeroVector;
-		float ParentToCurVerletSize = 0.0f;
-		ParentToCurVerlet.ToDirectionAndLength(OUT ParentToCurVerletDir, OUT ParentToCurVerletSize);
-
-		FVector ParentToCurPoseDir = FVector::ZeroVector;
-		float ParentToCurPoseSize = 0.0f;
-		ParentToCurPose.ToDirectionAndLength(OUT ParentToCurPoseDir, OUT ParentToCurPoseSize);
-
-		/// Calculate rotation
-		const FVector RotationAxis = FVector::CrossProduct(ParentToCurPoseDir, ParentToCurVerletDir).GetSafeNormal();
-		const float RotationAngle = FMath::Acos(FVector::DotProduct(ParentToCurPoseDir, ParentToCurVerletDir));
-		const FQuat DeltaRotation = FQuat(RotationAxis, RotationAngle);
-		ParentVerletBone.Rotation = DeltaRotation * ParentVerletBone.PoseRotation;
-		ParentVerletBone.Rotation.Normalize();
-	}
 }
 
 void FLKAnimNode_AnimVerlet::SolveConstraints(float InDeltaTime)
@@ -695,6 +743,14 @@ void FLKAnimNode_AnimVerlet::SolveConstraints(float InDeltaTime)
 		for (int32 i = 0; i < DistanceConstraints.Num(); ++i)
 		{
 			DistanceConstraints[i].Update(SubStepDeltaTime);
+		}
+		for (int32 i = 0; i < BendingConstraints.Num(); ++i)
+		{
+			BendingConstraints[i].Update(SubStepDeltaTime);
+		}
+		for (int32 i = 0; i < StraightenConstraints.Num(); ++i)
+		{
+			StraightenConstraints[i].Update(SubStepDeltaTime);
 		}
 		for (int32 i = 0; i < BallSocketConstraints.Num(); ++i)
 		{
@@ -795,6 +851,91 @@ void FLKAnimNode_AnimVerlet::SolveConstraints(float InDeltaTime)
 	});
 }
 
+void FLKAnimNode_AnimVerlet::UpdateSleep(float InDeltaTime)
+{
+	const float SleepThresholdSQ = SleepDeltaThreshold * SleepDeltaThreshold;
+	const float WakeUpThresholdSQ = WakeUpDeltaThreshold * WakeUpDeltaThreshold;
+	for (int32 i = 0; i < SimulateBones.Num(); ++i)
+	{
+		FLKAnimVerletBone& CurVerletBone = SimulateBones[i];
+
+		bool bForceWakeUp = false;
+		if (bIgnoreSleepWhenParentWakedUp && CurVerletBone.HasParentBone())
+		{
+			const FLKAnimVerletBone& ParentVerletBone = SimulateBones[CurVerletBone.ParentVerletBoneIndex];
+			if (ParentVerletBone.IsSleep() == false)
+				bForceWakeUp = true;
+		}
+
+		if (bForceWakeUp)
+		{
+			CurVerletBone.WakeUp();
+		}
+		else
+		{
+			const float CurDeltaSQ = (CurVerletBone.Location - CurVerletBone.PrevLocation).SizeSquared();
+			if (CurVerletBone.IsSleep())
+			{
+				if (CurDeltaSQ >= WakeUpThresholdSQ)
+				{
+					CurVerletBone.WakeUp();
+				}
+				else
+				{
+					CurVerletBone.Sleep();
+				}
+			}
+			else
+			{
+				if (CurDeltaSQ <= SleepThresholdSQ)
+				{
+					CurVerletBone.SleepTriggerElapsedTime += InDeltaTime;
+					if (CurVerletBone.SleepTriggerElapsedTime >= SleepTriggerDuration)
+					{
+						CurVerletBone.Sleep();
+					}
+				}
+				else
+				{
+					CurVerletBone.WakeUp();
+				}
+			}
+		}
+	}
+}
+
+void FLKAnimNode_AnimVerlet::PostUpdateBones(float InDeltaTime)
+{
+	/// Calculate rotations and fix length
+	for (int32 i = SimulateBones.Num() - 1; i >= 0; --i)
+	{
+		FLKAnimVerletBone& CurVerletBone = SimulateBones[i];
+		CurVerletBone.PostUpdate(InDeltaTime);
+
+		if (CurVerletBone.HasParentBone() == false)
+			continue;
+
+		FLKAnimVerletBone& ParentVerletBone = SimulateBones[CurVerletBone.ParentVerletBoneIndex];
+		const FVector ParentToCurPose = CurVerletBone.PoseLocation - ParentVerletBone.PoseLocation;
+		const FVector ParentToCurVerlet = CurVerletBone.Location - ParentVerletBone.Location;
+
+		FVector ParentToCurVerletDir = FVector::ZeroVector;
+		float ParentToCurVerletSize = 0.0f;
+		ParentToCurVerlet.ToDirectionAndLength(OUT ParentToCurVerletDir, OUT ParentToCurVerletSize);
+
+		FVector ParentToCurPoseDir = FVector::ZeroVector;
+		float ParentToCurPoseSize = 0.0f;
+		ParentToCurPose.ToDirectionAndLength(OUT ParentToCurPoseDir, OUT ParentToCurPoseSize);
+
+		/// Calculate rotation
+		const FVector RotationAxis = FVector::CrossProduct(ParentToCurPoseDir, ParentToCurVerletDir).GetSafeNormal();
+		const float RotationAngle = FMath::Acos(FVector::DotProduct(ParentToCurPoseDir, ParentToCurVerletDir));
+		const FQuat DeltaRotation = FQuat(RotationAxis, RotationAngle);
+		ParentVerletBone.Rotation = DeltaRotation * ParentVerletBone.PoseRotation;
+		ParentVerletBone.Rotation.Normalize();
+	}
+}
+
 void FLKAnimNode_AnimVerlet::ApplyResult(OUT TArray<FBoneTransform>& OutBoneTransforms, const FBoneContainer& BoneContainer)
 {
 	for (int32 i = 0; i < SimulateBones.Num(); ++i)
@@ -821,6 +962,8 @@ void FLKAnimNode_AnimVerlet::ClearSimulateBones()
 	///Constraints.Reset();
 	PinConstraints.Reset();
 	DistanceConstraints.Reset();
+	BendingConstraints.Reset();
+	StraightenConstraints.Reset();
 	FixedDistanceConstraints.Reset();
 	BallSocketConstraints.Reset();
 	SphereCollisionConstraints.Reset();
@@ -855,6 +998,14 @@ void FLKAnimNode_AnimVerlet::ForEachConstraints(Predicate Pred)
 		Pred(CurConstraint);
 	}
 	for (FLKAnimVerletConstraint_Distance& CurConstraint : DistanceConstraints)
+	{
+		Pred(CurConstraint);
+	}
+	for (FLKAnimVerletConstraint_IsometricBending& CurConstraint : BendingConstraints)
+	{
+		Pred(CurConstraint);
+	}
+	for (FLKAnimVerletConstraint_Straighten& CurConstraint : StraightenConstraints)
 	{
 		Pred(CurConstraint);
 	}

@@ -96,7 +96,10 @@ void ULKAnimGraphNode_AnimVerlet::Draw(FPrimitiveDrawInterface* PDI, USkeletalMe
 	{
 		const TArray<FLKAnimVerletBone>& AnimVerletBones = AnimVerletNode->GetSimulateBones();
 		for (const FLKAnimVerletBone& CurBone : AnimVerletBones)
-			DrawWireSphere(PDI, CurBone.Location, CurBone.bFakeBone ? FColor::Black : FColor::Yellow, AnimVerletNode->Thickness * BoneThicknessRenderScale, 16, SDPG_Foreground);
+		{
+			const bool bSleep = (bShowSleep && CurBone.IsSleep());
+			DrawWireSphere(PDI, CurBone.Location, bSleep ? FColor::Turquoise : (CurBone.bFakeBone ? FColor::Black : FColor::Yellow), AnimVerletNode->Thickness * BoneThicknessRenderScale, 16, SDPG_Foreground);
+		}
 	}
 
 	if (bShowConstraints)

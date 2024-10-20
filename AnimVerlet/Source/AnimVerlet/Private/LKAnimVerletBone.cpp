@@ -74,6 +74,9 @@ void FLKAnimVerletBone::Update(float DeltaTime, const FLKAnimVerletUpdateParam& 
 		/// StretchForce
 		Velocity += (PoseDirFromParent * InParam.StretchForce) * CurDeltaTime;
 
+		/// SideStraightenForce
+		Velocity += (Rotation.RotateVector(SideStraightenDirInLocal) * InParam.SideStraightenForce) * CurDeltaTime;
+
 		/// ExternalForce
 		Velocity += InParam.ExternalForce * CurDeltaTime;
 
@@ -103,6 +106,9 @@ void FLKAnimVerletBone::Update(float DeltaTime, const FLKAnimVerletUpdateParam& 
 
 		/// StretchForce
 		Location += (PoseDirFromParent * InParam.StretchForce) * CurDeltaTime;
+
+		/// SideStraightenForce
+		Location += (Rotation.RotateVector(SideStraightenDirInLocal) * InParam.SideStraightenForce) * CurDeltaTime;
 
 		/// ExternalForce
 		Location += InParam.ExternalForce * CurDeltaTime;
@@ -143,6 +149,21 @@ void FLKAnimVerletBone::AdjustPoseTransform(float DeltaTime, const FVector& Pare
 	}
 }
 
+void FLKAnimVerletBone::Sleep()
+{
+	bSleep = true;
+	SleepTriggerElapsedTime = 0.0f;
+
+	Location = PrevLocation;
+	Rotation = PrevRotation;
+}
+
+void FLKAnimVerletBone::WakeUp()
+{
+	bSleep = false;
+	SleepTriggerElapsedTime = 0.0f;
+}
+
 void FLKAnimVerletBone::ResetSimulation()
 {
 	MoveDelta = FVector::ZeroVector;
@@ -154,4 +175,7 @@ void FLKAnimVerletBone::ResetSimulation()
 	PrevRotation = Rotation;
 
 	Velocity = FVector::ZeroVector;
+
+	bSleep = false;
+	SleepTriggerElapsedTime = 0.0f;
 }

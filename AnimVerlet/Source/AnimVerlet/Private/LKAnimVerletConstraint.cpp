@@ -108,6 +108,230 @@ void FLKAnimVerletConstraint_Distance::ResetSimulation()
 ///=========================================================================================================================================
 
 ///=========================================================================================================================================
+/// FLKAnimVerletConstraint_IsometricBending
+///=========================================================================================================================================
+FLKAnimVerletConstraint_IsometricBending::FLKAnimVerletConstraint_IsometricBending(FLKAnimVerletBone* InBoneA, FLKAnimVerletBone* InBoneB, FLKAnimVerletBone* InBoneC, FLKAnimVerletBone* InBoneD, bool bInUseXPBDSolver, float InStiffness)
+	: BoneA(InBoneA)
+	, BoneB(InBoneB)
+	, BoneC(InBoneC)
+	, BoneD(InBoneD)
+{
+	verify(BoneA != nullptr);
+	verify(BoneB != nullptr);
+	verify(BoneC != nullptr);
+	verify(BoneD != nullptr);
+
+	bUseXPBDSolver = bInUseXPBDSolver;
+	if (bUseXPBDSolver)
+		Compliance = InStiffness;
+	else
+		Stiffness = InStiffness;
+
+	CalculateQMatrix(Q, BoneA, BoneB, BoneC, BoneD);
+	RestAngle = CalculateRestAngle(BoneA, BoneB, BoneC, BoneD);
+}
+
+void FLKAnimVerletConstraint_IsometricBending::CalculateQMatrix(float InQ[4][4], FLKAnimVerletBone* InBoneA, FLKAnimVerletBone* InBoneB, FLKAnimVerletBone* InBoneC, FLKAnimVerletBone* InBoneD)
+{
+	verify(InBoneA != nullptr);
+	verify(InBoneB != nullptr);
+	verify(InBoneC != nullptr);
+	verify(InBoneD != nullptr);
+
+	const FVector A = InBoneB->Location - InBoneA->Location;
+	const FVector B = InBoneC->Location - InBoneA->Location;
+	const FVector C = InBoneD->Location - InBoneA->Location;
+
+	const float Area = A.Cross(B).Length() / 2.0f;
+	for (int32 i = 0; i < 4; ++i)
+	{
+		for (int32 j = 0; j < 4; ++j)
+		{
+			if (i == j)
+			{
+				InQ[i][j] = 2.0f / Area;
+			}
+			else
+			{
+				const FVector V1 = (i == 0) ? A : (i == 1) ? B : C;
+				const FVector V2 = (j == 0) ? A : (j == 1) ? B : C;
+				InQ[i][j] = -2.0f * V1.Dot(V2) / (4.0f * Area);
+			}
+		}
+	}
+
+	/*for (int32 i = 0; i < 4; ++i)
+	{
+		for (int32 j = 0; j < 4; ++j)
+		{
+			if (i == j)
+			{
+				InQ[i][j] = 1.0f;
+			}
+			else
+			{
+				InQ[i][j] = -1.0f/3.0f;
+			}
+		}
+	}*/
+}
+
+float FLKAnimVerletConstraint_IsometricBending::CalculateRestAngle(FLKAnimVerletBone* InBoneA, FLKAnimVerletBone* InBoneB, FLKAnimVerletBone* InBoneC, FLKAnimVerletBone* InBoneD)
+{
+	verify(InBoneA != nullptr);
+	verify(InBoneB != nullptr);
+	verify(InBoneC != nullptr);
+	verify(InBoneD != nullptr);
+
+	const FVector Vec1 = InBoneB->Location - InBoneA->Location;
+	const FVector Vec2 = InBoneC->Location - InBoneA->Location;
+	const FVector Vec3 = InBoneD->Location - InBoneA->Location;
+
+	const float Angle1 = FMath::Atan2(Vec2.Y, Vec2.X) - FMath::Atan2(Vec1.Y, Vec1.X);
+	const float Angle2 = FMath::Atan2(Vec3.Y, Vec3.X) - FMath::Atan2(Vec1.Y, Vec1.X);
+	return Angle2 - Angle1;
+}
+
+void FLKAnimVerletConstraint_IsometricBending::Update(float DeltaTime)
+{
+	verify(BoneA != nullptr);
+	verify(BoneB != nullptr);
+	verify(BoneC != nullptr);
+	verify(BoneD != nullptr);
+
+	FLKAnimVerletBone* Bones[4] = { BoneA, BoneB, BoneC, BoneD };
+	float C = 0.0f;
+	for (int32 i = 0; i < 4; ++i)
+	{
+		for (int32 j = 0; j < 4; ++j)
+		{
+			C += Bones[i]->Location.Dot(Bones[j]->Location) * Q[i][j];
+		}
+	}
+	C -= RestAngle;
+
+	FVector Grad[4] = {};
+	for (int32 i = 0; i < 4; ++i)
+	{
+		Grad[i] = FVector::ZeroVector;
+		for (int32 j = 0; j < 4; ++j)
+		{
+			Grad[i] = Grad[i] + Bones[j]->Location * (2.0f * Q[i][j]);
+		}
+	}
+
+	float Sum = 0.0f;
+	for (int32 i = 0; i < 4; ++i)
+	{
+		Sum += Bones[i]->InvMass * Grad[i].Dot(Grad[i]);
+	}
+
+	/// XPBD
+	if (bUseXPBDSolver)
+	{
+		const float Alpha = Compliance / (DeltaTime * DeltaTime);
+		const float DeltaLambda = -(C + Alpha * Lambda) / (Sum + Alpha);
+		Lambda += DeltaLambda;
+
+		for (int32 i = 0; i < 4; ++i)
+		{
+			Bones[i]->Location += Grad[i] * (DeltaLambda * Bones[i]->InvMass);
+		}
+	}
+	/// PBD
+	else
+	{
+		const float DeltaLambda = C * Stiffness;
+		for (int32 i = 0; i < 4; ++i)
+		{
+			Bones[i]->Location += Grad[i] * (DeltaLambda * Bones[i]->InvMass);
+		}
+	}
+}
+
+void FLKAnimVerletConstraint_IsometricBending::PostUpdate(float DeltaTime)
+{
+	Lambda = 0.0f;
+}
+
+void FLKAnimVerletConstraint_IsometricBending::ResetSimulation()
+{
+	Lambda = 0.0f;
+}
+///=========================================================================================================================================
+
+///=========================================================================================================================================
+/// FLKAnimVerletConstraint_Straighten
+///=========================================================================================================================================
+FLKAnimVerletConstraint_Straighten::FLKAnimVerletConstraint_Straighten(FLKAnimVerletBone* InBoneA, FLKAnimVerletBone* InBoneB, FLKAnimVerletBone* InBoneC, float InStraightenStrength, bool bInStraightenCenterBone)
+	: BoneA(InBoneA)
+	, BoneB(InBoneB)
+	, BoneC(InBoneC)
+	, StraightenStrength(InStraightenStrength)
+	, bStraightenCenterBone(bInStraightenCenterBone)
+{
+	verify(BoneA != nullptr);
+	verify(BoneB != nullptr);
+	verify(BoneC != nullptr);
+}
+
+void FLKAnimVerletConstraint_Straighten::Update(float DeltaTime)
+{
+	verify(BoneA != nullptr);
+	verify(BoneB != nullptr);
+	verify(BoneC != nullptr);
+
+	float BToALength = 0.0f;
+	FVector BToADir = FVector::ZeroVector;
+	(BoneA->Location - BoneB->Location).ToDirectionAndLength(OUT BToADir, OUT BToALength);
+
+	float BToCLength = 0.0f;
+	FVector BToCDir = FVector::ZeroVector;
+	(BoneC->Location - BoneB->Location).ToDirectionAndLength(OUT BToCDir, OUT BToCLength);
+
+	const FVector AToBDir = -BToADir;
+	if (bStraightenCenterBone)
+	{
+		/*const FVector StraightenedVec = (BToADir * BToALength) + (BToCDir * BToCLength) * 0.5f;
+
+		float StraightenLength = 0.0f;
+		FVector StraightenedDir = FVector::ZeroVector;
+		StraightenedVec.ToDirectionAndLength(OUT StraightenedDir, OUT StraightenLength);
+
+		const float StraightenDist = FMath::Lerp(0.0f, StraightenLength, FMath::Clamp(StraightenStrength * DeltaTime, 0.0f, 1.0f));
+		BoneB->Location += StraightenedDir * StraightenDist;
+
+		float NewBToALength = 0.0f;
+		FVector NewBToADir = FVector::ZeroVector;
+		(BoneA->Location - BoneB->Location).ToDirectionAndLength(OUT NewBToADir, OUT NewBToALength);
+
+		float NewBToCLength = 0.0f;
+		FVector NewBToCDir = FVector::ZeroVector;
+		(BoneC->Location - BoneB->Location).ToDirectionAndLength(OUT NewBToCDir, OUT NewBToCLength);
+
+		BoneA->Location = BoneB->Location * NewBToADir * BToALength;
+		BoneC->Location = BoneB->Location * NewBToCDir * BToCLength;*/
+
+		const FVector StraightenedDirC = FMath::Lerp(BToCDir, AToBDir, StraightenStrength * DeltaTime);
+		BoneC->Location = BoneB->Location + StraightenedDirC * BToCLength;
+
+		float NewCToBLength = 0.0f;
+		FVector NewCToBDir = FVector::ZeroVector;
+		(BoneB->Location - BoneC->Location).ToDirectionAndLength(OUT NewCToBDir, OUT NewCToBLength);
+
+		const FVector AStraightenedDir = FMath::Lerp(BToADir, NewCToBDir, StraightenStrength * DeltaTime);
+		BoneA->Location = BoneB->Location + AStraightenedDir * BToALength;
+	}
+	else
+	{
+		const FVector StraightenedDir = FMath::Lerp(BToCDir, AToBDir, StraightenStrength * DeltaTime);
+		BoneC->Location = BoneB->Location + StraightenedDir * BToCLength;
+	}
+}
+///=========================================================================================================================================
+
+
+///=========================================================================================================================================
 /// FLKAnimVerletConstraint_FixedDistance
 ///=========================================================================================================================================
 FLKAnimVerletConstraint_FixedDistance::FLKAnimVerletConstraint_FixedDistance(FLKAnimVerletBone* InBoneA, FLKAnimVerletBone* InBoneB, bool bInStretchEachBone, float InStretchStrength, bool bInAwayFromEachOther, float InLengthMargin)

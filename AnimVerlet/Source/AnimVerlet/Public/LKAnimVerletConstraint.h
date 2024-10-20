@@ -59,6 +59,58 @@ public:
 ///=========================================================================================================================================
 
 ///=========================================================================================================================================
+/// FLKAnimVerletConstraint_IsometricBending
+///=========================================================================================================================================
+struct FLKAnimVerletConstraint_IsometricBending : public FLKAnimVerletConstraint
+{
+public:
+	struct FLKAnimVerletBone* BoneA = nullptr;
+	struct FLKAnimVerletBone* BoneB = nullptr;
+	struct FLKAnimVerletBone* BoneC = nullptr;
+	struct FLKAnimVerletBone* BoneD = nullptr;
+
+	bool bUseXPBDSolver = false;
+	float Q[4][4] = {};
+	float RestAngle = 0.0f;
+	float Stiffness = 0.0f;
+	float Lambda = 0.0f;		///for XPBD
+	float Compliance = 0.0;	///for XPBD
+
+public:
+	FLKAnimVerletConstraint_IsometricBending(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, struct FLKAnimVerletBone* InBoneC, struct FLKAnimVerletBone* InBoneD, bool bInUseXPBDSolver, float InStiffness);
+	virtual void Update(float DeltaTime) override;
+	virtual void PostUpdate(float DeltaTime) override;
+	virtual void ResetSimulation() override;
+
+private:
+	void CalculateQMatrix(float Q[4][4], struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, struct FLKAnimVerletBone* InBoneC, struct FLKAnimVerletBone* InBoneD);
+	float CalculateRestAngle(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, struct FLKAnimVerletBone* InBoneC, struct FLKAnimVerletBone* InBoneD);
+};
+///=========================================================================================================================================
+
+///=========================================================================================================================================
+/// FLKAnimVerletConstraint_Straighten
+///=========================================================================================================================================
+struct FLKAnimVerletConstraint_Straighten : public FLKAnimVerletConstraint
+{
+public:
+	struct FLKAnimVerletBone* BoneA = nullptr;
+	struct FLKAnimVerletBone* BoneB = nullptr;
+	struct FLKAnimVerletBone* BoneC = nullptr;
+
+	float StraightenStrength = 0.0;
+	bool bStraightenCenterBone = false;
+
+public:
+	FLKAnimVerletConstraint_Straighten(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, struct FLKAnimVerletBone* InBoneC, float InStraightenStrength, bool bInStraightenCenterBone);
+	virtual void Update(float DeltaTime) override;
+	virtual void BackwardUpdate(float DeltaTime) override {}
+	virtual void PostUpdate(float DeltaTime) override {}
+	virtual void ResetSimulation() override {}
+};
+///=========================================================================================================================================
+
+///=========================================================================================================================================
 /// FLKAnimVerletConstraint_FixedDistance
 ///=========================================================================================================================================
 struct FLKAnimVerletConstraint_FixedDistance : public FLKAnimVerletConstraint

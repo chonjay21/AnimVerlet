@@ -38,7 +38,10 @@ private:
 	void PrepareSimulation(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer);
 	void PrepareLocalCollisionConstraints(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer);
 	void SimulateVerlet(const UWorld* World, float InDeltaTime, const FTransform& ComponentTransform, const FTransform& PrevComponentTransform);
+	void PreUpdateBones(const UWorld* World, float InDeltaTime, const FTransform& ComponentTransform, const FTransform& PrevComponentTransform);
 	void SolveConstraints(float InDeltaTime);
+	void UpdateSleep(float InDeltaTime);
+	void PostUpdateBones(float InDeltaTime);
 	void ApplyResult(OUT TArray<FBoneTransform>& OutBoneTransforms, const FBoneContainer& BoneContainer);
 	void ClearSimulateBones();
 	void ResetSimulation();
@@ -114,11 +117,32 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Solve", meta = (EditCondition = "bUseXPBDSolver == false", ClampMin = "0.0"))
 	float Stiffness = 0.8f;
 
+	/** Sleep Simulating bone when difference is small */
+	UPROPERTY(EditAnywhere, Category = "Solve")
+	bool bUseSleep = true;
+	UPROPERTY(EditAnywhere, Category = "Solve", meta = (EditCondition = "bUseSleep"))
+	bool bIgnoreSleepWhenParentWakedUp = true;
+	UPROPERTY(EditAnywhere, Category = "Solve", meta = (EditCondition = "bUseSleep", ClampMin = "0.0", ForceUnits = "cm"))
+	float SleepDeltaThreshold = 0.05f;
+	UPROPERTY(EditAnywhere, Category = "Solve", meta = (EditCondition = "bUseSleep", ClampMin = "0.0", ForceUnits = "s"))
+	float SleepTriggerDuration = 5.0f;
+	UPROPERTY(EditAnywhere, Category = "Solve", meta = (EditCondition = "bUseSleep", ClampMin = "0.0", ForceUnits = "cm"))
+	float WakeUpDeltaThreshold = 0.1f;
+
 	/** Adjust distance constraint to diagonal directions. (This is helpful when using the bIgnoreAnimationPose option) */
 	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve")
 	bool bConstrainRightDiagonalDistance = false;
 	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve")
 	bool bConstrainLeftDiagonalDistance = false;
+	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve")
+	/** Bending constraint for inextensible surfaces(for more realistic looking when bending but may cause performance impact) */
+	bool bUseIsometricBendingConstraint = false;
+	/** Stiffness for Isometric Bending Constraint(XPBD) */
+	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve", meta = (EditCondition = "bUseIsometricBendingConstraint && bUseXPBDSolver", ClampMin = "0.0"))
+	float BendingCompliance = 100000.0f;
+	/** Stiffness for Isometric Bending Constraint(PBD). */
+	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve", meta = (EditCondition = "bUseIsometricBendingConstraint && bUseXPBDSolver == false", ClampMin = "0.0"))
+	float BendingStiffness = 1.0f;
 
 	/** The option to keep the distance between parent and child bones in the bone chain helps to keep SolveIteration small. */
 	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve")
@@ -130,11 +154,18 @@ public:
 	bool bPreserveSideLength = true;
 	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve", meta = (EditCondition = "bPreserveSideLength", ClampMin = "0.0", ForceUnits = "cm"))
 	float SideLengthMargin = 0.1f;
+	
 	/** Stretch each bone by referencing it`s animation pose */
 	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve")
 	bool bStretchEachBone = false;
 	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve", meta = (EditCondition = "bStretchEachBone", ClampMin = "0.0"))
 	float StretchStrength = 1.0f;
+
+	/** Stretch bended bone without referencing it`s animation pose */
+	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve")
+	bool bStraightenBendedBone = false;
+	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve", meta = (EditCondition = "bStraightenBendedBone", ClampMin = "0.0", ClampMax = "1.0"))
+	float StraightenBendedBoneStrength = 0.0003f;
 
 	/** 
 		It is the number of iterations to solve Verlet Integraion. 
@@ -186,6 +217,9 @@ public:
 	/** Adjust force to stretch the cloth from it`s parent */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Forces", meta = (PinHiddenByDefault, ForceUnits = "cm/s"))
 	float StretchForce = 0.0f;
+	/** Adjust force to stretch the cloth by referencing positional relationship between the roots of each bone chain.(A type of side way gravity applied to stretch the cloth from side to side) */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Forces", meta = (PinHiddenByDefault, ForceUnits = "cm/s"))
+	float SideStraightenForce = 0.0f;
 	/** Adjust force to return to the original animation pose(different from below inertia factor) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Forces", meta = (PinHiddenByDefault, ForceUnits = "cm/s"))
 	float ShapeMemoryForce = 0.0f;
@@ -235,6 +269,8 @@ private:
 	/// Unroll each constratins for better solve result(considering constraint`s solving order)
 	TArray<FLKAnimVerletConstraint_Pin> PinConstraints;
 	TArray<FLKAnimVerletConstraint_Distance> DistanceConstraints;
+	TArray<FLKAnimVerletConstraint_IsometricBending> BendingConstraints;
+	TArray<FLKAnimVerletConstraint_Straighten> StraightenConstraints;
 	TArray<FLKAnimVerletConstraint_FixedDistance> FixedDistanceConstraints;
 	TArray<FLKAnimVerletConstraint_BallSocket> BallSocketConstraints;
 	TArray<FLKAnimVerletConstraint_Sphere> SphereCollisionConstraints;
