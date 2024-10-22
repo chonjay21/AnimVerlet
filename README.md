@@ -17,6 +17,7 @@
 ![](https://github.com/chonjay21/Screenshots/blob/main/AnimVerlet_UE5.png)
 ![](https://github.com/chonjay21/Screenshots/blob/main/AnimVerlet_Short.gif)
 ![](https://github.com/chonjay21/Screenshots/blob/main/AnimVerlet_Graph.gif)
+![](https://github.com/chonjay21/Screenshots/blob/main/AnimVerlet_String.gif)
 
 <br />
 
