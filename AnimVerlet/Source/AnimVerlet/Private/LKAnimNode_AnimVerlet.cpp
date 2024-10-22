@@ -727,8 +727,7 @@ void FLKAnimNode_AnimVerlet::PreUpdateBones(const UWorld* World, float InDeltaTi
 void FLKAnimNode_AnimVerlet::SolveConstraints(float InDeltaTime)
 {
 	/// Solve Constraints
-	///const float SubStepDeltaTime = InDeltaTime / SolveIteration;
-	const float SubStepDeltaTime = InDeltaTime;
+	const float SubStepDeltaTime = FMath::Max(bUseXPBDSolver ? InDeltaTime / SolveIteration : InDeltaTime, KINDA_SMALL_NUMBER);
 	for (int32 Iteration = 0; Iteration < SolveIteration; ++Iteration)
 	{
 		const bool bFinalizeUpdate = (Iteration == SolveIteration - 1);
