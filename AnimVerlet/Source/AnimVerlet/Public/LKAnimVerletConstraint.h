@@ -11,8 +11,8 @@ struct FLKAnimVerletConstraint
 {
 public:
 	virtual ~FLKAnimVerletConstraint() {}
-	virtual void Update(float DeltaTime) = 0;
-	virtual void BackwardUpdate(float DeltaTime) { Update(DeltaTime); }
+	virtual void Update(float DeltaTime, bool bFinalize) = 0;
+	virtual void BackwardUpdate(float DeltaTime, bool bFinalize) { Update(DeltaTime, bFinalize); }
 	virtual void PostUpdate(float DeltaTime) = 0;
 	virtual void ResetSimulation() = 0;
 };
@@ -27,8 +27,12 @@ public:
 	float PinMargin = 0.0f;
 
 public:
-	FLKAnimVerletConstraint_Pin(struct FLKAnimVerletBone* InBone, float InPinMargin = 0.0f) : Bone(InBone), PinMargin(InPinMargin) { verify(Bone != nullptr); }
-	virtual void Update(float DeltaTime) override;
+	FLKAnimVerletConstraint_Pin(struct FLKAnimVerletBone* InBone, float InPinMargin = 0.0f) 
+		: Bone(InBone), PinMargin(InPinMargin) 
+	{ 
+		verify(Bone != nullptr); 
+	}
+	virtual void Update(float DeltaTime, bool bFinalize) override;
 	virtual void PostUpdate(float DeltaTime) override {}
 	virtual void ResetSimulation() override {}
 };
@@ -51,8 +55,9 @@ public:
 	double Compliance = 0.0;	///for XPBD
 
 public:
-	FLKAnimVerletConstraint_Distance(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, bool bInUseXPBDSolver, double InStiffness, bool bInStretchEachBone, float InStretchStrength);
-	virtual void Update(float DeltaTime) override;
+	FLKAnimVerletConstraint_Distance(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, bool bInUseXPBDSolver, 
+									 double InStiffness, bool bInStretchEachBone, float InStretchStrength);
+	virtual void Update(float DeltaTime, bool bFinalize) override;
 	virtual void PostUpdate(float DeltaTime) override;
 	virtual void ResetSimulation() override;
 };
@@ -77,8 +82,9 @@ public:
 	float Compliance = 0.0;	///for XPBD
 
 public:
-	FLKAnimVerletConstraint_IsometricBending(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, struct FLKAnimVerletBone* InBoneC, struct FLKAnimVerletBone* InBoneD, bool bInUseXPBDSolver, float InStiffness);
-	virtual void Update(float DeltaTime) override;
+	FLKAnimVerletConstraint_IsometricBending(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, struct FLKAnimVerletBone* InBoneC, 
+											 struct FLKAnimVerletBone* InBoneD, bool bInUseXPBDSolver, float InStiffness);
+	virtual void Update(float DeltaTime, bool bFinalize) override;
 	virtual void PostUpdate(float DeltaTime) override;
 	virtual void ResetSimulation() override;
 
@@ -102,9 +108,10 @@ public:
 	bool bStraightenCenterBone = false;
 
 public:
-	FLKAnimVerletConstraint_Straighten(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, struct FLKAnimVerletBone* InBoneC, float InStraightenStrength, bool bInStraightenCenterBone);
-	virtual void Update(float DeltaTime) override;
-	virtual void BackwardUpdate(float DeltaTime) override {}
+	FLKAnimVerletConstraint_Straighten(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, struct FLKAnimVerletBone* InBoneC, 
+									   float InStraightenStrength, bool bInStraightenCenterBone);
+	virtual void Update(float DeltaTime, bool bFinalize) override;
+	virtual void BackwardUpdate(float DeltaTime, bool bFinalize) override {}
 	virtual void PostUpdate(float DeltaTime) override {}
 	virtual void ResetSimulation() override {}
 };
@@ -126,9 +133,10 @@ public:
 	float LengthMargin = 0.0f;
 
 public:
-	FLKAnimVerletConstraint_FixedDistance(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, bool bInStretchEachBone, float InStretchStrength, bool bInAwayFromEachOther, float InLengthMargin = 0.0f);
-	virtual void Update(float DeltaTime) override;
-	virtual void BackwardUpdate(float DeltaTime) override;
+	FLKAnimVerletConstraint_FixedDistance(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, bool bInStretchEachBone, 
+										  float InStretchStrength, bool bInAwayFromEachOther, float InLengthMargin = 0.0f);
+	virtual void Update(float DeltaTime, bool bFinalize) override;
+	virtual void BackwardUpdate(float DeltaTime, bool bFinalize) override;
 	virtual void PostUpdate(float DeltaTime) override {}
 	virtual void ResetSimulation() override {}
 };
@@ -145,11 +153,16 @@ public:
 
 	float AngleDegrees = 0.0f;
 
+	bool bUseXPBDSolver = false;
+	double Compliance = 0.0;		///for XPBD
+	double Lambda = 0.0;			///for XPBD
+
 public:
-	FLKAnimVerletConstraint_BallSocket(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, float InAngleDegrees);
-	virtual void Update(float DeltaTime) override;
-	virtual void PostUpdate(float DeltaTime) override {}
-	virtual void ResetSimulation() override {}
+	FLKAnimVerletConstraint_BallSocket(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, float InAngleDegrees, 
+									   bool bInUseXPBDSolver, double InCompliance);
+	virtual void Update(float DeltaTime, bool bFinalize) override;
+	virtual void PostUpdate(float DeltaTime) override { Lambda = 0.0; }
+	virtual void ResetSimulation() override { Lambda = 0.0; }
 };
 ///=========================================================================================================================================
 
@@ -167,12 +180,16 @@ public:
 	TArray<FLKAnimVerletBone>* Bones = nullptr;
 	TExcludeBoneBits ExcludeBones;
 
+	bool bUseXPBDSolver = false;
+	double Compliance = 0.0;		///for XPBD
+	TArray<double> Lambdas;			///for XPBD
+
 public:
-	FLKAnimVerletConstraint_Sphere(const FVector& InLocation, float InRadius, float InThickness,
-								   TArray<FLKAnimVerletBone>* InBones, const TExcludeBoneBits& InExcludeBones);
-	virtual void Update(float DeltaTime) override;
-	virtual void PostUpdate(float DeltaTime) override {}
-	virtual void ResetSimulation() override {}
+	FLKAnimVerletConstraint_Sphere(const FVector& InLocation, float InRadius, float InThickness, TArray<FLKAnimVerletBone>* InBones, 
+								   const TExcludeBoneBits& InExcludeBones, bool bInUseXPBDSolver, double InCompliance);
+	virtual void Update(float DeltaTime, bool bFinalize) override;
+	virtual void PostUpdate(float DeltaTime) override { Lambdas.Reset(); }
+	virtual void ResetSimulation() override { Lambdas.Reset(); }
 };
 ///=========================================================================================================================================
 
@@ -191,12 +208,16 @@ public:
 	TArray<FLKAnimVerletBone>* Bones = nullptr;
 	TExcludeBoneBits ExcludeBones;
 
+	bool bUseXPBDSolver = false;
+	double Compliance = 0.0;		///for XPBD
+	TArray<double> Lambdas;			///for XPBD
+
 public:
 	FLKAnimVerletConstraint_Capsule(const FVector& InLocation, const FQuat& InRot, float InRadius, float InHalfHeight, float InThickness, 
-									TArray<FLKAnimVerletBone>* InBones, const TExcludeBoneBits& InExcludeBones);
-	virtual void Update(float DeltaTime) override;
-	virtual void PostUpdate(float DeltaTime) override {}
-	virtual void ResetSimulation() override {}
+									TArray<FLKAnimVerletBone>* InBones, const TExcludeBoneBits& InExcludeBones, bool bInUseXPBDSolver, double InCompliance);
+	virtual void Update(float DeltaTime, bool bFinalize) override;
+	virtual void PostUpdate(float DeltaTime) override { Lambdas.Reset(); }
+	virtual void ResetSimulation() override { Lambdas.Reset(); }
 };
 ///=========================================================================================================================================
 
@@ -214,12 +235,16 @@ public:
 	TArray<FLKAnimVerletBone>* Bones = nullptr;
 	TExcludeBoneBits ExcludeBones;
 
+	bool bUseXPBDSolver = false;
+	double Compliance = 0.0;		///for XPBD
+	TArray<double> Lambdas;			///for XPBD
+
 public:
 	FLKAnimVerletConstraint_Box(const FVector& InLocation, const FQuat& InRot, const FVector& InHalfExtents, float InThickness, 
-								TArray<FLKAnimVerletBone>* InBones, const TExcludeBoneBits& InExcludeBones);
-	virtual void Update(float DeltaTime) override;
-	virtual void PostUpdate(float DeltaTime) override {}
-	virtual void ResetSimulation() override {}
+								TArray<FLKAnimVerletBone>* InBones, const TExcludeBoneBits& InExcludeBones, bool bInUseXPBDSolver, double InCompliance);
+	virtual void Update(float DeltaTime, bool bFinalize) override;
+	virtual void PostUpdate(float DeltaTime) override;
+	virtual void ResetSimulation() override;
 };
 ///=========================================================================================================================================
 
@@ -238,12 +263,16 @@ public:
 	TArray<FLKAnimVerletBone>* Bones = nullptr;
 	TExcludeBoneBits ExcludeBones;
 
+	bool bUseXPBDSolver = false;
+	double Compliance = 0.0;		///for XPBD
+	TArray<double> Lambdas;			///for XPBD
+
 public:
-	FLKAnimVerletConstraint_Plane(const FVector& InPlaneBase, const FVector& InPlaneNormal, const FQuat& InRotation, const FVector2D& InPlaneHalfExtents, 
-								  float InThickness, TArray<FLKAnimVerletBone>* InBones, const TExcludeBoneBits& InExcludeBones);
-	virtual void Update(float DeltaTime) override;
-	virtual void PostUpdate(float DeltaTime) override {}
-	virtual void ResetSimulation() override {}
+	FLKAnimVerletConstraint_Plane(const FVector& InPlaneBase, const FVector& InPlaneNormal, const FQuat& InRotation, const FVector2D& InPlaneHalfExtents, float InThickness, 
+								  TArray<FLKAnimVerletBone>* InBones, const TExcludeBoneBits& InExcludeBones, bool bInUseXPBDSolver, double InCompliance);
+	virtual void Update(float DeltaTime, bool bFinalize) override;
+	virtual void PostUpdate(float DeltaTime) override { Lambdas.Reset(); }
+	virtual void ResetSimulation() override { Lambdas.Reset(); }
 };
 ///=========================================================================================================================================
 
@@ -264,7 +293,7 @@ public:
 public:
 	FLKAnimVerletConstraint_World(const class UWorld* InWorld, class UPrimitiveComponent* InSelfComponent, const FName& InCollisionProfileName,
 								  float InThickness, TArray<FLKAnimVerletBone>* InBones, const TExcludeBoneBits& InExcludeBones);
-	virtual void Update(float DeltaTime) override;
+	virtual void Update(float DeltaTime, bool bFinalize) override;
 	virtual void PostUpdate(float DeltaTime) override {}
 	virtual void ResetSimulation() override {}
 };
