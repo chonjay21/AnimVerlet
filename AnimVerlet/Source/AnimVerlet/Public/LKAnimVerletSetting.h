@@ -14,6 +14,10 @@ public:
 	UPROPERTY(EditAnywhere, Category = "BoneChain")
 	TArray<FBoneReference> ExcludeBones;
 
+	/** Stretch excluded bones by referencing their simulated parent and child bone. */
+	UPROPERTY(EditAnywhere, Category = "BoneChain")
+	bool bStraightenExcludedBonesByParent = true;
+
 	/** Based on the RootBone, it helps the simulation result by creating a virtual bone at the Offset location. */
 	UPROPERTY(EditAnywhere, Category = "BoneChain")
 	bool bFakeBone = false;

@@ -82,6 +82,11 @@ void FLKAnimNode_AnimVerlet::InitializeBoneReferences(const FBoneContainer& Requ
 	{
 		SimulateBones[i].BoneReference.Initialize(RequiredBones);
 	}
+
+	for (int32 i = 0; i < ExcludedBones.Num(); ++i)
+	{
+		ExcludedBones[i].BoneReference.Initialize(RequiredBones);
+	}
 }
 
 bool FLKAnimNode_AnimVerlet::IsValidToEvaluate(const USkeleton* Skeleton, const FBoneContainer& RequiredBones)
@@ -100,7 +105,7 @@ void FLKAnimNode_AnimVerlet::UpdateInternal(const FAnimationUpdateContext& Conte
 {
 	FAnimNode_SkeletalControlBase::UpdateInternal(Context);
 
-	DeltaTime = FMath::IsNearlyZero(FixedDeltaTime, KINDA_SMALL_NUMBER) ? FMath::Clamp(Context.GetDeltaTime(), 0.0f, MaxDeltaTime) : (Context.AnimInstanceProxy != nullptr ? FixedDeltaTime * Context.AnimInstanceProxy->GetTimeDilation() : FixedDeltaTime);
+	UpdateDeltaTime(Context.GetDeltaTime(), Context.AnimInstanceProxy != nullptr ? Context.AnimInstanceProxy->GetTimeDilation() : 1.0f);
 }
 
 void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer)
@@ -115,7 +120,7 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 	{
 		const int32 FoundBoneIndex = ReferenceSkeleton.FindBoneIndex(CurBoneSetting.RootBone.BoneName);
 		if (FoundBoneIndex != INDEX_NONE)
-			MakeSimulateBones(PoseContext, BoneContainer, ReferenceSkeleton, FoundBoneIndex, INDEX_NONE, INDEX_NONE, CurBoneSetting);
+			MakeSimulateBones(PoseContext, BoneContainer, ReferenceSkeleton, FoundBoneIndex, INDEX_NONE, INDEX_NONE, CurBoneSetting, false, INDEX_NONE);
 	}
 
 	/// Create constraints
@@ -387,8 +392,8 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 	}
 }
 
-bool FLKAnimNode_AnimVerlet::MakeSimulateBones(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer, const FReferenceSkeleton& ReferenceSkeleton,
-											   int32 BoneIndex, int32 ParentSimulateBoneIndex, int32 RootSimulateBoneIndex, const FLKAnimVerletBoneSetting& BoneSetting)
+bool FLKAnimNode_AnimVerlet::MakeSimulateBones(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer, const FReferenceSkeleton& ReferenceSkeleton, int32 BoneIndex, 
+											   int32 ParentSimulateBoneIndex, int32 RootSimulateBoneIndex, const FLKAnimVerletBoneSetting& BoneSetting, bool bParentExcluded, int32 ParentExcludedBoneIndex)
 {
 	verify(BoneIndex >= 0 && BoneIndex < ReferenceSkeleton.GetNum());
 
@@ -396,6 +401,8 @@ bool FLKAnimNode_AnimVerlet::MakeSimulateBones(FComponentSpacePoseContext& PoseC
 	CurBoneRef.BoneName = ReferenceSkeleton.GetBoneName(BoneIndex);
 	
 	int32 CurSimulateBoneIndex = ParentSimulateBoneIndex;
+	int32 CurExcludedBoneIndex = ParentExcludedBoneIndex;
+	bool bNewlyExcluded = false;
 	const bool bExcludedBone = (BoneSetting.ExcludeBones.Find(CurBoneRef) != INDEX_NONE);
 	if (bExcludedBone == false)
 	{
@@ -436,6 +443,14 @@ bool FLKAnimNode_AnimVerlet::MakeSimulateBones(FComponentSpacePoseContext& PoseC
 				const FTransform SubDividedBonePoseT = SubDividedSimulateBone.MakeFakeBonePoseTransform(ReferenceBonePoseT);
 				SubDividedSimulateBone.InitializeTransform(SubDividedBonePoseT);
 				const int32 SubDividedSimulateBoneIndex = SimulateBones.Emplace(SubDividedSimulateBone);
+				if (SubDividedSimulateBone.ParentVerletBoneIndex != INDEX_NONE)
+				{
+					/// Add child indexes
+					FLKAnimVerletBone& CurParentVerletBone = SimulateBones[SubDividedSimulateBone.ParentVerletBoneIndex];
+					bool bAlreadyInSet = false;
+					CurParentVerletBone.ChildVerletBoneIndexes.Add(SubDividedSimulateBoneIndex, &bAlreadyInSet);
+				}
+
 				const int32 CurAddedBoneChainLength = BoneChainIndexes[RootSimulateBoneIndex].Add(SubDividedSimulateBoneIndex) + 1;
 				MaxBoneChainLength = FMath::Max(MaxBoneChainLength, CurAddedBoneChainLength);
 
@@ -445,6 +460,14 @@ bool FLKAnimNode_AnimVerlet::MakeSimulateBones(FComponentSpacePoseContext& PoseC
 		}
 
 		CurSimulateBoneIndex = SimulateBones.Emplace(NewSimulateBone);
+		if (NewSimulateBone.ParentVerletBoneIndex != INDEX_NONE)
+		{
+			/// Add child indexes
+			FLKAnimVerletBone& CurParentVerletBone = SimulateBones[NewSimulateBone.ParentVerletBoneIndex];
+			bool bAlreadyInSet = false;
+			CurParentVerletBone.ChildVerletBoneIndexes.Add(CurSimulateBoneIndex, &bAlreadyInSet);
+		}
+
 		if (ParentSimulateBoneIndex == INDEX_NONE)
 		{
 			RootSimulateBoneIndex = BoneChainIndexes.Emplace();
@@ -456,45 +479,118 @@ bool FLKAnimNode_AnimVerlet::MakeSimulateBones(FComponentSpacePoseContext& PoseC
 		const int32 CurAddedBoneChainLength = BoneChainIndexes[RootSimulateBoneIndex].Add(CurSimulateBoneIndex) + 1;
 		MaxBoneChainLength = FMath::Max(MaxBoneChainLength, CurAddedBoneChainLength);
 	}
-	const bool bTipBone = (WalkChildsAndMakeSimulateBones(PoseContext, BoneContainer, ReferenceSkeleton, BoneIndex, CurSimulateBoneIndex, RootSimulateBoneIndex, BoneSetting) == false);
-
-	if (bTipBone && bExcludedBone == false)
+	else if (BoneSetting.bStraightenExcludedBonesByParent)
 	{
-		if (bLockTipBone == false && bMakeFakeTipBone && FakeTipBoneLength > 0.0f)
+		FLKAnimVerletExcludedBone NewExcludedBone(CurBoneRef, ParentSimulateBoneIndex, bParentExcluded ? ParentExcludedBoneIndex : INDEX_NONE);
+		NewExcludedBone.BoneReference.Initialize(BoneContainer);
+		if (NewExcludedBone.BoneReference.CachedCompactPoseIndex != INDEX_NONE)
 		{
-			FLKAnimVerletBone FakeSimulateBone;
-			FakeSimulateBone.bFakeBone = true;
-			FakeSimulateBone.bTipBone = true;
-			FakeSimulateBone.ParentVerletBoneIndex = CurSimulateBoneIndex;
+			const FTransform ReferenceBonePoseT = PoseContext.Pose.GetComponentSpaceTransform(NewExcludedBone.BoneReference.CachedCompactPoseIndex);
+			NewExcludedBone.PrepareSimulation(ReferenceBonePoseT);
 
-			FTransform FakeBoneT = FTransform::Identity;
-			MakeFakeBoneTransform(OUT FakeBoneT, CurSimulateBoneIndex);
-			FakeSimulateBone.InitializeTransform(FakeBoneT);
+			if (bParentExcluded == false && ParentSimulateBoneIndex != INDEX_NONE)
+				NewExcludedBone.LengthToParent = (SimulateBones[ParentSimulateBoneIndex].PoseLocation - ReferenceBonePoseT.GetLocation()).Size();
+			else if (bParentExcluded && ParentExcludedBoneIndex != INDEX_NONE)
+				NewExcludedBone.LengthToParent = (ExcludedBones[ParentExcludedBoneIndex].PoseLocation - ReferenceBonePoseT.GetLocation()).Size();
 
-			const int32 FakeBoneIndex = SimulateBones.Emplace(FakeSimulateBone);
-			const int32 AddedFakeBoneChainLength = BoneChainIndexes[RootSimulateBoneIndex].Add(FakeBoneIndex) + 1;
-			MaxBoneChainLength = FMath::Max(MaxBoneChainLength, AddedFakeBoneChainLength);
+			CurExcludedBoneIndex = ExcludedBones.Emplace(NewExcludedBone);
+			bNewlyExcluded = true;
+		}
+	}
+	const bool bTipBone = (WalkChildsAndMakeSimulateBones(PoseContext, BoneContainer, ReferenceSkeleton, BoneIndex, CurSimulateBoneIndex, RootSimulateBoneIndex, BoneSetting, bNewlyExcluded, CurExcludedBoneIndex) == false);
+
+	if (bTipBone)
+	{
+		if (bExcludedBone == false)
+		{
+			if (bLockTipBone == false && bMakeFakeTipBone && FakeTipBoneLength > 0.0f)
+			{
+				FLKAnimVerletBone FakeSimulateBone;
+				FakeSimulateBone.bFakeBone = true;
+				FakeSimulateBone.bTipBone = true;
+				FakeSimulateBone.ParentVerletBoneIndex = CurSimulateBoneIndex;
+
+				FTransform FakeBoneT = FTransform::Identity;
+				MakeFakeBoneTransform(OUT FakeBoneT, CurSimulateBoneIndex);
+				FakeSimulateBone.InitializeTransform(FakeBoneT);
+
+				const int32 FakeBoneIndex = SimulateBones.Emplace(FakeSimulateBone);
+				if (FakeSimulateBone.ParentVerletBoneIndex != INDEX_NONE)
+				{
+					/// Add child indexes
+					FLKAnimVerletBone& CurParentVerletBone = SimulateBones[FakeSimulateBone.ParentVerletBoneIndex];
+					bool bAlreadyInSet = false;
+					CurParentVerletBone.ChildVerletBoneIndexes.Add(FakeBoneIndex, &bAlreadyInSet);
+				}
+
+				const int32 AddedFakeBoneChainLength = BoneChainIndexes[RootSimulateBoneIndex].Add(FakeBoneIndex) + 1;
+				MaxBoneChainLength = FMath::Max(MaxBoneChainLength, AddedFakeBoneChainLength);
+			}
+			else
+			{
+				SimulateBones[CurSimulateBoneIndex].bTipBone = true;
+			}
 		}
 		else
 		{
-			SimulateBones[CurSimulateBoneIndex].bTipBone = true;
+			if (bLockTipBone == false && bMakeFakeTipBone && FakeTipBoneLength > 0.0f)
+			{
+				FLKAnimVerletBone FakeSimulateBone;
+				FakeSimulateBone.bFakeBone = true;
+				FakeSimulateBone.bTipBone = true;
+				FakeSimulateBone.ParentVerletBoneIndex = CurSimulateBoneIndex;
+
+				FTransform FakeBoneT = FTransform::Identity;
+				MakeFakeBoneTransform(OUT FakeBoneT, CurSimulateBoneIndex);
+				FakeSimulateBone.InitializeTransform(FakeBoneT);
+
+				const int32 FakeBoneIndex = SimulateBones.Emplace(FakeSimulateBone);
+				if (FakeSimulateBone.ParentVerletBoneIndex != INDEX_NONE)
+				{
+					/// Add child indexes
+					FLKAnimVerletBone& CurParentVerletBone = SimulateBones[FakeSimulateBone.ParentVerletBoneIndex];
+					bool bAlreadyInSet = false;
+					CurParentVerletBone.ChildVerletBoneIndexes.Add(FakeBoneIndex, &bAlreadyInSet);
+				}
+
+				const int32 AddedFakeBoneChainLength = BoneChainIndexes[RootSimulateBoneIndex].Add(FakeBoneIndex) + 1;
+				MaxBoneChainLength = FMath::Max(MaxBoneChainLength, AddedFakeBoneChainLength);
+			}
+			else
+			{
+				SimulateBones[CurSimulateBoneIndex].bTipBone = true;
+			}
+
+			FLKAnimVerletExcludedBone NewExcludedBone(CurBoneRef, ParentSimulateBoneIndex, bParentExcluded ? ParentExcludedBoneIndex : INDEX_NONE);
+			NewExcludedBone.BoneReference.Initialize(BoneContainer);
+			if (NewExcludedBone.BoneReference.CachedCompactPoseIndex != INDEX_NONE)
+			{
+				const FTransform ReferenceBonePoseT = PoseContext.Pose.GetComponentSpaceTransform(NewExcludedBone.BoneReference.CachedCompactPoseIndex);
+				NewExcludedBone.PrepareSimulation(ReferenceBonePoseT);
+
+				if (bParentExcluded == false && ParentSimulateBoneIndex != INDEX_NONE)
+					NewExcludedBone.LengthToParent = (SimulateBones[ParentSimulateBoneIndex].PoseLocation - ReferenceBonePoseT.GetLocation()).Size();
+				else if (bParentExcluded && ParentExcludedBoneIndex != INDEX_NONE)
+					NewExcludedBone.LengthToParent = (ExcludedBones[ParentExcludedBoneIndex].PoseLocation - ReferenceBonePoseT.GetLocation()).Size();
+
+				const int32 ExcludedTipBoneIndex = ExcludedBones.Emplace(NewExcludedBone);
+				bNewlyExcluded = true;
+			}
 		}
 	}
 	return true;
 }
 
-bool FLKAnimNode_AnimVerlet::WalkChildsAndMakeSimulateBones(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer, const FReferenceSkeleton& ReferenceSkeleton,
-															int32 BoneIndex, int32 ParentSimulateBoneIndex, int32 RootSimulateBoneIndex, const FLKAnimVerletBoneSetting& BoneSetting)
+bool FLKAnimNode_AnimVerlet::WalkChildsAndMakeSimulateBones(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer, const FReferenceSkeleton& ReferenceSkeleton, int32 BoneIndex, 
+															int32 ParentSimulateBoneIndex, int32 RootSimulateBoneIndex, const FLKAnimVerletBoneSetting& BoneSetting, bool bParentExcluded, int32 ParentExcludedBoneIndex)
 {
-	verify(RootSimulateBoneIndex != INDEX_NONE);
-
 	bool bWalked = false;
 	const int32 NumBones = ReferenceSkeleton.GetNum();
 	for (int32 ChildIndex = BoneIndex + 1; ChildIndex < NumBones; ++ChildIndex)
 	{
 		if (BoneIndex == ReferenceSkeleton.GetParentIndex(ChildIndex))
 		{
-			MakeSimulateBones(PoseContext, BoneContainer, ReferenceSkeleton, ChildIndex, ParentSimulateBoneIndex, RootSimulateBoneIndex, BoneSetting);
+			MakeSimulateBones(PoseContext, BoneContainer, ReferenceSkeleton, ChildIndex, ParentSimulateBoneIndex, RootSimulateBoneIndex, BoneSetting, bParentExcluded, ParentExcludedBoneIndex);
 			bWalked = true;
 		}
 	}
@@ -510,8 +606,17 @@ void FLKAnimNode_AnimVerlet::MakeFakeBoneTransform(OUT FTransform& OutTransform,
 	OutTransform = FTransform(ParentBone.Rotation, ParentBone.PoseLocation - DirToParent * FakeTipBoneLength);
 }
 
+void FLKAnimNode_AnimVerlet::UpdateDeltaTime(float InDeltaTime, float InTimeDilation)
+{
+	DeltaTime = FMath::IsNearlyZero(FixedDeltaTime, KINDA_SMALL_NUMBER) ? FMath::Clamp(InDeltaTime, MinDeltaTime, MaxDeltaTime) : FMath::Clamp(FixedDeltaTime * InTimeDilation, MinDeltaTime, MaxDeltaTime);
+}
+
 void FLKAnimNode_AnimVerlet::PrepareSimulation(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer)
 {
+	/// Just make sure
+	if (DeltaTime <= 0.0f)
+		UpdateDeltaTime(KINDA_SMALL_NUMBER, 1.0f);
+
 	for (int32 SimulateBoneIndex = 0; SimulateBoneIndex < SimulateBones.Num(); ++SimulateBoneIndex)
 	{
 		FLKAnimVerletBone& CurSimulateBone = SimulateBones[SimulateBoneIndex];
@@ -534,6 +639,15 @@ void FLKAnimNode_AnimVerlet::PrepareSimulation(FComponentSpacePoseContext& PoseC
 
 		const FVector PoseDirFromParent = CurSimulateBone.HasParentBone() ? (CurBonePoseT.GetLocation() - SimulateBones[CurSimulateBone.ParentVerletBoneIndex].PoseLocation).GetSafeNormal() : FVector::ZeroVector;
 		CurSimulateBone.PrepareSimulation(CurBonePoseT, PoseDirFromParent);
+	}
+
+	for (int32 ExcludedBoneIndex = 0; ExcludedBoneIndex < ExcludedBones.Num(); ++ExcludedBoneIndex)
+	{
+		FLKAnimVerletExcludedBone& CurExcludedBone = ExcludedBones[ExcludedBoneIndex];
+		const FCompactPoseBoneIndex PoseBoneIndex = CurExcludedBone.BoneReference.GetCompactPoseIndex(BoneContainer);
+		/// LOD case?
+		const FTransform CurBonePoseT = PoseBoneIndex != INDEX_NONE ? PoseContext.Pose.GetComponentSpaceTransform(PoseBoneIndex) : FTransform::Identity;
+		CurExcludedBone.PrepareSimulation(CurBonePoseT);
 	}
 
 	PrepareLocalCollisionConstraints(PoseContext, BoneContainer);
@@ -932,11 +1046,122 @@ void FLKAnimNode_AnimVerlet::PostUpdateBones(float InDeltaTime)
 		ParentToCurPose.ToDirectionAndLength(OUT ParentToCurPoseDir, OUT ParentToCurPoseSize);
 
 		/// Calculate rotation
-		const FVector RotationAxis = FVector::CrossProduct(ParentToCurPoseDir, ParentToCurVerletDir).GetSafeNormal();
-		const float RotationAngle = FMath::Acos(FVector::DotProduct(ParentToCurPoseDir, ParentToCurVerletDir));
-		const FQuat DeltaRotation = FQuat(RotationAxis, RotationAngle);
+		const FQuat DeltaRotation = FQuat::FindBetweenNormals(ParentToCurPoseDir, ParentToCurVerletDir);
+		///const FVector RotationAxis = FVector::CrossProduct(ParentToCurPoseDir, ParentToCurVerletDir).GetSafeNormal();
+		///const float RotationAngle = FMath::Acos(FVector::DotProduct(ParentToCurPoseDir, ParentToCurVerletDir));
+		///const FQuat DeltaRotation = FQuat(RotationAxis, RotationAngle);
 		ParentVerletBone.Rotation = DeltaRotation * ParentVerletBone.PoseRotation;
 		ParentVerletBone.Rotation.Normalize();
+	}
+
+	for (int32 i = 0; i < ExcludedBones.Num(); ++i)
+	{
+		FLKAnimVerletExcludedBone& CurExcludedVerletBone = ExcludedBones[i];
+		if (CurExcludedVerletBone.HasVerletParentBone())
+		{
+			FLKAnimVerletBone& ParentVerletBone = SimulateBones[CurExcludedVerletBone.ParentVerletBoneIndex];
+			if (ParentVerletBone.ChildVerletBoneIndexes.Num() > 0)
+			{
+				FVector ChildPoseCenterLocation = FVector::ZeroVector;
+				FVector ChildCenterLocation = FVector::ZeroVector;
+				for (const int32 CurChildVerletBoneIndex : ParentVerletBone.ChildVerletBoneIndexes)
+				{
+					const FLKAnimVerletBone& ChildVerletBone = SimulateBones[CurChildVerletBoneIndex];
+					ChildPoseCenterLocation += ChildVerletBone.PoseLocation;
+					ChildCenterLocation += ChildVerletBone.Location;
+				}
+				ChildPoseCenterLocation /= ParentVerletBone.ChildVerletBoneIndexes.Num();
+				ChildCenterLocation /= ParentVerletBone.ChildVerletBoneIndexes.Num();
+
+				const FVector ParentToChildDir = (ChildCenterLocation - ParentVerletBone.Location).GetSafeNormal();
+				const FVector CurExcludedVerletBoneSrcLoc = CurExcludedVerletBone.HasExcludedParentBone() ? ExcludedBones[CurExcludedVerletBone.ParentExcludedBoneIndex].Location : ParentVerletBone.Location;
+				CurExcludedVerletBone.Location = CurExcludedVerletBoneSrcLoc + ParentToChildDir * CurExcludedVerletBone.LengthToParent;
+
+				/// Calculate rotation
+				const FVector ChildVerletPoseToCurExcludedPose = ChildPoseCenterLocation - CurExcludedVerletBone.PoseLocation;
+				const FVector ChildVerletToCurExcluded = ChildCenterLocation - CurExcludedVerletBone.Location;
+
+				FVector ChildVerletToCurExcludedDir = FVector::ZeroVector;
+				float ChildVerletToCurExcludedSize = 0.0f;
+				ChildVerletToCurExcluded.ToDirectionAndLength(OUT ChildVerletToCurExcludedDir, OUT ChildVerletToCurExcludedSize);
+
+				FVector ChildVerletPoseToCurExcludedPoseDir = FVector::ZeroVector;
+				float ChildVerletPoseToCurExcludedPoseSize = 0.0f;
+				ChildVerletPoseToCurExcludedPose.ToDirectionAndLength(OUT ChildVerletPoseToCurExcludedPoseDir, OUT ChildVerletPoseToCurExcludedPoseSize);
+
+				const FQuat DeltaRotation = FQuat::FindBetweenNormals(ChildVerletPoseToCurExcludedPoseDir, ChildVerletToCurExcludedDir);
+				///const FVector RotationAxis = FVector::CrossProduct(ChildVerletPoseToCurExcludedPoseDir, ChildVerletToCurExcludedDir).GetSafeNormal();
+				///const float RotationAngle = FMath::Acos(FVector::DotProduct(ChildVerletPoseToCurExcludedPoseDir, ChildVerletToCurExcludedDir));
+				///const FQuat DeltaRotation = FQuat(RotationAxis, RotationAngle);
+				CurExcludedVerletBone.Rotation = DeltaRotation * CurExcludedVerletBone.PoseRotation;
+				CurExcludedVerletBone.Rotation.Normalize();
+			}
+			else if (ParentVerletBone.HasParentBone())
+			{
+				const FLKAnimVerletBone& GrandParentVerletBone = SimulateBones[ParentVerletBone.ParentVerletBoneIndex];
+				const FVector GrandParentToParentPose = ParentVerletBone.PoseLocation - GrandParentVerletBone.PoseLocation;
+				const FVector GrandParentToParentVerlet = ParentVerletBone.Location - GrandParentVerletBone.Location;
+
+				FVector GrandParentToParentVerletDir = FVector::ZeroVector;
+				float GrandParentToParentVerletSize = 0.0f;
+				GrandParentToParentVerlet.ToDirectionAndLength(OUT GrandParentToParentVerletDir, OUT GrandParentToParentVerletSize);
+
+				const FVector CurExcludedVerletBoneSrcLoc = CurExcludedVerletBone.HasExcludedParentBone() ? ExcludedBones[CurExcludedVerletBone.ParentExcludedBoneIndex].Location : ParentVerletBone.Location;
+				CurExcludedVerletBone.Location = CurExcludedVerletBoneSrcLoc + GrandParentToParentVerletDir * CurExcludedVerletBone.LengthToParent;
+			}
+			/// Parent does not have a child and grand parent == Single dot simulation == do nothing
+			///else
+			///{
+			///}
+
+
+			/// Re align parent simulated verlet bone`s Rotation(rotation may be miss aligned by this excluded bone)
+			if (CurExcludedVerletBone.HasExcludedParentBone() == false)
+			{
+				const FVector ParentToCurExcludedPose = CurExcludedVerletBone.PoseLocation - ParentVerletBone.PoseLocation;
+				const FVector ParentToCurExcluded = CurExcludedVerletBone.Location - ParentVerletBone.Location;
+
+				FVector ParentToCurExcludedDir = FVector::ZeroVector;
+				float ParentToCurExcludedSize = 0.0f;
+				ParentToCurExcluded.ToDirectionAndLength(OUT ParentToCurExcludedDir, OUT ParentToCurExcludedSize);
+
+				FVector ParentToCurExcludedPoseDir = FVector::ZeroVector;
+				float ParentToCurExcludedPoseSize = 0.0f;
+				ParentToCurExcludedPose.ToDirectionAndLength(OUT ParentToCurExcludedPoseDir, OUT ParentToCurExcludedPoseSize);
+
+				/// Calculate rotation
+				const FQuat DeltaRotation = FQuat::FindBetweenNormals(ParentToCurExcludedPoseDir, ParentToCurExcludedDir);
+				///const FVector RotationAxis = FVector::CrossProduct(ParentToCurExcludedPoseDir, ParentToCurExcludedDir).GetSafeNormal();
+				///const float RotationAngle = FMath::Acos(FVector::DotProduct(ParentToCurExcludedPoseDir, ParentToCurExcludedDir));
+				///const FQuat DeltaRotation = FQuat(RotationAxis, RotationAngle);
+				ParentVerletBone.Rotation = DeltaRotation * ParentVerletBone.PoseRotation;
+				ParentVerletBone.Rotation.Normalize();
+			}
+		}
+
+		if (CurExcludedVerletBone.HasExcludedParentBone())
+		{
+			/// Re align parent excluded bone`s Rotation(rotation may be miss aligned by this excluded bone)
+			FLKAnimVerletExcludedBone& ParentExcludedVerletBone = ExcludedBones[CurExcludedVerletBone.ParentExcludedBoneIndex];
+			const FVector ParentToCurExcludedPose = CurExcludedVerletBone.PoseLocation - ParentExcludedVerletBone.PoseLocation;
+			const FVector ParentToCurExcluded = CurExcludedVerletBone.Location - ParentExcludedVerletBone.Location;
+
+			FVector ParentToCurExcludedDir = FVector::ZeroVector;
+			float ParentToCurExcludedSize = 0.0f;
+			ParentToCurExcluded.ToDirectionAndLength(OUT ParentToCurExcludedDir, OUT ParentToCurExcludedSize);
+
+			FVector ParentToCurExcludedPoseDir = FVector::ZeroVector;
+			float ParentToCurExcludedPoseSize = 0.0f;
+			ParentToCurExcludedPose.ToDirectionAndLength(OUT ParentToCurExcludedPoseDir, OUT ParentToCurExcludedPoseSize);
+
+			/// Calculate rotation
+			const FQuat DeltaRotation = FQuat::FindBetweenNormals(ParentToCurExcludedPoseDir, ParentToCurExcludedDir);
+			///const FVector RotationAxis = FVector::CrossProduct(ParentToCurExcludedPoseDir, ParentToCurExcludedDir).GetSafeNormal();
+			///const float RotationAngle = FMath::Acos(FVector::DotProduct(ParentToCurExcludedPoseDir, ParentToCurExcludedDir));
+			///const FQuat DeltaRotation = FQuat(RotationAxis, RotationAngle);
+			ParentExcludedVerletBone.Rotation = DeltaRotation * ParentExcludedVerletBone.PoseRotation;
+			ParentExcludedVerletBone.Rotation.Normalize();
+		}
 	}
 }
 
@@ -953,6 +1178,18 @@ void FLKAnimNode_AnimVerlet::ApplyResult(OUT TArray<FBoneTransform>& OutBoneTran
 		if (BonePoseIndex != INDEX_NONE)
 		{
 			const FTransform ResultBoneT(CurVerletBone.Rotation, CurVerletBone.Location, CurVerletBone.PoseScale);
+			OutBoneTransforms.Emplace(FBoneTransform(BonePoseIndex, ResultBoneT));
+		}
+	}
+
+	for (int32 i = 0; i < ExcludedBones.Num(); ++i)
+	{
+		const FLKAnimVerletExcludedBone& CurExcludedBone = ExcludedBones[i];
+		const FCompactPoseBoneIndex BonePoseIndex = CurExcludedBone.BoneReference.GetCompactPoseIndex(BoneContainer);
+		/// LOD case?
+		if (BonePoseIndex != INDEX_NONE)
+		{
+			const FTransform ResultBoneT(CurExcludedBone.Rotation, CurExcludedBone.Location, CurExcludedBone.PoseScale);
 			OutBoneTransforms.Emplace(FBoneTransform(BonePoseIndex, ResultBoneT));
 		}
 	}
@@ -978,6 +1215,7 @@ void FLKAnimNode_AnimVerlet::ClearSimulateBones()
 
 	BoneChainIndexes.Reset();
 	MaxBoneChainLength = 0;
+	ExcludedBones.Reset();
 	SimulateBones.Reset();
 }
 

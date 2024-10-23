@@ -179,3 +179,17 @@ void FLKAnimVerletBone::ResetSimulation()
 	bSleep = false;
 	SleepTriggerElapsedTime = 0.0f;
 }
+
+
+///=========================================================================================================================================
+/// FLKAnimVerletExcludedBone
+///=========================================================================================================================================
+void FLKAnimVerletExcludedBone::PrepareSimulation(const FTransform& PoseT)
+{
+	PoseLocation = PoseT.GetLocation();
+	Location = PoseLocation;
+	PoseRotation = PoseT.GetRotation();
+	Rotation = PoseRotation;
+
+	PoseScale = PoseT.GetScale3D();
+}

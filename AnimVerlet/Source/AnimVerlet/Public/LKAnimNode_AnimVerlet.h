@@ -29,12 +29,13 @@ protected:
 
 private:
 	void InitializeSimulateBones(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer);
-	bool MakeSimulateBones(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer, const FReferenceSkeleton& ReferenceSkeleton,
-						   int32 BoneIndex, int32 ParentSimulateBoneIndex, int32 RootSimulateBoneIndex, const FLKAnimVerletBoneSetting& BoneSetting);
-	bool WalkChildsAndMakeSimulateBones(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer, const FReferenceSkeleton& ReferenceSkeleton,
-										int32 BoneIndex, int32 ParentSimulateBoneIndex, int32 RootSimulateBoneIndex, const FLKAnimVerletBoneSetting& BoneSetting);
+	bool MakeSimulateBones(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer, const FReferenceSkeleton& ReferenceSkeleton, int32 BoneIndex, 
+						   int32 ParentSimulateBoneIndex, int32 RootSimulateBoneIndex, const FLKAnimVerletBoneSetting& BoneSetting, bool bParentExcluded, int32 ParentExcludedBoneIndex);
+	bool WalkChildsAndMakeSimulateBones(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer, const FReferenceSkeleton& ReferenceSkeleton, int32 BoneIndex, 
+										int32 ParentSimulateBoneIndex, int32 RootSimulateBoneIndex, const FLKAnimVerletBoneSetting& BoneSetting, bool bParentExcluded, int32 ParentExcludedBoneIndex);
 	void MakeFakeBoneTransform(OUT FTransform& OutTransform, int32 ParentSimulateBoneIndex) const;
 
+	void UpdateDeltaTime(float InDeltaTime, float InTimeDilation);
 	void PrepareSimulation(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer);
 	void PrepareLocalCollisionConstraints(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer);
 	void SimulateVerlet(const UWorld* World, float InDeltaTime, const FTransform& ComponentTransform, const FTransform& PrevComponentTransform);
@@ -181,6 +182,9 @@ public:
 
 	/** Limit delta time in situations where the frame rate fluctuates. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = "Solve", meta = (ClampMin = "0.0", ForceUnits = "s"))
+	float MinDeltaTime = KINDA_SMALL_NUMBER;
+	/** Limit delta time in situations where the frame rate fluctuates. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = "Solve", meta = (ClampMin = "0.0", ForceUnits = "s"))
 	float MaxDeltaTime = 0.05f;
 
 	/** Calculate forces via real verlet integration */
@@ -262,9 +266,9 @@ public:
 	float RotationInertiaClampDegrees = 30.0f;
 
 private:
-	float DeltaTime = 0.0f;
 	FTransform PrevComponentT = FTransform::Identity;
 	TArray<FLKAnimVerletBone> SimulateBones;
+	TArray<FLKAnimVerletExcludedBone> ExcludedBones;
 	///TArray<FLKAnimVerletConstraint*> Constraints;
 	/// Unroll each constratins for better solve result(considering constraint`s solving order)
 	TArray<FLKAnimVerletConstraint_Pin> PinConstraints;
@@ -280,4 +284,7 @@ private:
 	TArray<FLKAnimVerletConstraint_World> WorldCollisionConstraints;
 	TArray<TArray<int32>> BoneChainIndexes;
 	int32 MaxBoneChainLength = 0;
+
+private:
+	float DeltaTime = 0.0f;
 };
