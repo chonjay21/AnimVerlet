@@ -1,13 +1,13 @@
 #pragma once
 #include <CoreMinimal.h>
-#include "LKAnimVerletConstraint.h"
-#include "LKAnimVerletCollisionShape.generated.h"
+#include <Engine/DataAsset.h>
+#include "LKAnimVerletCollisionData.generated.h"
 
 ///=========================================================================================================================================
-/// FLKAnimVerletCollisionShape(Base Interface)
+/// FLKAnimVerletCollisionData(Base Interface)
 ///=========================================================================================================================================
 USTRUCT(BlueprintType)
-struct FLKAnimVerletCollisionShape
+struct ANIMVERLET_API FLKAnimVerletCollisionData
 {
 	GENERATED_BODY()
 
@@ -15,33 +15,33 @@ public:
 	/** Use the LocationOffset and RotationOffset as the world transform for this collision shape.(This variable can be used to set collision that exists outside of a skeletal mesh every frame by an animation blueprint or source code.) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Collision", meta = (DisplayPriority = "1"))
 	bool bUseAbsoluteWorldTransform = false;
-	UPROPERTY(EditAnywhere, Category = "Collision", meta = (DisplayPriority = "2", EditCondition = "bUseAbsoluteWorldTransform == false"))
-	FBoneReference AttachedBone;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Collision", meta = (DisplayPriority = "2", EditCondition = "bUseAbsoluteWorldTransform == false"))
+	FName AttachBoneName;
 
-	UPROPERTY(EditAnywhere, Category = "Collision", meta = (DisplayPriority = "3"))
-	TArray<FBoneReference> ExcludeBones;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Collision", meta = (DisplayPriority = "3"))
+	TArray<FName> ExcludeBones;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Offset", meta = (DisplayPriority = "4"))
 	FVector LocationOffset = FVector::ZeroVector;
 
 public:
-	TExcludeBoneBits ExcludeBoneBits;
-
-public:
-	virtual ~FLKAnimVerletCollisionShape() {}
+	virtual ~FLKAnimVerletCollisionData() {}
 	virtual bool IsSphere() const { return false; }
 	virtual bool IsCapsule() const { return false; }
 	virtual bool IsBox() const { return false; }
 	virtual bool IsPlane() const { return false; }
+
+protected:
+	void ConvertToShapeBase(OUT struct FLKAnimVerletCollisionShape& OutShapeBase) const;
 };
 ///=========================================================================================================================================
 
 
 ///=========================================================================================================================================
-/// FLKAnimVerletCollisionSphere
+/// FLKAnimVerletCollisionDataSphere
 ///=========================================================================================================================================
 USTRUCT(BlueprintType)
-struct FLKAnimVerletCollisionSphere : public FLKAnimVerletCollisionShape
+struct ANIMVERLET_API FLKAnimVerletCollisionDataSphere : public FLKAnimVerletCollisionData
 {
 	GENERATED_BODY()
 
@@ -51,14 +51,17 @@ public:
 
 public:
 	virtual bool IsSphere() const override final { return true; }
+
+public:
+	void ConvertToShape(OUT struct FLKAnimVerletCollisionSphere& OutSphere) const;
 };
 ///=========================================================================================================================================
 
 ///=========================================================================================================================================
-/// FLKAnimVerletCollisionCapsule
+/// FLKAnimVerletCollisionDataCapsule
 ///=========================================================================================================================================
 USTRUCT(BlueprintType)
-struct FLKAnimVerletCollisionCapsule : public FLKAnimVerletCollisionShape
+struct ANIMVERLET_API FLKAnimVerletCollisionDataCapsule : public FLKAnimVerletCollisionData
 {
 	GENERATED_BODY()
 
@@ -74,14 +77,17 @@ public:
 
 public:
 	virtual bool IsCapsule() const override final { return true; }
+
+public:
+	void ConvertToShape(OUT struct FLKAnimVerletCollisionCapsule& OutCapsule) const;
 };
 ///=========================================================================================================================================
 
 ///=========================================================================================================================================
-/// FLKAnimVerletCollisionBox
+/// FLKAnimVerletCollisionDataBox
 ///=========================================================================================================================================
 USTRUCT(BlueprintType)
-struct FLKAnimVerletCollisionBox : public FLKAnimVerletCollisionShape
+struct ANIMVERLET_API FLKAnimVerletCollisionDataBox : public FLKAnimVerletCollisionData
 {
 	GENERATED_BODY()
 
@@ -94,14 +100,17 @@ public:
 
 public:
 	virtual bool IsBox() const override final { return true; }
+
+public:
+	void ConvertToShape(OUT struct FLKAnimVerletCollisionBox& OutBox) const;
 };
 ///=========================================================================================================================================
 
 ///=========================================================================================================================================
-/// FLKAnimVerletCollisionPlane
+/// FLKAnimVerletCollisionDataPlane
 ///=========================================================================================================================================
 USTRUCT(BlueprintType)
-struct FLKAnimVerletCollisionPlane : public FLKAnimVerletCollisionShape
+struct ANIMVERLET_API FLKAnimVerletCollisionDataPlane : public FLKAnimVerletCollisionData
 {
 	GENERATED_BODY()
 
@@ -117,35 +126,50 @@ public:
 
 public:
 	virtual bool IsPlane() const override final { return true; }
+
+public:
+	void ConvertToShape(OUT struct FLKAnimVerletCollisionPlane& OutPlane) const;
 };
 ///=========================================================================================================================================
 
 
 ///=========================================================================================================================================
-/// FLKAnimVerletCollisionShapeList
+/// FLKAnimVerletCollisionDataList
 ///=========================================================================================================================================
 USTRUCT(BlueprintType)
-struct FLKAnimVerletCollisionShapeList
+struct ANIMVERLET_API FLKAnimVerletCollisionDataList
 {
 	GENERATED_BODY()
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Collision")
-	TArray<FLKAnimVerletCollisionSphere> SphereCollisionShapes;
+	TArray<FLKAnimVerletCollisionDataSphere> SphereCollisionData;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Collision")
-	TArray<FLKAnimVerletCollisionCapsule> CapsuleCollisionShapes;
+	TArray<FLKAnimVerletCollisionDataCapsule> CapsuleCollisionData;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Collision")
-	TArray<FLKAnimVerletCollisionBox> BoxCollisionShapes;
+	TArray<FLKAnimVerletCollisionDataBox> BoxCollisionData;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Collision")
-	TArray<FLKAnimVerletCollisionPlane> PlaneCollisionShapes;
+	TArray<FLKAnimVerletCollisionDataPlane> PlaneCollisionData;
 
 public:
-	void ResetCollisionShapeList()
-	{
-		SphereCollisionShapes.Reset();
-		CapsuleCollisionShapes.Reset();
-		BoxCollisionShapes.Reset();
-		PlaneCollisionShapes.Reset();
-	}
+	void ConvertToShape(OUT struct FLKAnimVerletCollisionShapeList& OutShapeList) const;
+};
+///=========================================================================================================================================
+
+
+///=========================================================================================================================================
+/// ULKAnimVerletCollisionDataAsset
+///=========================================================================================================================================
+UCLASS(Blueprintable, BlueprintType)
+class ANIMVERLET_API ULKAnimVerletCollisionDataAsset : public UDataAsset
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Collision")
+	FLKAnimVerletCollisionDataList CollisionDataList;
+
+public:
+	void ConvertToShape(OUT struct FLKAnimVerletCollisionShapeList& OutShapeList) const;
 };
 ///=========================================================================================================================================

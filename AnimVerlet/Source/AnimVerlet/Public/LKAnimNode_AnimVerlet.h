@@ -29,6 +29,7 @@ protected:
 
 private:
 	void InitializeSimulateBones(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer);
+	void InitializeAttachedShape(struct FLKAnimVerletCollisionShape& InShape, const FBoneContainer& BoneContainer);
 	bool MakeSimulateBones(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer, const FReferenceSkeleton& ReferenceSkeleton, int32 BoneIndex, 
 						   int32 ParentSimulateBoneIndex, int32 RootSimulateBoneIndex, const FLKAnimVerletBoneSetting& BoneSetting, bool bParentExcluded, int32 ParentExcludedBoneIndex);
 	bool WalkChildsAndMakeSimulateBones(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer, const FReferenceSkeleton& ReferenceSkeleton, int32 BoneIndex, 
@@ -59,6 +60,8 @@ public:
 	const TArray<FLKAnimVerletConstraint_Capsule>& GetCapsuleCollisionConstraints() const { return CapsuleCollisionConstraints; }
 	const TArray<FLKAnimVerletConstraint_Box>& GetBoxCollisionConstraints() const { return BoxCollisionConstraints; }
 	const TArray<FLKAnimVerletConstraint_Plane>& GetPlaneCollisionConstraints() const { return PlaneCollisionConstraints; }
+
+	void SetDynamicCollisionShapes(const FLKAnimVerletCollisionShapeList& InDynamicCollisionShapes) { DynamicCollisionShapes = InDynamicCollisionShapes; }
 	void ForceClearSimulateBones() { ClearSimulateBones(); }	/// for live editor preview
 
 public:
@@ -71,7 +74,7 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Setup", meta = (EditCondition = "SubDivideBones", EditConditionHides, ClampMin = "0"))
 	uint8 NumSubDividedBone = 1;
 	UPROPERTY(EditAnywhere, Category = "Setup")
-	bool bSkipUpdateOnDedicatedServer = false;
+	bool bSkipUpdateOnDedicatedServer = true;
 
 	/** Adds an fake(virtual) bone to the end of the body.(may affect the rotation or collision of the end bone) */
 	UPROPERTY(EditAnywhere, Category = "Setup", meta = (EditCondition = "bLockTipBone == false"))
@@ -211,6 +214,12 @@ public:
 	TArray<FLKAnimVerletCollisionBox> BoxCollisionShapes;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Collision", meta = (PinHiddenByDefault))
 	TArray<FLKAnimVerletCollisionPlane> PlaneCollisionShapes;
+	/** For sharing collision data from pre made data */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Collision", meta = (PinHiddenByDefault))
+	class ULKAnimVerletCollisionDataAsset* CollisionDataAsset = nullptr;
+	/** For sharing collision data from Animation Blueprint or external source code etc every frame */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Collision", meta = (PinShownByDefault))
+	FLKAnimVerletCollisionShapeList DynamicCollisionShapes;
 
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Gravity", meta = (PinHiddenByDefault, ForceUnits = "cm/s"))
@@ -269,6 +278,7 @@ private:
 	FTransform PrevComponentT = FTransform::Identity;
 	TArray<FLKAnimVerletBone> SimulateBones;
 	TArray<FLKAnimVerletExcludedBone> ExcludedBones;
+	FLKAnimVerletCollisionShapeList SimulatingCollisionShapes;
 	///TArray<FLKAnimVerletConstraint*> Constraints;
 	/// Unroll each constratins for better solve result(considering constraint`s solving order)
 	TArray<FLKAnimVerletConstraint_Pin> PinConstraints;

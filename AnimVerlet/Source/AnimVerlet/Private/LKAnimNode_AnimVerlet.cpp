@@ -5,6 +5,7 @@
 #include <Animation/AnimTypes.h>
 #include <DrawDebugHelpers.h>
 #include <Kismet/KismetSystemLibrary.h>
+#include "LKAnimVerletCollisionData.h"
 
 FLKAnimNode_AnimVerlet::FLKAnimNode_AnimVerlet()
 	: FAnimNode_SkeletalControlBase()
@@ -338,57 +339,43 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 	}
 
 	/// LocalCollision(Contact) constraints
-	for (FLKAnimVerletCollisionSphere& CurShape : SphereCollisionShapes)
-	{
-		CurShape.AttachedBone.Initialize(BoneContainer);
+	SimulatingCollisionShapes.SphereCollisionShapes = SphereCollisionShapes;
+	SimulatingCollisionShapes.CapsuleCollisionShapes = CapsuleCollisionShapes;
+	SimulatingCollisionShapes.BoxCollisionShapes = BoxCollisionShapes;
+	SimulatingCollisionShapes.PlaneCollisionShapes = PlaneCollisionShapes;
+	if (CollisionDataAsset != nullptr)
+		CollisionDataAsset->ConvertToShape(OUT SimulatingCollisionShapes);
 
-		CurShape.ExcludeBoneBits.Init(false, SimulateBones.Num());
-		for (int32 i = 0; i < CurShape.ExcludeBones.Num(); ++i)
-		{
-			CurShape.ExcludeBones[i].Initialize(BoneContainer);
-			const int32 FoundIndex = SimulateBones.IndexOfByKey(FLKAnimVerletBoneKey(CurShape.ExcludeBones[i]));
-			if (FoundIndex != INDEX_NONE)
-				CurShape.ExcludeBoneBits[FoundIndex] = true;
-		}
-	}
-	for (FLKAnimVerletCollisionCapsule& CurShape : CapsuleCollisionShapes)
+	for (FLKAnimVerletCollisionSphere& CurShape : SimulatingCollisionShapes.SphereCollisionShapes)
 	{
-		CurShape.AttachedBone.Initialize(BoneContainer);
-		
-		CurShape.ExcludeBoneBits.Init(false, SimulateBones.Num());
-		for (int32 i = 0; i < CurShape.ExcludeBones.Num(); ++i)
-		{
-			CurShape.ExcludeBones[i].Initialize(BoneContainer);
-			const int32 FoundIndex = SimulateBones.IndexOfByKey(FLKAnimVerletBoneKey(CurShape.ExcludeBones[i]));
-			if (FoundIndex != INDEX_NONE)
-				CurShape.ExcludeBoneBits[FoundIndex] = true;
-		}
+		InitializeAttachedShape(CurShape, BoneContainer);
 	}
-	for (FLKAnimVerletCollisionBox& CurShape : BoxCollisionShapes)
+	for (FLKAnimVerletCollisionCapsule& CurShape : SimulatingCollisionShapes.CapsuleCollisionShapes)
 	{
-		CurShape.AttachedBone.Initialize(BoneContainer);
-		
-		CurShape.ExcludeBoneBits.Init(false, SimulateBones.Num());
-		for (int32 i = 0; i < CurShape.ExcludeBones.Num(); ++i)
-		{
-			CurShape.ExcludeBones[i].Initialize(BoneContainer);
-			const int32 FoundIndex = SimulateBones.IndexOfByKey(FLKAnimVerletBoneKey(CurShape.ExcludeBones[i]));
-			if (FoundIndex != INDEX_NONE)
-				CurShape.ExcludeBoneBits[FoundIndex] = true;
-		}
+		InitializeAttachedShape(CurShape, BoneContainer);
 	}
-	for (FLKAnimVerletCollisionPlane& CurShape : PlaneCollisionShapes)
+	for (FLKAnimVerletCollisionBox& CurShape : SimulatingCollisionShapes.BoxCollisionShapes)
 	{
-		CurShape.AttachedBone.Initialize(BoneContainer);
-		
-		CurShape.ExcludeBoneBits.Init(false, SimulateBones.Num());
-		for (int32 i = 0; i < CurShape.ExcludeBones.Num(); ++i)
-		{
-			CurShape.ExcludeBones[i].Initialize(BoneContainer);
-			const int32 FoundIndex = SimulateBones.IndexOfByKey(FLKAnimVerletBoneKey(CurShape.ExcludeBones[i]));
-			if (FoundIndex != INDEX_NONE)
-				CurShape.ExcludeBoneBits[FoundIndex] = true;
-		}
+		InitializeAttachedShape(CurShape, BoneContainer);
+	}
+	for (FLKAnimVerletCollisionPlane& CurShape : SimulatingCollisionShapes.PlaneCollisionShapes)
+	{
+		InitializeAttachedShape(CurShape, BoneContainer);
+	}
+}
+
+void FLKAnimNode_AnimVerlet::InitializeAttachedShape(FLKAnimVerletCollisionShape& InShape, const FBoneContainer& BoneContainer)
+{
+	if (InShape.bUseAbsoluteWorldTransform == false)
+		InShape.AttachedBone.Initialize(BoneContainer);
+
+	InShape.ExcludeBoneBits.Init(false, SimulateBones.Num());
+	for (int32 i = 0; i < InShape.ExcludeBones.Num(); ++i)
+	{
+		InShape.ExcludeBones[i].Initialize(BoneContainer);
+		const int32 FoundIndex = SimulateBones.IndexOfByKey(FLKAnimVerletBoneKey(InShape.ExcludeBones[i]));
+		if (FoundIndex != INDEX_NONE)
+			InShape.ExcludeBoneBits[FoundIndex] = true;
 	}
 }
 
@@ -657,77 +644,228 @@ void FLKAnimNode_AnimVerlet::PrepareLocalCollisionConstraints(FComponentSpacePos
 {
 	const double Compliance = static_cast<double>(1.0 / InvCompliance);
 
+	///----------------------------------------------------------------------------------------------------------------------------
+	/// Sphere
+	///----------------------------------------------------------------------------------------------------------------------------
 	SphereCollisionConstraints.Reset();
-	for (int32 i = 0; i < SphereCollisionShapes.Num(); ++i)
+	for (int32 i = 0; i < SimulatingCollisionShapes.SphereCollisionShapes.Num(); ++i)
 	{
-		const FLKAnimVerletCollisionSphere& CurShapeSphere = SphereCollisionShapes[i];
-		
-		const FCompactPoseBoneIndex PoseBoneIndex = CurShapeSphere.AttachedBone.GetCompactPoseIndex(BoneContainer);
-		/// LOD case?
-		if (PoseBoneIndex != INDEX_NONE)
+		const FLKAnimVerletCollisionSphere& CurShapeSphere = SimulatingCollisionShapes.SphereCollisionShapes[i];
+		if (CurShapeSphere.bUseAbsoluteWorldTransform)
 		{
-			FTransform BoneTInCS = PoseContext.Pose.GetComponentSpaceTransform(PoseBoneIndex);
-			const FTransform OffsetT(FQuat::Identity, CurShapeSphere.LocationOffset);
-
-			BoneTInCS = OffsetT * BoneTInCS;
-			const FVector BoneLocation = BoneTInCS.GetLocation();
-
-			const FLKAnimVerletConstraint_Sphere SphereConstraint(BoneLocation, CurShapeSphere.Radius, Thickness, 
+			const FVector BoneLocation = CurShapeSphere.LocationOffset;
+			const FLKAnimVerletConstraint_Sphere SphereConstraint(BoneLocation, CurShapeSphere.Radius, Thickness,
 																  &SimulateBones, CurShapeSphere.ExcludeBoneBits, bUseXPBDSolver, Compliance);
 			SphereCollisionConstraints.Emplace(SphereConstraint);
 		}
+		else
+		{
+			const FCompactPoseBoneIndex PoseBoneIndex = CurShapeSphere.AttachedBone.GetCompactPoseIndex(BoneContainer);
+			/// LOD case?
+			if (PoseBoneIndex != INDEX_NONE)
+			{
+				FTransform BoneTInCS = PoseContext.Pose.GetComponentSpaceTransform(PoseBoneIndex);
+				const FTransform OffsetT(FQuat::Identity, CurShapeSphere.LocationOffset);
+
+				BoneTInCS = OffsetT * BoneTInCS;
+				const FVector BoneLocation = BoneTInCS.GetLocation();
+				const FLKAnimVerletConstraint_Sphere SphereConstraint(BoneLocation, CurShapeSphere.Radius, Thickness,
+																	  &SimulateBones, CurShapeSphere.ExcludeBoneBits, bUseXPBDSolver, Compliance);
+				SphereCollisionConstraints.Emplace(SphereConstraint);
+			}
+		}
+	}
+	for (int32 i = 0; i < DynamicCollisionShapes.SphereCollisionShapes.Num(); ++i)
+	{
+		FLKAnimVerletCollisionSphere& CurShapeSphere = DynamicCollisionShapes.SphereCollisionShapes[i];
+		if (CurShapeSphere.bUseAbsoluteWorldTransform)
+		{
+			const FVector BoneLocation = CurShapeSphere.LocationOffset;
+			const FLKAnimVerletConstraint_Sphere SphereConstraint(BoneLocation, CurShapeSphere.Radius, Thickness,
+																  &SimulateBones, CurShapeSphere.ExcludeBoneBits, bUseXPBDSolver, Compliance);
+			SphereCollisionConstraints.Emplace(SphereConstraint);
+		}
+		else
+		{
+			if (CurShapeSphere.AttachedBone.BoneName != NAME_None && CurShapeSphere.AttachedBone.HasValidSetup() == false)
+			{
+				InitializeAttachedShape(CurShapeSphere, BoneContainer);
+			}
+
+			const FCompactPoseBoneIndex PoseBoneIndex = CurShapeSphere.AttachedBone.GetCompactPoseIndex(BoneContainer);
+			/// LOD case?
+			if (PoseBoneIndex != INDEX_NONE)
+			{
+				FTransform BoneTInCS = PoseContext.Pose.GetComponentSpaceTransform(PoseBoneIndex);
+				const FTransform OffsetT(FQuat::Identity, CurShapeSphere.LocationOffset);
+
+				BoneTInCS = OffsetT * BoneTInCS;
+				const FVector BoneLocation = BoneTInCS.GetLocation();
+				const FLKAnimVerletConstraint_Sphere SphereConstraint(BoneLocation, CurShapeSphere.Radius, Thickness,
+																	  &SimulateBones, CurShapeSphere.ExcludeBoneBits, bUseXPBDSolver, Compliance);
+				SphereCollisionConstraints.Emplace(SphereConstraint);
+			}
+		}
 	}
 
+	///----------------------------------------------------------------------------------------------------------------------------
+	/// Capsule
+	///----------------------------------------------------------------------------------------------------------------------------
 	CapsuleCollisionConstraints.Reset();
-	for (int32 i = 0; i < CapsuleCollisionShapes.Num(); ++i)
+	for (int32 i = 0; i < SimulatingCollisionShapes.CapsuleCollisionShapes.Num(); ++i)
 	{
-		const FLKAnimVerletCollisionCapsule& CurShapeCapsule = CapsuleCollisionShapes[i];
-		
-		const FCompactPoseBoneIndex PoseBoneIndex = CurShapeCapsule.AttachedBone.GetCompactPoseIndex(BoneContainer);
-		/// LOD case?
-		if (PoseBoneIndex != INDEX_NONE)
+		const FLKAnimVerletCollisionCapsule& CurShapeCapsule = SimulatingCollisionShapes.CapsuleCollisionShapes[i];
+		if (CurShapeCapsule.bUseAbsoluteWorldTransform)
 		{
-			FTransform BoneTInCS = PoseContext.Pose.GetComponentSpaceTransform(PoseBoneIndex);
-			const FTransform OffsetT(CurShapeCapsule.RotationOffset.Quaternion(), CurShapeCapsule.LocationOffset);
-
-			BoneTInCS = OffsetT * BoneTInCS;
-			const FVector BoneLocation = BoneTInCS.GetLocation();
-			const FQuat BoneRotation = BoneTInCS.GetRotation();
-
-			const FLKAnimVerletConstraint_Capsule CapsuleConstraint(BoneLocation, BoneRotation, CurShapeCapsule.Radius, CurShapeCapsule.HalfHeight, Thickness, 
+			const FVector BoneLocation = CurShapeCapsule.LocationOffset;
+			const FQuat BoneRotation = CurShapeCapsule.RotationOffset.Quaternion();
+			const FLKAnimVerletConstraint_Capsule CapsuleConstraint(BoneLocation, BoneRotation, CurShapeCapsule.Radius, CurShapeCapsule.HalfHeight, Thickness,
 																	&SimulateBones, CurShapeCapsule.ExcludeBoneBits, bUseXPBDSolver, Compliance);
 			CapsuleCollisionConstraints.Emplace(CapsuleConstraint);
 		}
-	}
-
-	BoxCollisionConstraints.Reset();
-	for (int32 i = 0; i < BoxCollisionShapes.Num(); ++i)
-	{
-		const FLKAnimVerletCollisionBox& CurShapeBox = BoxCollisionShapes[i];
-
-		const FCompactPoseBoneIndex PoseBoneIndex = CurShapeBox.AttachedBone.GetCompactPoseIndex(BoneContainer);
-		/// LOD case?
-		if (PoseBoneIndex != INDEX_NONE)
+		else
 		{
-			FTransform BoneTInCS = PoseContext.Pose.GetComponentSpaceTransform(PoseBoneIndex);
-			const FTransform OffsetT(CurShapeBox.RotationOffset.Quaternion(), CurShapeBox.LocationOffset);
+			const FCompactPoseBoneIndex PoseBoneIndex = CurShapeCapsule.AttachedBone.GetCompactPoseIndex(BoneContainer);
+			/// LOD case?
+			if (PoseBoneIndex != INDEX_NONE)
+			{
+				FTransform BoneTInCS = PoseContext.Pose.GetComponentSpaceTransform(PoseBoneIndex);
+				const FTransform OffsetT(CurShapeCapsule.RotationOffset.Quaternion(), CurShapeCapsule.LocationOffset);
 
-			BoneTInCS = OffsetT * BoneTInCS;
-			const FVector BoneLocation = BoneTInCS.GetLocation();
-			const FQuat BoneRotation = BoneTInCS.GetRotation();
+				BoneTInCS = OffsetT * BoneTInCS;
+				const FVector BoneLocation = BoneTInCS.GetLocation();
+				const FQuat BoneRotation = BoneTInCS.GetRotation();
+				const FLKAnimVerletConstraint_Capsule CapsuleConstraint(BoneLocation, BoneRotation, CurShapeCapsule.Radius, CurShapeCapsule.HalfHeight, Thickness,
+																		&SimulateBones, CurShapeCapsule.ExcludeBoneBits, bUseXPBDSolver, Compliance);
+				CapsuleCollisionConstraints.Emplace(CapsuleConstraint);
+			}
+		}
+	}
+	for (int32 i = 0; i < DynamicCollisionShapes.CapsuleCollisionShapes.Num(); ++i)
+	{
+		FLKAnimVerletCollisionCapsule& CurShapeCapsule = DynamicCollisionShapes.CapsuleCollisionShapes[i];
+		if (CurShapeCapsule.bUseAbsoluteWorldTransform)
+		{
+			const FVector BoneLocation = CurShapeCapsule.LocationOffset;
+			const FQuat BoneRotation = CurShapeCapsule.RotationOffset.Quaternion();
+			const FLKAnimVerletConstraint_Capsule CapsuleConstraint(BoneLocation, BoneRotation, CurShapeCapsule.Radius, CurShapeCapsule.HalfHeight, Thickness,
+																	&SimulateBones, CurShapeCapsule.ExcludeBoneBits, bUseXPBDSolver, Compliance);
+			CapsuleCollisionConstraints.Emplace(CapsuleConstraint);
+		}
+		else
+		{
+			if (CurShapeCapsule.AttachedBone.BoneName != NAME_None && CurShapeCapsule.AttachedBone.HasValidSetup() == false)
+			{
+				InitializeAttachedShape(CurShapeCapsule, BoneContainer);
+			}
 
-			const FLKAnimVerletConstraint_Box BoxConstraint(BoneLocation, BoneRotation, CurShapeBox.HalfExtents, Thickness, 
-															&SimulateBones, CurShapeBox.ExcludeBoneBits, bUseXPBDSolver, Compliance);
-			BoxCollisionConstraints.Emplace(BoxConstraint);
+			const FCompactPoseBoneIndex PoseBoneIndex = CurShapeCapsule.AttachedBone.GetCompactPoseIndex(BoneContainer);
+			/// LOD case?
+			if (PoseBoneIndex != INDEX_NONE)
+			{
+				FTransform BoneTInCS = PoseContext.Pose.GetComponentSpaceTransform(PoseBoneIndex);
+				const FTransform OffsetT(CurShapeCapsule.RotationOffset.Quaternion(), CurShapeCapsule.LocationOffset);
+
+				BoneTInCS = OffsetT * BoneTInCS;
+				const FVector BoneLocation = BoneTInCS.GetLocation();
+				const FQuat BoneRotation = BoneTInCS.GetRotation();
+				const FLKAnimVerletConstraint_Capsule CapsuleConstraint(BoneLocation, BoneRotation, CurShapeCapsule.Radius, CurShapeCapsule.HalfHeight, Thickness,
+																		&SimulateBones, CurShapeCapsule.ExcludeBoneBits, bUseXPBDSolver, Compliance);
+				CapsuleCollisionConstraints.Emplace(CapsuleConstraint);
+			}
 		}
 	}
 
-	PlaneCollisionConstraints.Reset();
+	///----------------------------------------------------------------------------------------------------------------------------
+	/// Box
+	///----------------------------------------------------------------------------------------------------------------------------
+	BoxCollisionConstraints.Reset();
+	for (int32 i = 0; i < SimulatingCollisionShapes.BoxCollisionShapes.Num(); ++i)
 	{
-		for (int32 i = 0; i < PlaneCollisionShapes.Num(); ++i)
+		const FLKAnimVerletCollisionBox& CurShapeBox = SimulatingCollisionShapes.BoxCollisionShapes[i];
+		if (CurShapeBox.bUseAbsoluteWorldTransform)
 		{
-			const FLKAnimVerletCollisionPlane& CurShapePlane = PlaneCollisionShapes[i];
+			const FVector BoneLocation = CurShapeBox.LocationOffset;
+			const FQuat BoneRotation = CurShapeBox.RotationOffset.Quaternion();
 
+			const FLKAnimVerletConstraint_Box BoxConstraint(BoneLocation, BoneRotation, CurShapeBox.HalfExtents, Thickness,
+															&SimulateBones, CurShapeBox.ExcludeBoneBits, bUseXPBDSolver, Compliance);
+			BoxCollisionConstraints.Emplace(BoxConstraint);
+		}
+		else
+		{
+			const FCompactPoseBoneIndex PoseBoneIndex = CurShapeBox.AttachedBone.GetCompactPoseIndex(BoneContainer);
+			/// LOD case?
+			if (PoseBoneIndex != INDEX_NONE)
+			{
+				FTransform BoneTInCS = PoseContext.Pose.GetComponentSpaceTransform(PoseBoneIndex);
+				const FTransform OffsetT(CurShapeBox.RotationOffset.Quaternion(), CurShapeBox.LocationOffset);
+
+				BoneTInCS = OffsetT * BoneTInCS;
+				const FVector BoneLocation = BoneTInCS.GetLocation();
+				const FQuat BoneRotation = BoneTInCS.GetRotation();
+
+				const FLKAnimVerletConstraint_Box BoxConstraint(BoneLocation, BoneRotation, CurShapeBox.HalfExtents, Thickness,
+																&SimulateBones, CurShapeBox.ExcludeBoneBits, bUseXPBDSolver, Compliance);
+				BoxCollisionConstraints.Emplace(BoxConstraint);
+			}
+		}
+	}
+	for (int32 i = 0; i < DynamicCollisionShapes.BoxCollisionShapes.Num(); ++i)
+	{
+		FLKAnimVerletCollisionBox& CurShapeBox = DynamicCollisionShapes.BoxCollisionShapes[i];
+		if (CurShapeBox.bUseAbsoluteWorldTransform)
+		{
+			const FVector BoneLocation = CurShapeBox.LocationOffset;
+			const FQuat BoneRotation = CurShapeBox.RotationOffset.Quaternion();
+
+			const FLKAnimVerletConstraint_Box BoxConstraint(BoneLocation, BoneRotation, CurShapeBox.HalfExtents, Thickness,
+															&SimulateBones, CurShapeBox.ExcludeBoneBits, bUseXPBDSolver, Compliance);
+			BoxCollisionConstraints.Emplace(BoxConstraint);
+		}
+		else
+		{
+			if (CurShapeBox.AttachedBone.BoneName != NAME_None && CurShapeBox.AttachedBone.HasValidSetup() == false)
+			{
+				InitializeAttachedShape(CurShapeBox, BoneContainer);
+			}
+
+			const FCompactPoseBoneIndex PoseBoneIndex = CurShapeBox.AttachedBone.GetCompactPoseIndex(BoneContainer);
+			/// LOD case?
+			if (PoseBoneIndex != INDEX_NONE)
+			{
+				FTransform BoneTInCS = PoseContext.Pose.GetComponentSpaceTransform(PoseBoneIndex);
+				const FTransform OffsetT(CurShapeBox.RotationOffset.Quaternion(), CurShapeBox.LocationOffset);
+
+				BoneTInCS = OffsetT * BoneTInCS;
+				const FVector BoneLocation = BoneTInCS.GetLocation();
+				const FQuat BoneRotation = BoneTInCS.GetRotation();
+
+				const FLKAnimVerletConstraint_Box BoxConstraint(BoneLocation, BoneRotation, CurShapeBox.HalfExtents, Thickness,
+																&SimulateBones, CurShapeBox.ExcludeBoneBits, bUseXPBDSolver, Compliance);
+				BoxCollisionConstraints.Emplace(BoxConstraint);
+			}
+		}
+	}
+
+	///----------------------------------------------------------------------------------------------------------------------------
+	/// Plane
+	///----------------------------------------------------------------------------------------------------------------------------
+	PlaneCollisionConstraints.Reset();
+	for (int32 i = 0; i < SimulatingCollisionShapes.PlaneCollisionShapes.Num(); ++i)
+	{
+		const FLKAnimVerletCollisionPlane& CurShapePlane = SimulatingCollisionShapes.PlaneCollisionShapes[i];
+		if (CurShapePlane.bUseAbsoluteWorldTransform)
+		{
+			const FVector BoneLocation = CurShapePlane.LocationOffset;
+			const FQuat BoneRotation = CurShapePlane.RotationOffset.Quaternion();
+			const FLKAnimVerletConstraint_Plane PlaneConstraint(BoneLocation, BoneRotation.GetUpVector(), BoneRotation,
+																CurShapePlane.bFinitePlane ? CurShapePlane.FinitePlaneHalfExtents : FVector2D::ZeroVector, Thickness,
+																&SimulateBones, CurShapePlane.ExcludeBoneBits, bUseXPBDSolver, Compliance);
+			PlaneCollisionConstraints.Emplace(PlaneConstraint);
+		}
+		else
+		{
 			const FCompactPoseBoneIndex PoseBoneIndex = CurShapePlane.AttachedBone.GetCompactPoseIndex(BoneContainer);
 			/// LOD case?
 			if (PoseBoneIndex != INDEX_NONE)
@@ -740,7 +878,43 @@ void FLKAnimNode_AnimVerlet::PrepareLocalCollisionConstraints(FComponentSpacePos
 				const FQuat BoneRotation = BoneTInCS.GetRotation();
 
 				const FLKAnimVerletConstraint_Plane PlaneConstraint(BoneLocation, BoneRotation.GetUpVector(), BoneRotation,
-																	CurShapePlane.bFinitePlane ? CurShapePlane.FinitePlaneHalfExtents : FVector2D::ZeroVector, Thickness, 
+																	CurShapePlane.bFinitePlane ? CurShapePlane.FinitePlaneHalfExtents : FVector2D::ZeroVector, Thickness,
+																	&SimulateBones, CurShapePlane.ExcludeBoneBits, bUseXPBDSolver, Compliance);
+				PlaneCollisionConstraints.Emplace(PlaneConstraint);
+			}
+		}
+	}
+	for (int32 i = 0; i < DynamicCollisionShapes.PlaneCollisionShapes.Num(); ++i)
+	{
+		FLKAnimVerletCollisionPlane& CurShapePlane = DynamicCollisionShapes.PlaneCollisionShapes[i];
+		if (CurShapePlane.bUseAbsoluteWorldTransform)
+		{
+			const FVector BoneLocation = CurShapePlane.LocationOffset;
+			const FQuat BoneRotation = CurShapePlane.RotationOffset.Quaternion();
+			const FLKAnimVerletConstraint_Plane PlaneConstraint(BoneLocation, BoneRotation.GetUpVector(), BoneRotation,
+																CurShapePlane.bFinitePlane ? CurShapePlane.FinitePlaneHalfExtents : FVector2D::ZeroVector, Thickness,
+																& SimulateBones, CurShapePlane.ExcludeBoneBits, bUseXPBDSolver, Compliance);
+			PlaneCollisionConstraints.Emplace(PlaneConstraint);
+		}
+		else
+		{
+			if (CurShapePlane.AttachedBone.BoneName != NAME_None && CurShapePlane.AttachedBone.HasValidSetup() == false)
+			{
+				InitializeAttachedShape(CurShapePlane, BoneContainer);
+			}
+
+			const FCompactPoseBoneIndex PoseBoneIndex = CurShapePlane.AttachedBone.GetCompactPoseIndex(BoneContainer);
+			/// LOD case?
+			if (PoseBoneIndex != INDEX_NONE)
+			{
+				FTransform BoneTInCS = PoseContext.Pose.GetComponentSpaceTransform(PoseBoneIndex);
+				const FTransform OffsetT(CurShapePlane.RotationOffset.Quaternion(), CurShapePlane.LocationOffset);
+
+				BoneTInCS = OffsetT * BoneTInCS;
+				const FVector BoneLocation = BoneTInCS.GetLocation();
+				const FQuat BoneRotation = BoneTInCS.GetRotation();
+				const FLKAnimVerletConstraint_Plane PlaneConstraint(BoneLocation, BoneRotation.GetUpVector(), BoneRotation,
+																	CurShapePlane.bFinitePlane ? CurShapePlane.FinitePlaneHalfExtents : FVector2D::ZeroVector, Thickness,
 																	&SimulateBones, CurShapePlane.ExcludeBoneBits, bUseXPBDSolver, Compliance);
 				PlaneCollisionConstraints.Emplace(PlaneConstraint);
 			}
@@ -1200,6 +1374,8 @@ void FLKAnimNode_AnimVerlet::ApplyResult(OUT TArray<FBoneTransform>& OutBoneTran
 
 void FLKAnimNode_AnimVerlet::ClearSimulateBones()
 {
+	SimulatingCollisionShapes.ResetCollisionShapeList();
+
 	///Constraints.Reset();
 	PinConstraints.Reset();
 	DistanceConstraints.Reset();
