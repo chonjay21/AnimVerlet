@@ -64,6 +64,12 @@ public:
 	void SetDynamicCollisionShapes(const FLKAnimVerletCollisionShapeList& InDynamicCollisionShapes) { DynamicCollisionShapes = InDynamicCollisionShapes; }
 	void ForceClearSimulateBones() { ClearSimulateBones(); }	/// for live editor preview
 
+	void ResetCollisionShapes();
+	void CollisionShapesToCollisionShapeList(OUT FLKAnimVerletCollisionShapeList& OutShapeList) const;
+	void CollisionShapesFromCollisionShapeList(const FLKAnimVerletCollisionShapeList& InShapeList);
+	bool ConvertCollisionShapesToDataAsset();
+	bool ConvertCollisionShapesFromDataAsset();
+
 public:
 	/** Input the starting bone of the cloth sequentially. */
 	UPROPERTY(EditAnywhere, Category = "Setup", meta = (DisplayPriority = "1"))

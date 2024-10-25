@@ -1456,3 +1456,55 @@ void FLKAnimNode_AnimVerlet::ForEachConstraints(Predicate Pred)
 		Pred(CurConstraint);
 	}
 }
+
+void FLKAnimNode_AnimVerlet::ResetCollisionShapes()
+{
+	SphereCollisionShapes.Reset();
+	CapsuleCollisionShapes.Reset();
+	BoxCollisionShapes.Reset();
+	PlaneCollisionShapes.Reset();
+}
+
+void FLKAnimNode_AnimVerlet::CollisionShapesToCollisionShapeList(OUT FLKAnimVerletCollisionShapeList& OutShapeList) const
+{
+	OutShapeList.SphereCollisionShapes = SphereCollisionShapes;
+	OutShapeList.CapsuleCollisionShapes = CapsuleCollisionShapes;
+	OutShapeList.BoxCollisionShapes = BoxCollisionShapes;
+	OutShapeList.PlaneCollisionShapes = PlaneCollisionShapes;
+}
+
+void FLKAnimNode_AnimVerlet::CollisionShapesFromCollisionShapeList(const FLKAnimVerletCollisionShapeList& InShapeList)
+{
+	SphereCollisionShapes = InShapeList.SphereCollisionShapes;
+	CapsuleCollisionShapes = InShapeList.CapsuleCollisionShapes;
+	BoxCollisionShapes = InShapeList.BoxCollisionShapes;
+	PlaneCollisionShapes = InShapeList.PlaneCollisionShapes;
+}
+
+bool FLKAnimNode_AnimVerlet::ConvertCollisionShapesToDataAsset()
+{
+	if (CollisionDataAsset == nullptr)
+		return false;
+
+	FLKAnimVerletCollisionShapeList ShapeList;
+	CollisionShapesToCollisionShapeList(OUT ShapeList);
+
+	CollisionDataAsset->Reset();
+	CollisionDataAsset->ConvertFromShape(ShapeList);
+
+	return true;
+}
+
+bool FLKAnimNode_AnimVerlet::ConvertCollisionShapesFromDataAsset()
+{
+	if (CollisionDataAsset == nullptr)
+		return false;
+
+	ResetCollisionShapes();
+
+	FLKAnimVerletCollisionShapeList ShapeList;
+	CollisionDataAsset->ConvertToShape(OUT ShapeList);
+	CollisionShapesFromCollisionShapeList(ShapeList);
+
+	return true;
+}

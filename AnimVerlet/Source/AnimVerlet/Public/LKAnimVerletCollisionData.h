@@ -33,6 +33,7 @@ public:
 
 protected:
 	void ConvertToShapeBase(OUT struct FLKAnimVerletCollisionShape& OutShapeBase) const;
+	void ConvertFromShapeBase(const struct FLKAnimVerletCollisionShape& InShapeBase);
 };
 ///=========================================================================================================================================
 
@@ -54,6 +55,7 @@ public:
 
 public:
 	void ConvertToShape(OUT struct FLKAnimVerletCollisionSphere& OutSphere) const;
+	void ConvertFromShape(const struct FLKAnimVerletCollisionSphere& InSphere);
 };
 ///=========================================================================================================================================
 
@@ -80,6 +82,7 @@ public:
 
 public:
 	void ConvertToShape(OUT struct FLKAnimVerletCollisionCapsule& OutCapsule) const;
+	void ConvertFromShape(const struct FLKAnimVerletCollisionCapsule& InCapsule);
 };
 ///=========================================================================================================================================
 
@@ -103,6 +106,7 @@ public:
 
 public:
 	void ConvertToShape(OUT struct FLKAnimVerletCollisionBox& OutBox) const;
+	void ConvertFromShape(const struct FLKAnimVerletCollisionBox& InBox);
 };
 ///=========================================================================================================================================
 
@@ -129,6 +133,7 @@ public:
 
 public:
 	void ConvertToShape(OUT struct FLKAnimVerletCollisionPlane& OutPlane) const;
+	void ConvertFromShape(const struct FLKAnimVerletCollisionPlane& InPlane);
 };
 ///=========================================================================================================================================
 
@@ -153,6 +158,8 @@ public:
 
 public:
 	void ConvertToShape(OUT struct FLKAnimVerletCollisionShapeList& OutShapeList) const;
+	void ConvertFromShape(const struct FLKAnimVerletCollisionShapeList& InShapeList);
+	void Reset();
 };
 ///=========================================================================================================================================
 
@@ -171,5 +178,7 @@ public:
 
 public:
 	void ConvertToShape(OUT struct FLKAnimVerletCollisionShapeList& OutShapeList) const;
+	void ConvertFromShape(const struct FLKAnimVerletCollisionShapeList& InShapeList);
+	void Reset();
 };
 ///=========================================================================================================================================

@@ -20,6 +20,21 @@ void FLKAnimVerletCollisionData::ConvertToShapeBase(OUT FLKAnimVerletCollisionSh
 	OutShapeBase.LocationOffset = LocationOffset;
 }
 
+void FLKAnimVerletCollisionData::ConvertFromShapeBase(const FLKAnimVerletCollisionShape& InShapeBase)
+{
+	bUseAbsoluteWorldTransform = InShapeBase.bUseAbsoluteWorldTransform;
+	if (bUseAbsoluteWorldTransform == false)
+		AttachBoneName = InShapeBase.AttachedBone.BoneName;
+
+	ExcludeBones.SetNum(InShapeBase.ExcludeBones.Num());
+	for (int32 i = 0; i < InShapeBase.ExcludeBones.Num(); ++i)
+	{
+		const FName& CurBoneName = InShapeBase.ExcludeBones[i].BoneName;
+		ExcludeBones[i] = CurBoneName;
+	}
+	LocationOffset = InShapeBase.LocationOffset;
+}
+
 ///=========================================================================================================================================
 /// FLKAnimVerletCollisionDataSphere
 ///=========================================================================================================================================
@@ -28,6 +43,13 @@ void FLKAnimVerletCollisionDataSphere::ConvertToShape(OUT FLKAnimVerletCollision
 	ConvertToShapeBase(OUT OutSphere);
 
 	OutSphere.Radius = Radius;
+}
+
+void FLKAnimVerletCollisionDataSphere::ConvertFromShape(const FLKAnimVerletCollisionSphere& InSphere)
+{
+	ConvertFromShapeBase(InSphere);
+
+	Radius = InSphere.Radius;
 }
 
 ///=========================================================================================================================================
@@ -42,6 +64,15 @@ void FLKAnimVerletCollisionDataCapsule::ConvertToShape(OUT FLKAnimVerletCollisio
 	OutCapsule.HalfHeight = HalfHeight;
 }
 
+void FLKAnimVerletCollisionDataCapsule::ConvertFromShape(const FLKAnimVerletCollisionCapsule& InCapsule)
+{
+	ConvertFromShapeBase(InCapsule);
+
+	RotationOffset = InCapsule.RotationOffset;
+	Radius = InCapsule.Radius;
+	HalfHeight = InCapsule.HalfHeight;
+}
+
 ///=========================================================================================================================================
 /// FLKAnimVerletCollisionDataBox
 ///=========================================================================================================================================
@@ -51,6 +82,14 @@ void FLKAnimVerletCollisionDataBox::ConvertToShape(OUT FLKAnimVerletCollisionBox
 
 	OutBox.RotationOffset = RotationOffset;
 	OutBox.HalfExtents = HalfExtents;
+}
+
+void FLKAnimVerletCollisionDataBox::ConvertFromShape(const FLKAnimVerletCollisionBox& InBox)
+{
+	ConvertFromShapeBase(InBox);
+
+	RotationOffset = InBox.RotationOffset;
+	HalfExtents = InBox.HalfExtents;
 }
 
 ///=========================================================================================================================================
@@ -63,6 +102,15 @@ void FLKAnimVerletCollisionDataPlane::ConvertToShape(OUT FLKAnimVerletCollisionP
 	OutPlane.RotationOffset = RotationOffset;
 	OutPlane.bFinitePlane = bFinitePlane;
 	OutPlane.FinitePlaneHalfExtents = FinitePlaneHalfExtents;
+}
+
+void FLKAnimVerletCollisionDataPlane::ConvertFromShape(const FLKAnimVerletCollisionPlane& InPlane)
+{
+	ConvertFromShapeBase(InPlane);
+
+	RotationOffset = InPlane.RotationOffset;
+	bFinitePlane = InPlane.bFinitePlane;
+	FinitePlaneHalfExtents = InPlane.FinitePlaneHalfExtents;
 }
 
 ///=========================================================================================================================================
@@ -99,10 +147,59 @@ void FLKAnimVerletCollisionDataList::ConvertToShape(OUT FLKAnimVerletCollisionSh
 	}
 }
 
+void FLKAnimVerletCollisionDataList::ConvertFromShape(const FLKAnimVerletCollisionShapeList& InShapeList)
+{
+	SphereCollisionData.Reserve(SphereCollisionData.Num() + InShapeList.SphereCollisionShapes.Num());
+	for (const FLKAnimVerletCollisionSphere& CurData : InShapeList.SphereCollisionShapes)
+	{
+		FLKAnimVerletCollisionDataSphere& SphereShape = SphereCollisionData.Emplace_GetRef();
+		SphereShape.ConvertFromShape(CurData);
+	}
+
+	CapsuleCollisionData.Reserve(CapsuleCollisionData.Num() + InShapeList.CapsuleCollisionShapes.Num());
+	for (const FLKAnimVerletCollisionCapsule& CurData : InShapeList.CapsuleCollisionShapes)
+	{
+		FLKAnimVerletCollisionDataCapsule& CapsuleShape = CapsuleCollisionData.Emplace_GetRef();
+		CapsuleShape.ConvertFromShape(CurData);
+	}
+
+	BoxCollisionData.Reserve(BoxCollisionData.Num() + InShapeList.BoxCollisionShapes.Num());
+	for (const FLKAnimVerletCollisionBox& CurData : InShapeList.BoxCollisionShapes)
+	{
+		FLKAnimVerletCollisionDataBox& BoxShape = BoxCollisionData.Emplace_GetRef();
+		BoxShape.ConvertFromShape(CurData);
+	}
+
+	PlaneCollisionData.Reserve(PlaneCollisionData.Num() + InShapeList.PlaneCollisionShapes.Num());
+	for (const FLKAnimVerletCollisionPlane& CurData : InShapeList.PlaneCollisionShapes)
+	{
+		FLKAnimVerletCollisionDataPlane& PlaneShape = PlaneCollisionData.Emplace_GetRef();
+		PlaneShape.ConvertFromShape(CurData);
+	}
+}
+
+void FLKAnimVerletCollisionDataList::Reset()
+{
+	SphereCollisionData.Reset();
+	CapsuleCollisionData.Reset();
+	BoxCollisionData.Reset();
+	PlaneCollisionData.Reset();
+}
+
 ///=========================================================================================================================================
 /// ULKAnimVerletCollisionDataAsset
 ///=========================================================================================================================================
 void ULKAnimVerletCollisionDataAsset::ConvertToShape(OUT FLKAnimVerletCollisionShapeList& OutShapeList) const
 {
 	CollisionDataList.ConvertToShape(OUT OutShapeList);
+}
+
+void ULKAnimVerletCollisionDataAsset::ConvertFromShape(const FLKAnimVerletCollisionShapeList& InShapeList)
+{
+	CollisionDataList.ConvertFromShape(InShapeList);
+}
+
+void ULKAnimVerletCollisionDataAsset::Reset()
+{
+	CollisionDataList.Reset();
 }

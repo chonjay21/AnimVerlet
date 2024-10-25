@@ -6,9 +6,12 @@
 #include <DetailWidgetRow.h>
 #include <DetailCategoryBuilder.h>
 #include <EngineGlobals.h>
-#include <Materials/MaterialInstanceDynamic.h>
 #include <PropertyHandle.h>
+#include <Framework/Notifications/NotificationManager.h>
+#include <Materials/MaterialInstanceDynamic.h>
 #include <Widgets/Input/SButton.h>
+#include <Widgets/Notifications/SNotificationList.h>
+
 
 #define LOCTEXT_NAMESPACE "AnimVerlet"
 ULKAnimGraphNode_AnimVerlet::ULKAnimGraphNode_AnimVerlet(const FObjectInitializer& ObjectInitializer)
@@ -69,14 +72,32 @@ void ULKAnimGraphNode_AnimVerlet::CustomizeDetails(IDetailLayoutBuilder& DetailB
 	Super::CustomizeDetails(DetailBuilder);
 
 	IDetailCategoryBuilder& PreviewCategory = DetailBuilder.EditCategory(TEXT("Preview"));
-	FDetailWidgetRow& WidgetRow = PreviewCategory.AddCustomRow(LOCTEXT("ResetButtonRow", "Reset"));
-
-	WidgetRow
+	FDetailWidgetRow& ResetWidgetRow = PreviewCategory.AddCustomRow(LOCTEXT("ResetButtonRow", "Reset"));
+	ResetWidgetRow
 		[
 			SNew(SButton)
 			.Text(LOCTEXT("ResetButtonText", "Reset Simulation"))
 		.ToolTipText(LOCTEXT("ResetButtonToolTip", "Resets the simulation for this node"))
 		.OnClicked(FOnClicked::CreateStatic(&ULKAnimGraphNode_AnimVerlet::ResetSimulationButtonClicked, &DetailBuilder))
+		];
+
+	IDetailCategoryBuilder& AnimVerletToolCategory = DetailBuilder.EditCategory(TEXT("AnimVerlet Tool"));
+	FDetailWidgetRow& ConvertToDaWidgetRow = AnimVerletToolCategory.AddCustomRow(LOCTEXT("ConvertToDataAssetRow", "ConvertCollisionToDataAsset"));
+	ConvertToDaWidgetRow
+		[
+			SNew(SButton)
+				.Text(LOCTEXT("ConvertToDaButtonText", "Convert Collision To DataAsset"))
+				.ToolTipText(LOCTEXT("ConvertToDaButtonToolTip", "Convert collision shape data list to CollisionDataAsset(Need to save the DataAsset manually after convert)"))
+				.OnClicked(FOnClicked::CreateStatic(&ULKAnimGraphNode_AnimVerlet::ConvertToDaButtonClicked, &DetailBuilder))
+		];
+
+	FDetailWidgetRow& ConvertFromDaWidgetRow = AnimVerletToolCategory.AddCustomRow(LOCTEXT("ConvertFromDataAssetRow", "ConvertCollisionFromDataAsset"));
+	ConvertFromDaWidgetRow
+		[
+			SNew(SButton)
+				.Text(LOCTEXT("ConvertFromDaButtonText", "Convert Collision From DataAsset"))
+				.ToolTipText(LOCTEXT("ConvertFromDaButtonToolTip", "Convert CollisionDataAsset to collision shape data list(Need to save the AnimBlueprint manually after convert)"))
+				.OnClicked(FOnClicked::CreateStatic(&ULKAnimGraphNode_AnimVerlet::ConvertFromDaButtonClicked, &DetailBuilder))
 		];
 }
 
@@ -174,6 +195,15 @@ void ULKAnimGraphNode_AnimVerlet::Draw(FPrimitiveDrawInterface* PDI, USkeletalMe
 	}
 }
 
+void ULKAnimGraphNode_AnimVerlet::ShowNotification(const FText& InText, bool bSuccess)
+{
+	FNotificationInfo NotificationInfo(InText);
+	NotificationInfo.ExpireDuration = 5.0f;
+
+	TSharedPtr<SNotificationItem> NotificationItem = FSlateNotificationManager::Get().AddNotification(NotificationInfo);
+	NotificationItem->SetCompletionState(bSuccess ? SNotificationItem::CS_Success : SNotificationItem::CS_Fail);
+}
+
 void ULKAnimGraphNode_AnimVerlet::ResetSimulation()
 {
 	FLKAnimNode_AnimVerlet* PreviewNode = GetPreviewAnimVerletNode();
@@ -182,7 +212,6 @@ void ULKAnimGraphNode_AnimVerlet::ResetSimulation()
 		PreviewNode->ResetDynamics(ETeleportType::ResetPhysics);
 	}
 }
-
 FReply ULKAnimGraphNode_AnimVerlet::ResetSimulationButtonClicked(IDetailLayoutBuilder* DetailLayoutBuilder)
 {
 	const TArray<TWeakObjectPtr<UObject>>& SelectedObjectsList = DetailLayoutBuilder->GetSelectedObjects();
@@ -191,6 +220,65 @@ FReply ULKAnimGraphNode_AnimVerlet::ResetSimulationButtonClicked(IDetailLayoutBu
 		if (ULKAnimGraphNode_AnimVerlet* AnimVerletGraphNode = Cast<ULKAnimGraphNode_AnimVerlet>(Object.Get()))
 		{
 			AnimVerletGraphNode->ResetSimulation();
+		}
+	}
+
+	return FReply::Handled();
+}
+
+void ULKAnimGraphNode_AnimVerlet::ConvertCollisionShapesToDataAsset()
+{
+	const bool bResult = Node.ConvertCollisionShapesToDataAsset();
+	if (bResult)
+	{
+		ShowNotification(FText::FromString(TEXT("Converted to CollisionDataAsset")), true);
+	}
+	else
+	{
+		ShowNotification(FText::FromString(TEXT("CollisionDataAsset is required")), false);
+	}
+}
+FReply ULKAnimGraphNode_AnimVerlet::ConvertToDaButtonClicked(IDetailLayoutBuilder* DetailLayoutBuilder)
+{
+	const TArray<TWeakObjectPtr<UObject>>& SelectedObjectsList = DetailLayoutBuilder->GetSelectedObjects();
+	for (TWeakObjectPtr<UObject> Object : SelectedObjectsList)
+	{
+		if (ULKAnimGraphNode_AnimVerlet* AnimVerletGraphNode = Cast<ULKAnimGraphNode_AnimVerlet>(Object.Get()))
+		{
+			AnimVerletGraphNode->ConvertCollisionShapesToDataAsset();
+		}
+	}
+
+	return FReply::Handled();
+}
+
+void ULKAnimGraphNode_AnimVerlet::ConvertCollisionShapesFromDataAsset()
+{
+	const bool bResult = Node.ConvertCollisionShapesFromDataAsset();
+	if (bResult)
+	{
+		ShowNotification(FText::FromString(TEXT("Converted from CollisionDataAsset")), true);
+	}
+	else
+	{
+		ShowNotification(FText::FromString(TEXT("CollisionDataAsset is required")), false);
+		return;
+	}
+
+	FLKAnimNode_AnimVerlet* PreviewNode = GetPreviewAnimVerletNode();
+	if (PreviewNode != nullptr)
+	{
+		PreviewNode->ConvertCollisionShapesFromDataAsset();
+	}
+}
+FReply ULKAnimGraphNode_AnimVerlet::ConvertFromDaButtonClicked(IDetailLayoutBuilder* DetailLayoutBuilder)
+{
+	const TArray<TWeakObjectPtr<UObject>>& SelectedObjectsList = DetailLayoutBuilder->GetSelectedObjects();
+	for (TWeakObjectPtr<UObject> Object : SelectedObjectsList)
+	{
+		if (ULKAnimGraphNode_AnimVerlet* AnimVerletGraphNode = Cast<ULKAnimGraphNode_AnimVerlet>(Object.Get()))
+		{
+			AnimVerletGraphNode->ConvertCollisionShapesFromDataAsset();
 		}
 	}
 
@@ -209,7 +297,6 @@ FLKAnimNode_AnimVerlet* ULKAnimGraphNode_AnimVerlet::GetPreviewAnimVerletNode() 
 			ActivePreviewNode = Class->GetPropertyInstance<FLKAnimNode_AnimVerlet>(Instance, NodeGuid);
 		}
 	}
-
 	return ActivePreviewNode;
 }
 

@@ -11,11 +11,15 @@ class ULKAnimGraphNode_AnimVerlet : public UAnimGraphNode_SkeletalControlBase
 
 public:
 	static FReply ResetSimulationButtonClicked(IDetailLayoutBuilder* DetailLayoutBuilder);
+	static FReply ConvertToDaButtonClicked(IDetailLayoutBuilder* DetailLayoutBuilder);
+	static FReply ConvertFromDaButtonClicked(IDetailLayoutBuilder* DetailLayoutBuilder);
 
 public:
 	ULKAnimGraphNode_AnimVerlet(const FObjectInitializer& ObjectInitializer);
 
 	void ResetSimulation();
+	void ConvertCollisionShapesToDataAsset();
+	void ConvertCollisionShapesFromDataAsset();
 	FLKAnimNode_AnimVerlet* GetPreviewAnimVerletNode() const;
 
 public:
@@ -29,6 +33,9 @@ public:
 protected:
 	virtual FText GetControllerDescription() const override;
 	virtual const FAnimNode_SkeletalControlBase* GetNode() const override { return &Node; }
+
+private:
+	void ShowNotification(const FText& InText, bool bSuccess);
 
 private:
 	UPROPERTY(Transient)
