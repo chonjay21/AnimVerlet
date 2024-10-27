@@ -5,9 +5,9 @@
 * Support Cloth(cloak, cape, flag) simulation while respecting the animation pose.
 * Support String(hair, skirt)(one chain cloth) simulation while respecting the animation pose.
 * Support Blob, fluid like soft body simulation while respecting the animation pose.
-* Support custom collision(Sphere, Capsule, Box, Plain)
+* Support custom collision(Sphere, Capsule, Box, Plain) and support the feature to easily modify collision transforms in the preview editor
 * Support ball socket constraints(Cone angle constraints)
-* Use simple position based physics simulation(by Verlet Integration).
+* Use simple position based physics simulation or optionally use extended position based physics simulation (by Verlet Integration).
 * Minimize solve iterations by using a heuristic solve order.(1 iteration is usually sufficient)
 * Easy readable source code
 

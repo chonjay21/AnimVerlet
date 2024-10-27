@@ -1,17 +1,16 @@
 #include "LKAnimGraphNode_AnimVerlet.h"
 
-#include <Animation/AnimInstance.h>
 #include <AnimNodeEditModes.h>
 #include <DetailLayoutBuilder.h>
 #include <DetailWidgetRow.h>
 #include <DetailCategoryBuilder.h>
 #include <EngineGlobals.h>
 #include <PropertyHandle.h>
+#include <Animation/AnimInstance.h>
 #include <Framework/Notifications/NotificationManager.h>
 #include <Materials/MaterialInstanceDynamic.h>
 #include <Widgets/Input/SButton.h>
 #include <Widgets/Notifications/SNotificationList.h>
-
 
 #define LOCTEXT_NAMESPACE "AnimVerlet"
 ULKAnimGraphNode_AnimVerlet::ULKAnimGraphNode_AnimVerlet(const FObjectInitializer& ObjectInitializer)
@@ -22,6 +21,26 @@ ULKAnimGraphNode_AnimVerlet::ULKAnimGraphNode_AnimVerlet(const FObjectInitialize
 FText ULKAnimGraphNode_AnimVerlet::GetControllerDescription() const
 {
 	return LOCTEXT("AnimVerlet", "AnimVerlet");
+}
+
+void ULKAnimGraphNode_AnimVerlet::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
+{
+	FLKAnimNode_AnimVerlet* PreviewNode = GetPreviewAnimVerletNode();
+	if (PreviewNode != nullptr)
+	{
+		/// data sync from GraphNode to Preview(Runtime) node(for realtime synt without blueprint compile)
+		PreviewNode->SyncFromOtherAnimVerletNode(Node);
+		PreviewNode->ForceClearSimulateBones();
+		PreviewNode->MarkLocalColliderDirty();
+	}
+
+	Super::PostEditChangeProperty(PropertyChangedEvent);
+}
+
+void ULKAnimGraphNode_AnimVerlet::PostEditChangeChainProperty(FPropertyChangedChainEvent& PropertyChangedEvent)
+{
+
+	Super::PostEditChangeChainProperty(PropertyChangedEvent);
 }
 
 FText ULKAnimGraphNode_AnimVerlet::GetNodeTitle(ENodeTitleType::Type TitleType) const
@@ -54,17 +73,6 @@ FText ULKAnimGraphNode_AnimVerlet::GetNodeTitle(ENodeTitleType::Type TitleType) 
 FEditorModeID ULKAnimGraphNode_AnimVerlet::GetEditorMode() const
 {
 	return "AnimGraph.SkeletalControl.AnimVerlet";
-}
-
-void ULKAnimGraphNode_AnimVerlet::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
-{
-	FLKAnimNode_AnimVerlet* PreviewNode = GetPreviewAnimVerletNode();
-	if (PreviewNode != nullptr)
-	{
-		PreviewNode->ForceClearSimulateBones();
-	}
-
-	Super::PostEditChangeProperty(PropertyChangedEvent);
 }
 
 void ULKAnimGraphNode_AnimVerlet::CustomizeDetails(IDetailLayoutBuilder& DetailBuilder)
@@ -136,7 +144,7 @@ void ULKAnimGraphNode_AnimVerlet::Draw(FPrimitiveDrawInterface* PDI, USkeletalMe
 				DrawWireSphere(PDI, PinConstraint.Bone->Location, FColor::Red, AnimVerletNode->Thickness * 2, 16, SDPG_Foreground);
 		}
 
-		if (bShowBallSocketConstraints)
+		if (bShowSimulatingBallSocketConstraints)
 		{
 			const TArray<FLKAnimVerletConstraint_BallSocket>& BallSocketConstraints = AnimVerletNode->GetBallSocketConstraints();
 			for (const FLKAnimVerletConstraint_BallSocket& CurConstraint : BallSocketConstraints)
@@ -148,16 +156,21 @@ void ULKAnimGraphNode_AnimVerlet::Draw(FPrimitiveDrawInterface* PDI, USkeletalMe
 			VertexSpaceCache.Reset();
 		}
 
-		if (bShowLocalCollisionConstraints)
+		/// Show simulating local collision constraints
+		if (bShowSimulatingSphereCollisionConstraints)
 		{
 			const TArray<FLKAnimVerletConstraint_Sphere>& SphereCollisionConstraints = AnimVerletNode->GetSphereCollisionConstraints();
 			for (const FLKAnimVerletConstraint_Sphere& CurConstraint : SphereCollisionConstraints)
 				DrawWireSphere(PDI, CurConstraint.Location, FColor::Blue, CurConstraint.Radius, 16, SDPG_Foreground);
-
+		}
+		if (bShowSimulatingCapsuleCollisionConstraints)
+		{
 			const TArray<FLKAnimVerletConstraint_Capsule>& CapsuleCollisionConstraints = AnimVerletNode->GetCapsuleCollisionConstraints();
 			for (const FLKAnimVerletConstraint_Capsule& CurConstraint : CapsuleCollisionConstraints)
 				DrawWireCapsule(PDI, CurConstraint.Location, CurConstraint.Rotation.GetAxisX(), CurConstraint.Rotation.GetAxisY(), CurConstraint.Rotation.GetAxisZ(), FColor::Blue, CurConstraint.Radius, CurConstraint.HalfHeight, 16, SDPG_Foreground);
-
+		}
+		if (bShowSimulatingBoxCollisionConstraints)
+		{
 			const TArray<FLKAnimVerletConstraint_Box>& BoxCollisionConstraints = AnimVerletNode->GetBoxCollisionConstraints();
 			for (const FLKAnimVerletConstraint_Box& CurConstraint : BoxCollisionConstraints)
 			{
@@ -166,29 +179,28 @@ void ULKAnimGraphNode_AnimVerlet::Draw(FPrimitiveDrawInterface* PDI, USkeletalMe
 				const FBox Box(-CurConstraint.HalfExtents, CurConstraint.HalfExtents);
 				DrawWireBox(PDI, BoxMat, Box, FColor::Blue, SDPG_Foreground);
 			}
-
-			if (bShowPlaneCollisionConstraints)
+		}
+		if (bShowSimulatingPlaneCollisionConstraints)
+		{
+			const TArray<FLKAnimVerletConstraint_Plane>& PlaneCollisionConstraints = AnimVerletNode->GetPlaneCollisionConstraints();
+			for (const FLKAnimVerletConstraint_Plane& CurConstraint : PlaneCollisionConstraints)
 			{
-				const TArray<FLKAnimVerletConstraint_Plane>& PlaneCollisionConstraints = AnimVerletNode->GetPlaneCollisionConstraints();
-				for (const FLKAnimVerletConstraint_Plane& CurConstraint : PlaneCollisionConstraints)
+				const FTransform PlaneT(CurConstraint.Rotation, CurConstraint.PlaneBase);
+				const FMatrix PlaneMat = PlaneT.ToMatrixNoScale();
+				if (CurConstraint.PlaneHalfExtents.IsNearlyZero() == false)
 				{
-					const FTransform PlaneT(CurConstraint.Rotation, CurConstraint.PlaneBase);
-					const FMatrix PlaneMat = PlaneT.ToMatrixNoScale();
-					if (CurConstraint.PlaneHalfExtents.IsNearlyZero() == false)
-					{
-						const FVector PlaneBoxExtents(CurConstraint.PlaneHalfExtents.X, CurConstraint.PlaneHalfExtents.Y, 1.0f);
-						const FBox Box(-PlaneBoxExtents, PlaneBoxExtents);
-						DrawWireBox(PDI, PlaneMat, Box, FColor::Orange, SDPG_Foreground);
-						DrawDirectionalArrow(PDI, FRotationMatrix(FRotator(90.0f, 0.0f, 0.0f)) * PlaneMat, FLinearColor::Gray, 50.0f, 20.0f, SDPG_Foreground, 0.5f);
-					}
-					else
-					{
-						///DrawPlane10x10(PDI, PlaneMat, 200.0f, FVector2D(0.0f, 0.0f), FVector2D(1.0f, 1.0f), GEngine->ConstraintLimitMaterialPrismatic->GetRenderProxy(), SDPG_World);
-						const FVector PlaneBoxExtents(100.0f, 100.0f, 1.0f);
-						const FBox Box(-PlaneBoxExtents, PlaneBoxExtents);
-						DrawWireBox(PDI, PlaneMat, Box, FColor::Orange, SDPG_Foreground);
-						DrawDirectionalArrow(PDI, FRotationMatrix(FRotator(90.0f, 0.0f, 0.0f)) * PlaneMat, FLinearColor::Gray, 50.0f, 20.0f, SDPG_Foreground, 0.5f);
-					}
+					const FVector PlaneBoxExtents(CurConstraint.PlaneHalfExtents.X, CurConstraint.PlaneHalfExtents.Y, 1.0f);
+					const FBox Box(-PlaneBoxExtents, PlaneBoxExtents);
+					DrawWireBox(PDI, PlaneMat, Box, FColor::Orange, SDPG_Foreground);
+					DrawDirectionalArrow(PDI, FRotationMatrix(FRotator(90.0f, 0.0f, 0.0f)) * PlaneMat, FLinearColor::Gray, 50.0f, 20.0f, SDPG_Foreground, 0.5f);
+				}
+				else
+				{
+					///DrawPlane10x10(PDI, PlaneMat, 200.0f, FVector2D(0.0f, 0.0f), FVector2D(1.0f, 1.0f), GEngine->ConstraintLimitMaterialPrismatic->GetRenderProxy(), SDPG_World);
+					const FVector PlaneBoxExtents(100.0f, 100.0f, 1.0f);
+					const FBox Box(-PlaneBoxExtents, PlaneBoxExtents);
+					DrawWireBox(PDI, PlaneMat, Box, FColor::Orange, SDPG_Foreground);
+					DrawDirectionalArrow(PDI, FRotationMatrix(FRotator(90.0f, 0.0f, 0.0f)) * PlaneMat, FLinearColor::Gray, 50.0f, 20.0f, SDPG_Foreground, 0.5f);
 				}
 			}
 		}

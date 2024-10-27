@@ -29,6 +29,7 @@ protected:
 
 private:
 	void InitializeSimulateBones(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer);
+	void InitializeLocalCollisionConstraints(const FBoneContainer& BoneContainer);
 	void InitializeAttachedShape(struct FLKAnimVerletCollisionShape& InShape, const FBoneContainer& BoneContainer);
 	bool MakeSimulateBones(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer, const FReferenceSkeleton& ReferenceSkeleton, int32 BoneIndex, 
 						   int32 ParentSimulateBoneIndex, int32 RootSimulateBoneIndex, const FLKAnimVerletBoneSetting& BoneSetting, bool bParentExcluded, int32 ParentExcludedBoneIndex);
@@ -65,10 +66,12 @@ public:
 	void ForceClearSimulateBones() { ClearSimulateBones(); }	/// for live editor preview
 
 	void ResetCollisionShapes();
+	void MarkLocalColliderDirty() { bLocalColliderDirty = true; }
 	void CollisionShapesToCollisionShapeList(OUT FLKAnimVerletCollisionShapeList& OutShapeList) const;
 	void CollisionShapesFromCollisionShapeList(const FLKAnimVerletCollisionShapeList& InShapeList);
 	bool ConvertCollisionShapesToDataAsset();
 	bool ConvertCollisionShapesFromDataAsset();
+	void SyncFromOtherAnimVerletNode(const FLKAnimNode_AnimVerlet& Other);
 
 public:
 	/** Input the starting bone of the cloth sequentially. */
@@ -77,7 +80,7 @@ public:
 	/** Insert a fake(virtual) bone in the middle of the chain.(It can affect the softness of the cloth or the collision reaction)  */
 	UPROPERTY(EditAnywhere, Category = "Setup")
 	bool bSubDivideBones = false;
-	UPROPERTY(EditAnywhere, Category = "Setup", meta = (EditCondition = "SubDivideBones", EditConditionHides, ClampMin = "0"))
+	UPROPERTY(EditAnywhere, Category = "Setup", meta = (EditCondition = "bSubDivideBones", EditConditionHides, ClampMin = "0"))
 	uint8 NumSubDividedBone = 1;
 	UPROPERTY(EditAnywhere, Category = "Setup")
 	bool bSkipUpdateOnDedicatedServer = true;
@@ -281,7 +284,6 @@ public:
 	float RotationInertiaClampDegrees = 30.0f;
 
 private:
-	FTransform PrevComponentT = FTransform::Identity;
 	TArray<FLKAnimVerletBone> SimulateBones;
 	TArray<FLKAnimVerletExcludedBone> ExcludedBones;
 	FLKAnimVerletCollisionShapeList SimulatingCollisionShapes;
@@ -302,5 +304,7 @@ private:
 	int32 MaxBoneChainLength = 0;
 
 private:
+	bool bLocalColliderDirty = false;
 	float DeltaTime = 0.0f;
+	FTransform PrevComponentT = FTransform::Identity;
 };

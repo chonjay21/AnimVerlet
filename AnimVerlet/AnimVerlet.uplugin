@@ -1,9 +1,9 @@
 {
 	"FileVersion": 3,
-	"Version": 2,
-	"VersionName": "2.0",
+	"Version": 3,
+	"VersionName": "3.0",
 	"FriendlyName": "AnimVerlet",
-	"Description": "Simple cloth anim dynamics(by verlet integration)",
+	"Description": "Simple cloth and string anim dynamics(by verlet integration)",
 	"Category": "Animation",
 	"CreatedBy": "chonjay21",
 	"CreatedByURL": "https://github.com/chonjay21",

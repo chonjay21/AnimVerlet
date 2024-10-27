@@ -23,9 +23,10 @@ public:
 	FLKAnimNode_AnimVerlet* GetPreviewAnimVerletNode() const;
 
 public:
+	virtual void PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent) override;
+	virtual void PostEditChangeChainProperty(struct FPropertyChangedChainEvent& PropertyChangedEvent) override;
 	virtual FText GetNodeTitle(ENodeTitleType::Type TitleType) const override;
 	virtual FEditorModeID GetEditorMode() const override;
-	virtual void PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent) override;
 	virtual void CustomizeDetails(IDetailLayoutBuilder& DetailBuilder) override;
 	virtual void Draw(FPrimitiveDrawInterface* PDI, USkeletalMeshComponent* PreviewSkelMeshComp) const override;
 	virtual void Serialize(FArchive& Ar) override;
@@ -45,6 +46,16 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Settings")
 	FLKAnimNode_AnimVerlet Node;
 
+	/** Show and modify(in preview screen) collisions*/
+	UPROPERTY(EditAnywhere, Category = "CollisionInput", meta = (DisplayPriority = "1"))
+	bool bShowAndModifySphereCollision = true;
+	UPROPERTY(EditAnywhere, Category = "CollisionInput", meta = (DisplayPriority = "1"))
+	bool bShowAndModifyCapsuleCollision = true;
+	UPROPERTY(EditAnywhere, Category = "CollisionInput", meta = (DisplayPriority = "1"))
+	bool bShowAndModifyBoxCollision = true;
+	UPROPERTY(EditAnywhere, Category = "CollisionInput", meta = (DisplayPriority = "1"))
+	bool bShowAndModifyPlaneCollision = true;
+
 	UPROPERTY(EditAnywhere, Category = "Preview")
 	bool bShowBones = true;
 	UPROPERTY(EditAnywhere, Category = "Preview", meta = (EditCondition = "bShowBones", EditConditionHides, ClampMin = "0.0"))
@@ -52,16 +63,21 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Preview", meta = (EditCondition = "bShowBones", EditConditionHides))
 	bool bShowSleep = true;
 
+	/** Show simulating(applying) constraints */
 	UPROPERTY(EditAnywhere, Category = "Preview")
 	bool bShowConstraints = true;
 	UPROPERTY(EditAnywhere, Category = "Preview", meta = (EditCondition = "bShowConstraints", EditConditionHides))
 	bool bShowFixedPoints = true;
 	UPROPERTY(EditAnywhere, Category = "Preview", meta = (EditCondition = "bShowConstraints", EditConditionHides))
-	bool bShowBallSocketConstraints = true;
+	bool bShowSimulatingBallSocketConstraints = true;
 	UPROPERTY(EditAnywhere, Category = "Preview", meta = (EditCondition = "bShowConstraints", EditConditionHides))
-	bool bShowLocalCollisionConstraints = true;
-	UPROPERTY(EditAnywhere, Category = "Preview", meta = (EditCondition = "bShowConstraints && bShowLocalCollisionConstraints", EditConditionHides))
-	bool bShowPlaneCollisionConstraints = true;
+	bool bShowSimulatingSphereCollisionConstraints = false;
+	UPROPERTY(EditAnywhere, Category = "Preview", meta = (EditCondition = "bShowConstraints", EditConditionHides))
+	bool bShowSimulatingCapsuleCollisionConstraints = false;
+	UPROPERTY(EditAnywhere, Category = "Preview", meta = (EditCondition = "bShowConstraints", EditConditionHides))
+	bool bShowSimulatingBoxCollisionConstraints = false;
+	UPROPERTY(EditAnywhere, Category = "Preview", meta = (EditCondition = "bShowConstraints", EditConditionHides))
+	bool bShowSimulatingPlaneCollisionConstraints = false;
 
 private:
 	FNodeTitleTextTable CachedNodeTitles;

@@ -1,13 +1,19 @@
+/**
+	FBoneReference cannot be included in DataAsset due to limitations in UE5.
+	So I split AnimVerletCollider into AnimVerletCollisionShape and AnimVerletCollisionData.
+*/
+
 #pragma once
 #include <CoreMinimal.h>
 #include "LKAnimVerletConstraint.h"
+#include "LKAnimVerletCollisionShapeType.h"
 #include "LKAnimVerletCollisionShape.generated.h"
 
 ///=========================================================================================================================================
 /// FLKAnimVerletCollisionShape(Base Interface)
 ///=========================================================================================================================================
 USTRUCT(BlueprintType)
-struct FLKAnimVerletCollisionShape
+struct FLKAnimVerletCollisionShape : public FLKAnimVerletColliderInterface
 {
 	GENERATED_BODY()
 
@@ -29,6 +35,12 @@ public:
 
 public:
 	virtual ~FLKAnimVerletCollisionShape() {}
+	virtual ELKAnimVerletCollider GetColliderType() const override { return ELKAnimVerletCollider::None; }
+	virtual bool IsUseAbsoluteWorldTransform() const override { return bUseAbsoluteWorldTransform; }
+	virtual FName GetAttachBoneName() const override { return bUseAbsoluteWorldTransform ? NAME_None : AttachedBone.BoneName; }
+	virtual FVector GetLocation() const override { return LocationOffset; }
+	virtual void SetLocation(const FVector& InLocation) override { LocationOffset = InLocation; }
+
 	virtual bool IsSphere() const { return false; }
 	virtual bool IsCapsule() const { return false; }
 	virtual bool IsBox() const { return false; }
@@ -50,7 +62,11 @@ public:
 	float Radius = 0.0f;
 
 public:
+	virtual ELKAnimVerletCollider GetColliderType() const override final { return ELKAnimVerletCollider::Sphere; }
 	virtual bool IsSphere() const override final { return true; }
+
+	virtual FVector GetHalfExtents() const override final { return FVector(Radius, Radius, Radius); }
+	virtual void SetHalfExtents(const FVector& InHalfExtents) override final { Radius = InHalfExtents.X; }
 };
 ///=========================================================================================================================================
 
@@ -73,7 +89,13 @@ public:
 	float HalfHeight = 0.0f;
 
 public:
+	virtual ELKAnimVerletCollider GetColliderType() const override final { return ELKAnimVerletCollider::Capsule; }
 	virtual bool IsCapsule() const override final { return true; }
+	virtual FRotator GetRotation() const override final { return RotationOffset; }
+	virtual void SetRotation(const FRotator& InRotator) override { RotationOffset = InRotator; }
+
+	virtual FVector GetHalfExtents() const override final { return FVector(Radius, Radius, HalfHeight); }
+	virtual void SetHalfExtents(const FVector& InHalfExtents) override final { Radius = InHalfExtents.X; HalfHeight = InHalfExtents.Z; }
 };
 ///=========================================================================================================================================
 
@@ -93,7 +115,13 @@ public:
 	FVector HalfExtents = FVector::ZeroVector;
 
 public:
+	virtual ELKAnimVerletCollider GetColliderType() const override final { return ELKAnimVerletCollider::Box; }
 	virtual bool IsBox() const override final { return true; }
+	virtual FRotator GetRotation() const override final { return RotationOffset; }
+	virtual void SetRotation(const FRotator& InRotator) override { RotationOffset = InRotator; }
+
+	virtual FVector GetHalfExtents() const override final { return HalfExtents; }
+	virtual void SetHalfExtents(const FVector& InHalfExtents) override final { HalfExtents = InHalfExtents; }
 };
 ///=========================================================================================================================================
 
@@ -116,7 +144,13 @@ public:
 	FVector2D FinitePlaneHalfExtents = FVector2D::ZeroVector;
 
 public:
+	virtual ELKAnimVerletCollider GetColliderType() const override final { return ELKAnimVerletCollider::Plane; }
 	virtual bool IsPlane() const override final { return true; }
+	virtual FRotator GetRotation() const override final { return RotationOffset; }
+	virtual void SetRotation(const FRotator& InRotator) override { RotationOffset = InRotator; }
+
+	virtual FVector GetHalfExtents() const override final { return bFinitePlane ? FVector(FinitePlaneHalfExtents, 0.0f) : FVector::ZeroVector; }
+	virtual void SetHalfExtents(const FVector& InHalfExtents) override final { FinitePlaneHalfExtents = bFinitePlane ? FVector2D(InHalfExtents.X, InHalfExtents.Y) : FVector2D::ZeroVector; }
 };
 ///=========================================================================================================================================
 

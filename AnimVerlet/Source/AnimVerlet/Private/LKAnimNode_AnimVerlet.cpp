@@ -339,6 +339,11 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 	}
 
 	/// LocalCollision(Contact) constraints
+	InitializeLocalCollisionConstraints(BoneContainer);
+}
+
+void FLKAnimNode_AnimVerlet::InitializeLocalCollisionConstraints(const FBoneContainer& BoneContainer)
+{
 	SimulatingCollisionShapes.SphereCollisionShapes = SphereCollisionShapes;
 	SimulatingCollisionShapes.CapsuleCollisionShapes = CapsuleCollisionShapes;
 	SimulatingCollisionShapes.BoxCollisionShapes = BoxCollisionShapes;
@@ -643,6 +648,12 @@ void FLKAnimNode_AnimVerlet::PrepareSimulation(FComponentSpacePoseContext& PoseC
 void FLKAnimNode_AnimVerlet::PrepareLocalCollisionConstraints(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer)
 {
 	const double Compliance = static_cast<double>(1.0 / InvCompliance);
+
+	if (bLocalColliderDirty)
+	{
+		SimulatingCollisionShapes.ResetCollisionShapeList();
+		InitializeLocalCollisionConstraints(BoneContainer);
+	}
 
 	///----------------------------------------------------------------------------------------------------------------------------
 	/// Sphere
@@ -1507,4 +1518,98 @@ bool FLKAnimNode_AnimVerlet::ConvertCollisionShapesFromDataAsset()
 	CollisionShapesFromCollisionShapeList(ShapeList);
 
 	return true;
+}
+
+void FLKAnimNode_AnimVerlet::SyncFromOtherAnimVerletNode(const FLKAnimNode_AnimVerlet& Other)
+{
+	VerletBones = Other.VerletBones;
+
+	bSubDivideBones = Other.bSubDivideBones;
+	NumSubDividedBone = Other.NumSubDividedBone;
+	bSkipUpdateOnDedicatedServer = Other.bSkipUpdateOnDedicatedServer;
+
+	bMakeFakeTipBone = Other.bMakeFakeTipBone;
+	FakeTipBoneLength = Other.FakeTipBoneLength;
+	bLockTipBone = Other.bLockTipBone;
+	TipBoneLockMargin = Other.TipBoneLockMargin;
+	StartBoneLockMargin = Other.StartBoneLockMargin;
+
+	AnimationPoseDeltaInertia = Other.AnimationPoseDeltaInertia;
+	AnimationPoseDeltaInertiaScale = Other.AnimationPoseDeltaInertiaScale;
+	bClampAnimationPoseDeltaInertia = Other.bClampAnimationPoseDeltaInertia;
+	AnimationPoseDeltaInertiaClampMax = Other.AnimationPoseDeltaInertiaClampMax;
+	bIgnoreAnimationPose = Other.bIgnoreAnimationPose;
+	AnimationPoseInertia = Other.AnimationPoseInertia;
+
+	Damping = Other.Damping;
+
+	bUseXPBDSolver = Other.bUseXPBDSolver;
+	InvCompliance = Other.InvCompliance;
+	Stiffness = Other.Stiffness;
+
+	bUseSleep = Other.bUseSleep;
+	bIgnoreSleepWhenParentWakedUp = Other.bIgnoreSleepWhenParentWakedUp;
+	SleepDeltaThreshold = Other.SleepDeltaThreshold;
+	SleepTriggerDuration = Other.SleepTriggerDuration;
+	WakeUpDeltaThreshold = Other.WakeUpDeltaThreshold;
+
+	bConstrainRightDiagonalDistance = Other.bConstrainRightDiagonalDistance;
+	bConstrainLeftDiagonalDistance = Other.bConstrainLeftDiagonalDistance;
+	bUseIsometricBendingConstraint = Other.bUseIsometricBendingConstraint;
+	BendingCompliance = Other.BendingCompliance;
+	BendingStiffness = Other.BendingStiffness;
+
+	bPreserveLengthFromParent = Other.bPreserveLengthFromParent;
+	LengthFromParentMargin = Other.LengthFromParentMargin;
+	bPreserveSideLength = Other.bPreserveSideLength;
+	SideLengthMargin = Other.SideLengthMargin;
+
+	bStretchEachBone = Other.bStretchEachBone;
+	StretchStrength = Other.StretchStrength;
+
+	bStraightenBendedBone = Other.bStraightenBendedBone;
+	StraightenBendedBoneStrength = Other.StraightenBendedBoneStrength;
+
+	SolveIteration = Other.SolveIteration;
+
+	FixedDeltaTime = Other.FixedDeltaTime;
+	MinDeltaTime = Other.MinDeltaTime;
+	MaxDeltaTime = Other.MaxDeltaTime;
+	bUseSquaredDeltaTime = Other.bUseSquaredDeltaTime;
+
+	ConeAngle = Other.ConeAngle;
+	Thickness = Other.Thickness;
+
+	WorldCollisionProfile = Other.WorldCollisionProfile;
+
+	SphereCollisionShapes = Other.SphereCollisionShapes;
+	CapsuleCollisionShapes = Other.CapsuleCollisionShapes;
+	BoxCollisionShapes = Other.BoxCollisionShapes;
+	PlaneCollisionShapes = Other.PlaneCollisionShapes;
+	CollisionDataAsset = Other.CollisionDataAsset;
+	DynamicCollisionShapes = Other.DynamicCollisionShapes;
+
+	Gravity = Other.Gravity;
+	bGravityInWorldSpace = Other.bGravityInWorldSpace;
+
+	StretchForce = Other.StretchForce;
+	SideStraightenForce = Other.SideStraightenForce;
+	ShapeMemoryForce = Other.ShapeMemoryForce;
+	ExternalForce = Other.ExternalForce;
+	bExternalForceInWorldSpace = Other.bExternalForceInWorldSpace;
+
+	RandomWindDirection = Other.RandomWindDirection;
+	RandomWindSizeMin = Other.RandomWindSizeMin;
+	RandomWindSizeMax = Other.RandomWindSizeMax;
+	bRandomWindDirectionInWorldSpace = Other.bRandomWindDirectionInWorldSpace;
+
+	bAdjustWindComponent = Other.bAdjustWindComponent;
+	WindComponentScale = Other.WindComponentScale;
+
+	MoveInertiaScale = Other.MoveInertiaScale;
+	bClampMoveInertia = Other.bClampMoveInertia;
+	MoveInertiaClampMaxDistance = Other.MoveInertiaClampMaxDistance;
+	RotationInertiaScale = Other.RotationInertiaScale;
+	bClampRotationInertia = Other.bClampRotationInertia;
+	RotationInertiaClampDegrees = Other.RotationInertiaClampDegrees;
 }
