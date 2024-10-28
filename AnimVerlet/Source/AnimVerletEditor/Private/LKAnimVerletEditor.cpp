@@ -1,7 +1,9 @@
 #include "LKAnimVerletEditor.h"
 
+#include <EditorModeRegistry.h>
 #include <Modules/ModuleManager.h>
 #include <Textures/SlateIcon.h>
+#include "LKAnimVerletEditMode.h"
 
 IMPLEMENT_MODULE(FLKAnimVerletEditorModule, AnimVerletEditor)
 

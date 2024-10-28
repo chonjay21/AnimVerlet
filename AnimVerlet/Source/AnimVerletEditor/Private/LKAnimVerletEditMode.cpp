@@ -60,6 +60,7 @@ void FLKAnimVerletEditMode::RenderSphereColliders(FPrimitiveDrawInterface* PDI, 
 		const FTransform CollisionWorldT = GetColliderWorldT(CurShape, PreviewMeshComponent);
 		const FVector ShapeLocation = CollisionWorldT.GetLocation();
 		DrawSphere(PDI, ShapeLocation, FRotator::ZeroRotator, FVector(CurShape.Radius), 16, 6, GEngine->ConstraintLimitMaterialPrismatic->GetRenderProxy(), SDPG_World);
+		DrawWireSphere(PDI, ShapeLocation, FLinearColor::Red, CurShape.Radius, 16, SDPG_World);
 		DrawCoordinateSystem(PDI, ShapeLocation, CollisionWorldT.Rotator(), CurShape.Radius, SDPG_Foreground);
 
 		PDI->SetHitProxy(nullptr);
@@ -75,6 +76,7 @@ void FLKAnimVerletEditMode::RenderSphereColliders(FPrimitiveDrawInterface* PDI, 
 			const FTransform CollisionWorldT = GetColliderWorldT(CurShapeData, PreviewMeshComponent);
 			const FVector ShapeLocation = CollisionWorldT.GetLocation();
 			DrawSphere(PDI, ShapeLocation, FRotator::ZeroRotator, FVector(CurShapeData.Radius), 16, 6, GEngine->ConstraintLimitMaterialPrismatic->GetRenderProxy(), SDPG_World);
+			DrawWireSphere(PDI, ShapeLocation, FLinearColor::Red, CurShapeData.Radius, 16, SDPG_World);
 			DrawCoordinateSystem(PDI, ShapeLocation, CollisionWorldT.Rotator(), CurShapeData.Radius, SDPG_Foreground);
 
 			PDI->SetHitProxy(nullptr);
@@ -101,10 +103,13 @@ void FLKAnimVerletEditMode::RenderCapsuleColliders(FPrimitiveDrawInterface* PDI,
 		const FQuat ShapeQuat = CollisionWorldT.GetRotation();
 		const FRotator ShapeRotator = ShapeQuat.Rotator();
 
+		const FVector CapsuleXAxis = ShapeQuat.GetAxisX();
+		const FVector CapsuleYAxis = ShapeQuat.GetAxisY();
 		const FVector CapsuleZAxis = ShapeQuat.GetAxisZ();
-		DrawCylinder(PDI, ShapeLocation, ShapeQuat.GetAxisX(), ShapeQuat.GetAxisY(), CapsuleZAxis, CurShape.Radius, CurShape.HalfHeight, 16, GEngine->ConstraintLimitMaterialPrismatic->GetRenderProxy(), SDPG_World);
+		DrawCylinder(PDI, ShapeLocation, CapsuleXAxis, CapsuleYAxis, CapsuleZAxis, CurShape.Radius, CurShape.HalfHeight, 16, GEngine->ConstraintLimitMaterialPrismatic->GetRenderProxy(), SDPG_World);
 		DrawSphere(PDI, ShapeLocation - CapsuleZAxis * CurShape.HalfHeight, ShapeRotator, FVector(CurShape.Radius), 16, 6, GEngine->ConstraintLimitMaterialPrismatic->GetRenderProxy(), SDPG_World);
 		DrawSphere(PDI, ShapeLocation + CapsuleZAxis * CurShape.HalfHeight, ShapeRotator, FVector(CurShape.Radius), 16, 6, GEngine->ConstraintLimitMaterialPrismatic->GetRenderProxy(), SDPG_World);
+		DrawWireCapsule(PDI, ShapeLocation, CapsuleXAxis, CapsuleYAxis, CapsuleZAxis, FLinearColor::Red, CurShape.Radius, CurShape.HalfHeight + CurShape.Radius, 16, SDPG_World);
 		DrawCoordinateSystem(PDI, ShapeLocation, ShapeRotator, CurShape.Radius, SDPG_Foreground);
 
 		PDI->SetHitProxy(nullptr);
@@ -122,10 +127,13 @@ void FLKAnimVerletEditMode::RenderCapsuleColliders(FPrimitiveDrawInterface* PDI,
 			const FQuat ShapeQuat = CollisionWorldT.GetRotation();
 			const FRotator ShapeRotator = ShapeQuat.Rotator();
 
+			const FVector CapsuleXAxis = ShapeQuat.GetAxisX();
+			const FVector CapsuleYAxis = ShapeQuat.GetAxisY();
 			const FVector CapsuleZAxis = ShapeQuat.GetAxisZ();
-			DrawCylinder(PDI, ShapeLocation, ShapeQuat.GetAxisX(), ShapeQuat.GetAxisY(), CapsuleZAxis, CurShapeData.Radius, CurShapeData.HalfHeight, 16, GEngine->ConstraintLimitMaterialPrismatic->GetRenderProxy(), SDPG_World);
+			DrawCylinder(PDI, ShapeLocation, CapsuleXAxis, CapsuleYAxis, CapsuleZAxis, CurShapeData.Radius, CurShapeData.HalfHeight, 16, GEngine->ConstraintLimitMaterialPrismatic->GetRenderProxy(), SDPG_World);
 			DrawSphere(PDI, ShapeLocation - CapsuleZAxis * CurShapeData.HalfHeight, ShapeRotator, FVector(CurShapeData.Radius), 16, 6, GEngine->ConstraintLimitMaterialPrismatic->GetRenderProxy(), SDPG_World);
 			DrawSphere(PDI, ShapeLocation + CapsuleZAxis * CurShapeData.HalfHeight, ShapeRotator, FVector(CurShapeData.Radius), 16, 6, GEngine->ConstraintLimitMaterialPrismatic->GetRenderProxy(), SDPG_World);
+			DrawWireCapsule(PDI, ShapeLocation, CapsuleXAxis, CapsuleYAxis, CapsuleZAxis, FLinearColor::Red, CurShapeData.Radius, CurShapeData.HalfHeight + CurShapeData.Radius, 16, SDPG_World);
 			DrawCoordinateSystem(PDI, ShapeLocation, ShapeRotator, CurShapeData.Radius, SDPG_Foreground);
 
 			PDI->SetHitProxy(nullptr);
@@ -151,7 +159,11 @@ void FLKAnimVerletEditMode::RenderBoxColliders(FPrimitiveDrawInterface* PDI, con
 		const FVector ShapeLocation = CollisionWorldT.GetLocation();
 		const FQuat ShapeQuat = CollisionWorldT.GetRotation();
 		const FRotator ShapeRotator = ShapeQuat.Rotator();
+
+		const FMatrix BoxMat = CollisionWorldT.ToMatrixNoScale();
+		const FBox Box(-CurShape.HalfExtents, CurShape.HalfExtents);
 		DrawBox(PDI, CollisionWorldT.ToMatrixNoScale(), CurShape.HalfExtents, GEngine->ConstraintLimitMaterialPrismatic->GetRenderProxy(), SDPG_World);
+		DrawWireBox(PDI, BoxMat, Box, FColor::Red, SDPG_World);
 		DrawCoordinateSystem(PDI, ShapeLocation, ShapeRotator, FMath::Max3(CurShape.HalfExtents.X, CurShape.HalfExtents.Y, CurShape.HalfExtents.Z), SDPG_Foreground);
 
 		PDI->SetHitProxy(nullptr);
@@ -168,7 +180,11 @@ void FLKAnimVerletEditMode::RenderBoxColliders(FPrimitiveDrawInterface* PDI, con
 			const FVector ShapeLocation = CollisionWorldT.GetLocation();
 			const FQuat ShapeQuat = CollisionWorldT.GetRotation();
 			const FRotator ShapeRotator = ShapeQuat.Rotator();
+
+			const FMatrix BoxMat = CollisionWorldT.ToMatrixNoScale();
+			const FBox Box(-CurShapeData.HalfExtents, CurShapeData.HalfExtents);
 			DrawBox(PDI, CollisionWorldT.ToMatrixNoScale(), CurShapeData.HalfExtents, GEngine->ConstraintLimitMaterialPrismatic->GetRenderProxy(), SDPG_World);
+			DrawWireBox(PDI, BoxMat, Box, FColor::Red, SDPG_World);
 			DrawCoordinateSystem(PDI, ShapeLocation, ShapeRotator, FMath::Max3(CurShapeData.HalfExtents.X, CurShapeData.HalfExtents.Y, CurShapeData.HalfExtents.Z), SDPG_Foreground);
 
 			PDI->SetHitProxy(nullptr);
@@ -194,10 +210,14 @@ void FLKAnimVerletEditMode::RenderPlaneColliders(FPrimitiveDrawInterface* PDI, c
 		const FVector ShapeLocation = CollisionWorldT.GetLocation();
 		const FQuat ShapeQuat = CollisionWorldT.GetRotation();
 		const FRotator ShapeRotator = ShapeQuat.Rotator();
+		const FMatrix PlaneMat = CollisionWorldT.ToMatrixNoScale();
 
 		const FVector2D PlaneHalfExtents2D = CurShape.bFinitePlane ? CurShape.FinitePlaneHalfExtents : FVector2D(100.0f, 100.0f);
 		const FVector PlaneHalfExtents = FVector(PlaneHalfExtents2D, 1.0f);
-		DrawBox(PDI, CollisionWorldT.ToMatrixNoScale(), PlaneHalfExtents, GEngine->ConstraintLimitMaterialPrismatic->GetRenderProxy(), SDPG_World);
+		const FBox Box(-PlaneHalfExtents, PlaneHalfExtents);
+		DrawBox(PDI, PlaneMat, PlaneHalfExtents, GEngine->ConstraintLimitMaterialPrismatic->GetRenderProxy(), SDPG_World);
+		DrawWireBox(PDI, PlaneMat, Box, FColor::Red, SDPG_World);
+		DrawDirectionalArrow(PDI, FRotationMatrix(FRotator(90.0f, 0.0f, 0.0f)) * PlaneMat, FLinearColor::Gray, 50.0f, 20.0f, SDPG_World, 0.5f);
 		DrawCoordinateSystem(PDI, ShapeLocation, ShapeRotator, FMath::Max3(PlaneHalfExtents.X, PlaneHalfExtents.Y, PlaneHalfExtents.Z), SDPG_Foreground);
 
 		PDI->SetHitProxy(nullptr);
@@ -214,10 +234,14 @@ void FLKAnimVerletEditMode::RenderPlaneColliders(FPrimitiveDrawInterface* PDI, c
 			const FVector ShapeLocation = CollisionWorldT.GetLocation();
 			const FQuat ShapeQuat = CollisionWorldT.GetRotation();
 			const FRotator ShapeRotator = ShapeQuat.Rotator();
+			const FMatrix PlaneMat = CollisionWorldT.ToMatrixNoScale();
 
 			const FVector2D PlaneHalfExtents2D = CurShapeData.bFinitePlane ? CurShapeData.FinitePlaneHalfExtents : FVector2D(100.0f, 100.0f);
 			const FVector PlaneHalfExtents = FVector(PlaneHalfExtents2D, 1.0f);
-			DrawBox(PDI, CollisionWorldT.ToMatrixNoScale(), PlaneHalfExtents, GEngine->ConstraintLimitMaterialPrismatic->GetRenderProxy(), SDPG_World);
+			const FBox Box(-PlaneHalfExtents, PlaneHalfExtents);
+			DrawBox(PDI, PlaneMat, PlaneHalfExtents, GEngine->ConstraintLimitMaterialPrismatic->GetRenderProxy(), SDPG_World);
+			DrawWireBox(PDI, PlaneMat, Box, FColor::Red, SDPG_World);
+			DrawDirectionalArrow(PDI, FRotationMatrix(FRotator(90.0f, 0.0f, 0.0f)) * PlaneMat, FLinearColor::Gray, 50.0f, 20.0f, SDPG_World, 0.5f);
 			DrawCoordinateSystem(PDI, ShapeLocation, ShapeRotator, FMath::Max3(PlaneHalfExtents.X, PlaneHalfExtents.Y, PlaneHalfExtents.Z), SDPG_Foreground);
 
 			PDI->SetHitProxy(nullptr);
