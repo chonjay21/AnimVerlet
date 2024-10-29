@@ -7,6 +7,17 @@
 #include <Kismet/KismetSystemLibrary.h>
 #include "LKAnimVerletCollisionData.h"
 
+#if LK_ENABLE_ANIMVERLET_DEBUG
+static TAutoConsoleVariable<bool> CVarAnimNodeAnimVerletEnable(TEXT("a.AnimNode.AnimVerlet.Enable"), true, TEXT("Enable/Disable AnimVerlet"));
+static TAutoConsoleVariable<bool> CVarAnimNodeAnimVerletDebug(TEXT("a.AnimNode.AnimVerlet.Debug"), false, TEXT("Turn on visualization debugging for AnimVerlet"));
+static TAutoConsoleVariable<bool> CVarAnimNodeAnimVerletDebugBallSocket(TEXT("a.AnimNode.AnimVerlet.Debug.BallSocket"), true, TEXT("Turn on visualization debugging for AnimVerlet`s BallSocket constraints"));
+///static TAutoConsoleVariable<bool> CVarAnimNodeAnimVerletDebugPlane(TEXT("a.AnimNode.AnimVerlet.Debug.Plane"), true, TEXT("Turn on visualization debugging for AnimVerlet`s Plane constraints"));
+static TAutoConsoleVariable<bool> CVarAnimNodeAnimVerletDebugSphereCollision(TEXT("a.AnimNode.AnimVerlet.Debug.SphereCollision"), true, TEXT("Turn on visualization debugging for AnimVerlet`s Sphere collision constraints"));
+static TAutoConsoleVariable<bool> CVarAnimNodeAnimVerletDebugCapsuleCollision(TEXT("a.AnimNode.AnimVerlet.Debug.CapsuleCollision"), true, TEXT("Turn on visualization debugging for AnimVerlet`s Capsule collision constraints"));
+///static TAutoConsoleVariable<bool> CVarAnimNodeAnimVerletDebugBoxCollision(TEXT("a.AnimNode.AnimVerlet.Debug.BoxCollision"), true, TEXT("Turn on visualization debugging for AnimVerlet`s Box collision constraints"));
+#endif
+
+
 FLKAnimNode_AnimVerlet::FLKAnimNode_AnimVerlet()
 	: FAnimNode_SkeletalControlBase()
 {
@@ -70,6 +81,13 @@ void FLKAnimNode_AnimVerlet::EvaluateSkeletalControl_AnyThread(FComponentSpacePo
 	ApplyResult(OutBoneTransforms, BoneContainer);
 
 	PrevComponentT = CurComponentT;
+
+#if LK_ENABLE_ANIMVERLET_DEBUG
+	if (CVarAnimNodeAnimVerletDebug.GetValueOnAnyThread())
+	{
+		DebugDrawAnimVerlet(Output);
+	}
+#endif
 }
 
 void FLKAnimNode_AnimVerlet::InitializeBoneReferences(const FBoneContainer& RequiredBones)
@@ -92,6 +110,13 @@ void FLKAnimNode_AnimVerlet::InitializeBoneReferences(const FBoneContainer& Requ
 
 bool FLKAnimNode_AnimVerlet::IsValidToEvaluate(const USkeleton* Skeleton, const FBoneContainer& RequiredBones)
 {
+#if LK_ENABLE_ANIMVERLET_DEBUG
+	if (CVarAnimNodeAnimVerletEnable.GetValueOnAnyThread() == false)
+	{
+		return false;
+	}
+#endif
+
 	for (const FLKAnimVerletBoneSetting& CurBoneSetting : VerletBones)
 	{
 		if (CurBoneSetting.RootBone.IsValidToEvaluate(RequiredBones) == false)
@@ -1569,4 +1594,103 @@ void FLKAnimNode_AnimVerlet::SyncFromOtherAnimVerletNode(const FLKAnimNode_AnimV
 	RotationInertiaScale = Other.RotationInertiaScale;
 	bClampRotationInertia = Other.bClampRotationInertia;
 	RotationInertiaClampDegrees = Other.RotationInertiaClampDegrees;
+}
+
+void FLKAnimNode_AnimVerlet::DebugDrawAnimVerlet(const FComponentSpacePoseContext& Output)
+{
+	FAnimInstanceProxy* AnimInstanceProxy = Output.AnimInstanceProxy;
+	if (AnimInstanceProxy == nullptr)
+		return;
+
+	USkeletalMeshComponent* SkeletalMeshComponent = AnimInstanceProxy->GetSkelMeshComponent();
+	if (SkeletalMeshComponent == nullptr)
+		return;
+
+	const UWorld* World = SkeletalMeshComponent->GetWorld();
+	const FTransform ComponentToWorld = AnimInstanceProxy->GetComponentTransform();
+	for (const FLKAnimVerletBone& CurBone : SimulateBones)
+	{
+		const FVector WorldLocation = ComponentToWorld.TransformPosition(CurBone.Location);
+
+		const bool bSleep = CurBone.IsSleep();
+		AnimInstanceProxy->AnimDrawDebugSphere(WorldLocation, Thickness, 16, bSleep ? FColor::Turquoise : (CurBone.bFakeBone ? FColor::Black : FColor::Yellow), false, -1.0f, 0.0f, SDPG_Foreground);
+	}
+
+	for (const FLKAnimVerletConstraint_Distance& CurConstraint : DistanceConstraints)
+	{
+		const FVector WorldLocationA = ComponentToWorld.TransformPosition(CurConstraint.BoneA->Location);
+		const FVector WorldLocationB = ComponentToWorld.TransformPosition(CurConstraint.BoneB->Location);
+
+		AnimInstanceProxy->AnimDrawDebugLine(WorldLocationA, WorldLocationB, FColor::White, false, -1.0f, 0.0f, SDPG_Foreground);
+	}
+
+#if LK_ENABLE_ANIMVERLET_DEBUG
+	if (CVarAnimNodeAnimVerletDebugBallSocket.GetValueOnAnyThread())
+	{
+		for (const FLKAnimVerletConstraint_BallSocket& CurConstraint : BallSocketConstraints)
+		{
+			const FVector WorldLocationA = ComponentToWorld.TransformPosition(CurConstraint.BoneA->Location);
+			const FVector WorldLocationAPose = ComponentToWorld.TransformPosition(CurConstraint.BoneA->PoseLocation);
+			const FVector WorldLocationBPose = ComponentToWorld.TransformPosition(CurConstraint.BoneB->PoseLocation);
+
+			FVector Dir = FVector::ZeroVector;
+			float Length = 0.0f;
+			(WorldLocationBPose - WorldLocationAPose).ToDirectionAndLength(OUT Dir, OUT Length);
+			AnimInstanceProxy->AnimDrawDebugCone(WorldLocationA, Length, Dir, FMath::DegreesToRadians(CurConstraint.AngleDegrees), FMath::DegreesToRadians(CurConstraint.AngleDegrees), 16, FColor::Magenta, false, -1.0f, SDPG_Foreground);
+		}
+	}
+
+	/*if (CVarAnimNodeAnimVerletDebugPlane.GetValueOnAnyThread())
+	{
+		for (const FLKAnimVerletConstraint_Plane& CurConstraint : PlaneCollisionConstraints)
+		{
+			const FVector WorldLocation = ComponentToWorld.TransformPosition(CurConstraint.PlaneBase);
+			const FVector WorldNormal = ComponentToWorld.TransformVectorNoScale(CurConstraint.PlaneNormal);
+			const FQuat WorldRotation = ComponentToWorld.TransformRotation(CurConstraint.Rotation);
+
+			if (CurConstraint.PlaneHalfExtents.IsNearlyZero() == false)
+			{
+				DrawDebugBox(World, WorldLocation, FVector(CurConstraint.PlaneHalfExtents * 2.0f, 1.0f), WorldRotation, FColor::Blue, false, -1.0f, SDPG_Foreground);
+				DrawDebugDirectionalArrow(World, WorldLocation, WorldLocation + WorldNormal * 50.0f, 20.0f, FColor::Orange, false, -1.0f, SDPG_Foreground);
+			}
+			else
+			{
+				DrawDebugBox(World, WorldLocation, FVector(100.0f, 100.0f, 1.0f), WorldRotation, FColor::Blue, false, -1.0f, SDPG_Foreground);
+				DrawDebugDirectionalArrow(World, WorldLocation, WorldLocation + WorldNormal * 50.0f, 20.0f, FColor::Orange, false, -1.0f, SDPG_Foreground);
+			}
+		}
+	}*/
+
+	if (CVarAnimNodeAnimVerletDebugSphereCollision.GetValueOnAnyThread())
+	{
+		for (const FLKAnimVerletConstraint_Sphere& CurConstraint : SphereCollisionConstraints)
+		{
+			const FVector WorldLocation = ComponentToWorld.TransformPosition(CurConstraint.Location);
+
+			AnimInstanceProxy->AnimDrawDebugSphere(WorldLocation, CurConstraint.Radius, 16, FColor::Blue, false, -1.0f, 0.0f, SDPG_Foreground);
+		}
+	}
+
+	if (CVarAnimNodeAnimVerletDebugCapsuleCollision.GetValueOnAnyThread())
+	{
+		for (const FLKAnimVerletConstraint_Capsule& CurConstraint : CapsuleCollisionConstraints)
+		{
+			const FVector WorldLocation = ComponentToWorld.TransformPosition(CurConstraint.Location);
+			const FQuat WorldRotation = ComponentToWorld.TransformRotation(CurConstraint.Rotation);
+
+			AnimInstanceProxy->AnimDrawDebugCapsule(WorldLocation, CurConstraint.HalfHeight + CurConstraint.Radius, CurConstraint.Radius, WorldRotation.Rotator(), FColor::Blue, false, -1.0f, SDPG_Foreground);
+		}
+	}
+
+	/*if (CVarAnimNodeAnimVerletDebugBoxCollision.GetValueOnAnyThread())
+	{
+		for (const FLKAnimVerletConstraint_Box& CurConstraint : BoxCollisionConstraints)
+		{
+			const FVector WorldLocation = ComponentToWorld.TransformPosition(CurConstraint.Location);
+			const FQuat WorldRotation = ComponentToWorld.TransformRotation(CurConstraint.Rotation);
+
+			DrawDebugBox(World, WorldLocation, CurConstraint.HalfExtents * 2.0f, WorldRotation, FColor::Blue, false, -1.0f, SDPG_Foreground);
+		}
+	}*/
+#endif
 }

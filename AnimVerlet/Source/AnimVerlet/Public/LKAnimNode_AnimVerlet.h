@@ -7,6 +7,13 @@
 #include "LKAnimverletSetting.h"
 #include "LKAnimNode_AnimVerlet.generated.h"
 
+#if ENABLE_ANIM_DEBUG && ENABLE_VISUAL_LOG
+#define LK_ENABLE_ANIMVERLET_DEBUG 1
+#else
+#define LK_ENABLE_ANIMVERLET_DEBUG 0
+#endif
+
+
 USTRUCT(BlueprintInternalUseOnly)
 struct ANIMVERLET_API FLKAnimNode_AnimVerlet : public FAnimNode_SkeletalControlBase
 {
@@ -72,6 +79,8 @@ public:
 	bool ConvertCollisionShapesToDataAsset();
 	bool ConvertCollisionShapesFromDataAsset();
 	void SyncFromOtherAnimVerletNode(const FLKAnimNode_AnimVerlet& Other);
+
+	void DebugDrawAnimVerlet(const FComponentSpacePoseContext& Output);
 
 public:
 	/** Input the starting bone of the cloth sequentially. */
