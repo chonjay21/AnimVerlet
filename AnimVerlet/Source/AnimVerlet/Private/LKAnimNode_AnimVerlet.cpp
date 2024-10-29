@@ -497,7 +497,7 @@ bool FLKAnimNode_AnimVerlet::MakeSimulateBones(FComponentSpacePoseContext& PoseC
 		const int32 CurAddedBoneChainLength = BoneChainIndexes[RootSimulateBoneIndex].Add(CurSimulateBoneIndex) + 1;
 		MaxBoneChainLength = FMath::Max(MaxBoneChainLength, CurAddedBoneChainLength);
 	}
-	else if (BoneSetting.bStraightenExcludedBonesByParent)
+	else
 	{
 		FLKAnimVerletExcludedBone NewExcludedBone(CurBoneRef, ParentSimulateBoneIndex, bParentExcluded ? ParentExcludedBoneIndex : INDEX_NONE);
 		NewExcludedBone.BoneReference.Initialize(BoneContainer);
@@ -510,6 +510,7 @@ bool FLKAnimNode_AnimVerlet::MakeSimulateBones(FComponentSpacePoseContext& PoseC
 				NewExcludedBone.LengthToParent = (SimulateBones[ParentSimulateBoneIndex].PoseLocation - ReferenceBonePoseT.GetLocation()).Size();
 			else if (bParentExcluded && ParentExcludedBoneIndex != INDEX_NONE)
 				NewExcludedBone.LengthToParent = (ExcludedBones[ParentExcludedBoneIndex].PoseLocation - ReferenceBonePoseT.GetLocation()).Size();
+			NewExcludedBone.bStraightenExcludedBonesByParent = BoneSetting.bStraightenExcludedBonesByParent;
 
 			CurExcludedBoneIndex = ExcludedBones.Emplace(NewExcludedBone);
 			RelevantBoneIndicators.Emplace(CurExcludedBoneIndex, true, bParentExcluded ? ParentExcludedBoneIndex : ParentSimulateBoneIndex, bParentExcluded);
@@ -594,6 +595,7 @@ bool FLKAnimNode_AnimVerlet::MakeSimulateBones(FComponentSpacePoseContext& PoseC
 				else if (bParentExcluded && ParentExcludedBoneIndex != INDEX_NONE)
 					NewExcludedBone.LengthToParent = (ExcludedBones[ParentExcludedBoneIndex].PoseLocation - ReferenceBonePoseT.GetLocation()).Size();
 
+				NewExcludedBone.bStraightenExcludedBonesByParent = BoneSetting.bStraightenExcludedBonesByParent;
 				const int32 ExcludedTipBoneIndex = ExcludedBones.Emplace(NewExcludedBone);
 				RelevantBoneIndicators.Emplace(ExcludedTipBoneIndex, true, bParentExcluded ? ParentExcludedBoneIndex : ParentSimulateBoneIndex, bParentExcluded);
 				bNewlyExcluded = true;
@@ -1250,6 +1252,9 @@ void FLKAnimNode_AnimVerlet::PostUpdateBones(float InDeltaTime)
 	for (int32 i = 0; i < ExcludedBones.Num(); ++i)
 	{
 		FLKAnimVerletExcludedBone& CurExcludedVerletBone = ExcludedBones[i];
+		if (CurExcludedVerletBone.bStraightenExcludedBonesByParent == false)
+			continue;
+
 		if (CurExcludedVerletBone.HasVerletParentBone())
 		{
 			FLKAnimVerletBone& ParentVerletBone = SimulateBones[CurExcludedVerletBone.ParentVerletBoneIndex];
@@ -1333,29 +1338,31 @@ void FLKAnimNode_AnimVerlet::PostUpdateBones(float InDeltaTime)
 
 void FLKAnimNode_AnimVerlet::ApplyResult(OUT TArray<FBoneTransform>& OutBoneTransforms, const FBoneContainer& BoneContainer)
 {
-	for (int32 i = 0; i < SimulateBones.Num(); ++i)
+	for (int32 i = 0; i < RelevantBoneIndicators.Num(); ++i)
 	{
-		const FLKAnimVerletBone& CurVerletBone = SimulateBones[i];
-		if (CurVerletBone.bFakeBone)
+		const FLKAnimVerletBoneIndicator& CurBoneIndicator = RelevantBoneIndicators[i];		verify(CurBoneIndicator.IsValidBoneIndicator());
+		
+		bool bFakeBone = false;
+		const FLKAnimVerletBoneBase* CurBone = nullptr;
+		if (CurBoneIndicator.bExcludedBone == false)
+		{
+			const FLKAnimVerletBone& CurVerletBone = SimulateBones[CurBoneIndicator.AnimVerletBoneIndex];
+			CurBone = &CurVerletBone;
+			bFakeBone = CurVerletBone.bFakeBone;
+		}
+		else
+		{
+			CurBone = &ExcludedBones[CurBoneIndicator.AnimVerletBoneIndex];
+		}
+
+		if (bFakeBone)
 			continue;
 
-		const FCompactPoseBoneIndex BonePoseIndex = CurVerletBone.BoneReference.GetCompactPoseIndex(BoneContainer);
+		const FCompactPoseBoneIndex BonePoseIndex = CurBone->BoneReference.GetCompactPoseIndex(BoneContainer);
 		/// LOD case?
 		if (BonePoseIndex != INDEX_NONE)
 		{
-			const FTransform ResultBoneT(CurVerletBone.Rotation, CurVerletBone.Location, CurVerletBone.PoseScale);
-			OutBoneTransforms.Emplace(FBoneTransform(BonePoseIndex, ResultBoneT));
-		}
-	}
-
-	for (int32 i = 0; i < ExcludedBones.Num(); ++i)
-	{
-		const FLKAnimVerletExcludedBone& CurExcludedBone = ExcludedBones[i];
-		const FCompactPoseBoneIndex BonePoseIndex = CurExcludedBone.BoneReference.GetCompactPoseIndex(BoneContainer);
-		/// LOD case?
-		if (BonePoseIndex != INDEX_NONE)
-		{
-			const FTransform ResultBoneT(CurExcludedBone.Rotation, CurExcludedBone.Location, CurExcludedBone.PoseScale);
+			const FTransform ResultBoneT(CurBone->Rotation, CurBone->Location, CurBone->PoseScale);
 			OutBoneTransforms.Emplace(FBoneTransform(BonePoseIndex, ResultBoneT));
 		}
 	}

@@ -294,7 +294,7 @@ public:
 
 private:
 	TArray<FLKAnimVerletBone> SimulateBones;							///Simulating bones(real bones + fake virtual bones)
-	TArray<FLKAnimVerletExcludedBone> ExcludedBones;					///Excluded bones in Simulating bone chain(real bones) - (created if bStraightenExcludedBonesByParent == true)
+	TArray<FLKAnimVerletExcludedBone> ExcludedBones;					///Excluded bones in Simulating bone chain(real bones)
 	TArray<FLKAnimVerletBoneIndicator> RelevantBoneIndicators;			///Simulating real bones + Excluded real bones + fake tip bone(for bone`s rotation at PostUpdate phase)
 	FLKAnimVerletCollisionShapeList SimulatingCollisionShapes;
 	///TArray<FLKAnimVerletConstraint*> Constraints;

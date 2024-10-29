@@ -94,6 +94,7 @@ public:
 	int32 ParentExcludedBoneIndex = INDEX_NONE;
 
 	float LengthToParent = 0.0f;
+	bool bStraightenExcludedBonesByParent = true;
 
 public:
 	FLKAnimVerletExcludedBone() = default;
