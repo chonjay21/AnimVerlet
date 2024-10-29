@@ -13,7 +13,9 @@ static TAutoConsoleVariable<bool> CVarAnimNodeAnimVerletDebug(TEXT("a.AnimNode.A
 static TAutoConsoleVariable<bool> CVarAnimNodeAnimVerletDebugBallSocket(TEXT("a.AnimNode.AnimVerlet.Debug.BallSocket"), true, TEXT("Turn on visualization debugging for AnimVerlet`s BallSocket constraints"));
 ///static TAutoConsoleVariable<bool> CVarAnimNodeAnimVerletDebugPlane(TEXT("a.AnimNode.AnimVerlet.Debug.Plane"), true, TEXT("Turn on visualization debugging for AnimVerlet`s Plane constraints"));
 static TAutoConsoleVariable<bool> CVarAnimNodeAnimVerletDebugSphereCollision(TEXT("a.AnimNode.AnimVerlet.Debug.SphereCollision"), true, TEXT("Turn on visualization debugging for AnimVerlet`s Sphere collision constraints"));
+#if (ENGINE_MINOR_VERSION >= 4)
 static TAutoConsoleVariable<bool> CVarAnimNodeAnimVerletDebugCapsuleCollision(TEXT("a.AnimNode.AnimVerlet.Debug.CapsuleCollision"), true, TEXT("Turn on visualization debugging for AnimVerlet`s Capsule collision constraints"));
+#endif
 ///static TAutoConsoleVariable<bool> CVarAnimNodeAnimVerletDebugBoxCollision(TEXT("a.AnimNode.AnimVerlet.Debug.BoxCollision"), true, TEXT("Turn on visualization debugging for AnimVerlet`s Box collision constraints"));
 #endif
 
@@ -1678,6 +1680,7 @@ void FLKAnimNode_AnimVerlet::DebugDrawAnimVerlet(const FComponentSpacePoseContex
 		}
 	}
 
+#if (ENGINE_MINOR_VERSION >= 4)
 	if (CVarAnimNodeAnimVerletDebugCapsuleCollision.GetValueOnAnyThread())
 	{
 		for (const FLKAnimVerletConstraint_Capsule& CurConstraint : CapsuleCollisionConstraints)
@@ -1688,6 +1691,7 @@ void FLKAnimNode_AnimVerlet::DebugDrawAnimVerlet(const FComponentSpacePoseContex
 			AnimInstanceProxy->AnimDrawDebugCapsule(WorldLocation, CurConstraint.HalfHeight + CurConstraint.Radius, CurConstraint.Radius, WorldRotation.Rotator(), FColor::Blue, false, -1.0f, SDPG_Foreground);
 		}
 	}
+#endif
 
 	/*if (CVarAnimNodeAnimVerletDebugBoxCollision.GetValueOnAnyThread())
 	{
