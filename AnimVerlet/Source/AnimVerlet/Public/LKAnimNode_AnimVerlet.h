@@ -284,8 +284,9 @@ public:
 	float RotationInertiaClampDegrees = 30.0f;
 
 private:
-	TArray<FLKAnimVerletBone> SimulateBones;
-	TArray<FLKAnimVerletExcludedBone> ExcludedBones;
+	TArray<FLKAnimVerletBone> SimulateBones;							///Simulating bones(real bones + fake virtual bones)
+	TArray<FLKAnimVerletExcludedBone> ExcludedBones;					///Excluded bones in Simulating bone chain(real bones) - (created if bStraightenExcludedBonesByParent == true)
+	TArray<FLKAnimVerletBoneIndicator> RelevantBoneIndicators;			///Simulating real bones + Excluded real bones + fake tip bone(for bone`s rotation at PostUpdate phase)
 	FLKAnimVerletCollisionShapeList SimulatingCollisionShapes;
 	///TArray<FLKAnimVerletConstraint*> Constraints;
 	/// Unroll each constratins for better solve result(considering constraint`s solving order)
@@ -300,7 +301,7 @@ private:
 	TArray<FLKAnimVerletConstraint_Box> BoxCollisionConstraints;
 	TArray<FLKAnimVerletConstraint_Plane> PlaneCollisionConstraints;
 	TArray<FLKAnimVerletConstraint_World> WorldCollisionConstraints;
-	TArray<TArray<int32>> BoneChainIndexes;
+	TArray<TArray<int32>> BoneChainIndexes;								///Simulating bone`s index list per single chain
 	int32 MaxBoneChainLength = 0;
 
 private:

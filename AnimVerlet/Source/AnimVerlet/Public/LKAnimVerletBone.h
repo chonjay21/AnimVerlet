@@ -2,12 +2,37 @@
 #include <CoreMinimal.h>
 
 ///=========================================================================================================================================
-/// FLKAnimVerletBone
+/// FLKAnimVerletBoneBase
 ///=========================================================================================================================================
-struct FLKAnimVerletBone
+struct FLKAnimVerletBoneBase
 {
 public:
 	FBoneReference BoneReference;
+
+	FVector PoseLocation = FVector::ZeroVector;
+	FVector Location = FVector::ZeroVector;
+
+	FQuat PoseRotation = FQuat::Identity;
+	FQuat Rotation = FQuat::Identity;
+
+	FVector PoseScale = FVector::ZeroVector;
+
+public:
+	FLKAnimVerletBoneBase() = default;
+	FLKAnimVerletBoneBase(const FBoneReference& InBoneReference)
+		: BoneReference(InBoneReference)
+	{
+	}
+
+	virtual ~FLKAnimVerletBoneBase() {}
+};
+
+///=========================================================================================================================================
+/// FLKAnimVerletBone
+///=========================================================================================================================================
+struct FLKAnimVerletBone : public FLKAnimVerletBoneBase
+{
+public:
 	int32 ParentVerletBoneIndex = INDEX_NONE;
 	TSet<int32, DefaultKeyFuncs<int32>, TInlineSetAllocator<8>> ChildVerletBoneIndexes;
 	bool bTipBone = false;
@@ -18,17 +43,12 @@ public:
 	FVector SideStraightenDirInLocal = FVector::ZeroVector;
 
 	FVector PrevPoseLocation = FVector::ZeroVector;
-	FVector PoseLocation = FVector::ZeroVector;
-	FVector Location = FVector::ZeroVector;
 	FVector PrevLocation = FVector::ZeroVector;
 
 	FQuat PrevPoseRotation = FQuat::Identity;
-	FQuat PoseRotation = FQuat::Identity;
-	FQuat Rotation = FQuat::Identity;
 	FQuat PrevRotation = FQuat::Identity;
 
 	FVector PoseDirFromParent = FVector::ZeroVector;
-	FVector PoseScale = FVector::ZeroVector;
 
 	FVector MoveDelta = FVector::ZeroVector;
 	FVector Velocity = FVector::ZeroVector;		///for XPBD
@@ -67,25 +87,18 @@ public:
 ///=========================================================================================================================================
 /// FLKAnimVerletExcludedBone
 ///=========================================================================================================================================
-struct FLKAnimVerletExcludedBone
+struct FLKAnimVerletExcludedBone : public FLKAnimVerletBoneBase
 {
 public:
-	FBoneReference BoneReference;
 	int32 ParentVerletBoneIndex = INDEX_NONE;
 	int32 ParentExcludedBoneIndex = INDEX_NONE;
 
-	FVector PoseLocation = FVector::ZeroVector;
-	FVector Location = FVector::ZeroVector;
-	FQuat PoseRotation = FQuat::Identity;
-	FQuat Rotation = FQuat::Identity;
-
-	FVector PoseScale = FVector::ZeroVector;
 	float LengthToParent = 0.0f;
 
 public:
 	FLKAnimVerletExcludedBone() = default;
 	FLKAnimVerletExcludedBone(const FBoneReference& InBoneReference, int32 InParentVerletBoneIndex, int32 InParentExcludedBoneIndex)
-		: BoneReference(InBoneReference), ParentVerletBoneIndex(InParentVerletBoneIndex), ParentExcludedBoneIndex(InParentExcludedBoneIndex)
+		: FLKAnimVerletBoneBase(InBoneReference), ParentVerletBoneIndex(InParentVerletBoneIndex), ParentExcludedBoneIndex(InParentExcludedBoneIndex)
 	{
 	}
 
@@ -96,6 +109,36 @@ public:
 
 public:
 	void PrepareSimulation(const FTransform& PoseT);
+};
+///=========================================================================================================================================
+
+
+///=========================================================================================================================================
+/// FLKAnimVerletBoneIndicator
+///=========================================================================================================================================
+struct FLKAnimVerletBoneIndicator
+{
+public:
+	int32 AnimVerletBoneIndex = INDEX_NONE;
+	bool bExcludedBone = false;
+
+	int32 ParentAnimVerletBoneIndex = INDEX_NONE;
+	bool bParentExcludedBone = false;
+
+public:
+	FLKAnimVerletBoneIndicator() = default;
+	FLKAnimVerletBoneIndicator(int32 InAnimVerletBoneIndex, bool bInExcludedBone)
+		: AnimVerletBoneIndex(InAnimVerletBoneIndex), bExcludedBone(bInExcludedBone)
+	{
+	}
+	FLKAnimVerletBoneIndicator(int32 InAnimVerletBoneIndex, bool bInExcludedBone, int32 InParentAnimVerletBoneIndex, bool bInParentExcludedBone)
+		: AnimVerletBoneIndex(InAnimVerletBoneIndex), bExcludedBone(bInExcludedBone), ParentAnimVerletBoneIndex(InParentAnimVerletBoneIndex), bParentExcludedBone(bInParentExcludedBone)
+	{
+	}
+
+	bool IsValidBoneIndicator() const { return AnimVerletBoneIndex != INDEX_NONE; }
+	bool HasParentSimulateBone() const { return bParentExcludedBone == false && ParentAnimVerletBoneIndex != INDEX_NONE; }
+	bool HasParentExcludedBone() const { return bParentExcludedBone && ParentAnimVerletBoneIndex != INDEX_NONE; }
 };
 ///=========================================================================================================================================
 
