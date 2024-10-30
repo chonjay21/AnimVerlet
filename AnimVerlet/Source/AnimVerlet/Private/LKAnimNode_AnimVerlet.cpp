@@ -479,7 +479,8 @@ bool FLKAnimNode_AnimVerlet::MakeSimulateBones(FComponentSpacePoseContext& PoseC
 		}
 
 		CurSimulateBoneIndex = SimulateBones.Emplace(NewSimulateBone);
-		RelevantBoneIndicators.Emplace(CurSimulateBoneIndex, false, bParentExcluded ? ParentExcludedBoneIndex : ParentSimulateBoneIndex, bParentExcluded);
+		if (BoneSetting.bFakeBone == false)
+			RelevantBoneIndicators.Emplace(CurSimulateBoneIndex, false, bParentExcluded ? ParentExcludedBoneIndex : ParentSimulateBoneIndex, bParentExcluded);
 		if (NewSimulateBone.ParentVerletBoneIndex != INDEX_NONE)
 		{
 			/// Add child indexes
@@ -515,7 +516,8 @@ bool FLKAnimNode_AnimVerlet::MakeSimulateBones(FComponentSpacePoseContext& PoseC
 			NewExcludedBone.bStraightenExcludedBonesByParent = BoneSetting.bStraightenExcludedBonesByParent;
 
 			CurExcludedBoneIndex = ExcludedBones.Emplace(NewExcludedBone);
-			RelevantBoneIndicators.Emplace(CurExcludedBoneIndex, true, bParentExcluded ? ParentExcludedBoneIndex : ParentSimulateBoneIndex, bParentExcluded);
+			if (BoneSetting.bFakeBone == false)
+				RelevantBoneIndicators.Emplace(CurExcludedBoneIndex, true, bParentExcluded ? ParentExcludedBoneIndex : ParentSimulateBoneIndex, bParentExcluded);
 			bNewlyExcluded = true;
 		}
 	}
@@ -537,7 +539,8 @@ bool FLKAnimNode_AnimVerlet::MakeSimulateBones(FComponentSpacePoseContext& PoseC
 				FakeSimulateBone.InitializeTransform(FakeBoneT);
 
 				const int32 FakeBoneIndex = SimulateBones.Emplace(FakeSimulateBone);
-				RelevantBoneIndicators.Emplace(FakeBoneIndex, false, bParentExcluded ? ParentExcludedBoneIndex : ParentSimulateBoneIndex, bParentExcluded);
+				if (BoneSetting.bFakeBone == false)
+					RelevantBoneIndicators.Emplace(FakeBoneIndex, false, bParentExcluded ? ParentExcludedBoneIndex : ParentSimulateBoneIndex, bParentExcluded);
 				if (FakeSimulateBone.ParentVerletBoneIndex != INDEX_NONE)
 				{
 					/// Add child indexes
@@ -568,7 +571,8 @@ bool FLKAnimNode_AnimVerlet::MakeSimulateBones(FComponentSpacePoseContext& PoseC
 				FakeSimulateBone.InitializeTransform(FakeBoneT);
 
 				const int32 FakeBoneIndex = SimulateBones.Emplace(FakeSimulateBone);
-				RelevantBoneIndicators.Emplace(FakeBoneIndex, false, bParentExcluded ? ParentExcludedBoneIndex : ParentSimulateBoneIndex, bParentExcluded);
+				if (BoneSetting.bFakeBone == false)
+					RelevantBoneIndicators.Emplace(FakeBoneIndex, false, bParentExcluded ? ParentExcludedBoneIndex : ParentSimulateBoneIndex, bParentExcluded);
 				if (FakeSimulateBone.ParentVerletBoneIndex != INDEX_NONE)
 				{
 					/// Add child indexes
@@ -599,7 +603,8 @@ bool FLKAnimNode_AnimVerlet::MakeSimulateBones(FComponentSpacePoseContext& PoseC
 
 				NewExcludedBone.bStraightenExcludedBonesByParent = BoneSetting.bStraightenExcludedBonesByParent;
 				const int32 ExcludedTipBoneIndex = ExcludedBones.Emplace(NewExcludedBone);
-				RelevantBoneIndicators.Emplace(ExcludedTipBoneIndex, true, bParentExcluded ? ParentExcludedBoneIndex : ParentSimulateBoneIndex, bParentExcluded);
+				if (BoneSetting.bFakeBone == false)
+					RelevantBoneIndicators.Emplace(ExcludedTipBoneIndex, true, bParentExcluded ? ParentExcludedBoneIndex : ParentSimulateBoneIndex, bParentExcluded);
 				bNewlyExcluded = true;
 			}
 		}
