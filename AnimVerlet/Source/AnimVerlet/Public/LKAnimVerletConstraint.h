@@ -1,6 +1,7 @@
 #pragma once
 #include <CoreMinimal.h>
 #include <UObject/WeakObjectPtrTemplates.h>
+#include "LKAnimVerletBone.h"
 
 using TExcludeBoneBits = TBitArray<TInlineAllocator<64>>;
 
@@ -150,6 +151,9 @@ struct FLKAnimVerletConstraint_BallSocket : public FLKAnimVerletConstraint
 public:
 	struct FLKAnimVerletBone* BoneA = nullptr;
 	struct FLKAnimVerletBone* BoneB = nullptr;
+	struct FLKAnimVerletBone* GrandParentBoneNullable = nullptr;
+	struct FLKAnimVerletBone* ParentBoneNullable = nullptr;
+
 
 	float AngleDegrees = 0.0f;
 
@@ -158,8 +162,8 @@ public:
 	double Lambda = 0.0;			///for XPBD
 
 public:
-	FLKAnimVerletConstraint_BallSocket(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, float InAngleDegrees, 
-									   bool bInUseXPBDSolver, double InCompliance);
+	FLKAnimVerletConstraint_BallSocket(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, struct FLKAnimVerletBone* InGrandParentNullable, struct FLKAnimVerletBone* InParentNullable,
+									   float InAngleDegrees, bool bInUseXPBDSolver, double InCompliance);
 	virtual void Update(float DeltaTime, bool bFinalize) override;
 	virtual void PostUpdate(float DeltaTime) override { Lambda = 0.0; }
 	virtual void ResetSimulation() override { Lambda = 0.0; }

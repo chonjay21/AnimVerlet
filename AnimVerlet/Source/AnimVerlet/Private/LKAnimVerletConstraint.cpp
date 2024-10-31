@@ -450,9 +450,12 @@ void FLKAnimVerletConstraint_FixedDistance::BackwardUpdate(float DeltaTime, bool
 ///=========================================================================================================================================
 /// FLKAnimVerletConstraint_BallSocket
 ///=========================================================================================================================================
-FLKAnimVerletConstraint_BallSocket::FLKAnimVerletConstraint_BallSocket(FLKAnimVerletBone* InBoneA, FLKAnimVerletBone* InBoneB, float InAngleDegrees, bool bInUseXPBDSolver, double InCompliance)
+FLKAnimVerletConstraint_BallSocket::FLKAnimVerletConstraint_BallSocket(FLKAnimVerletBone* InBoneA, FLKAnimVerletBone* InBoneB, FLKAnimVerletBone* InGrandParentNullable, FLKAnimVerletBone* InParentNullable
+																	   , float InAngleDegrees, bool bInUseXPBDSolver, double InCompliance)
 	: BoneA(InBoneA)
 	, BoneB(InBoneB)
+	, GrandParentBoneNullable(InGrandParentNullable)
+	, ParentBoneNullable(InParentNullable)
 	, AngleDegrees(InAngleDegrees)
 	, bUseXPBDSolver(bInUseXPBDSolver)
 	, Compliance(InCompliance)
@@ -469,12 +472,22 @@ void FLKAnimVerletConstraint_BallSocket::Update(float DeltaTime, bool bFinalize)
 	FVector BoneAToBoneB = FVector::ZeroVector;
 	float BoneAToBoneBSize = 0.0f;
 	(BoneB->Location - BoneA->Location).ToDirectionAndLength(OUT BoneAToBoneB, OUT BoneAToBoneBSize);
-	const FVector PoseAToPoseB = (BoneB->PoseLocation - BoneA->PoseLocation).GetSafeNormal();
 
-	const FVector RotationAxis = FVector::CrossProduct(PoseAToPoseB, BoneAToBoneB);
-	const float RotationAngle = FMath::Acos(FVector::DotProduct(PoseAToPoseB, BoneAToBoneB));
+	FVector ConstraintDirection = FVector::ZeroVector;
+	if (GrandParentBoneNullable != nullptr && ParentBoneNullable != nullptr)
+	{
+		const FVector GrandParentToParent = (ParentBoneNullable->Location - GrandParentBoneNullable->Location).GetSafeNormal();
+		ConstraintDirection = GrandParentToParent;
+	}
+	else
+	{
+		const FVector PoseAToPoseB = (BoneB->PoseLocation - BoneA->PoseLocation).GetSafeNormal();
+		ConstraintDirection = PoseAToPoseB;
+	}
+
+	const FVector RotationAxis = FVector::CrossProduct(ConstraintDirection, BoneAToBoneB);
+	const float RotationAngle = FMath::Acos(FVector::DotProduct(ConstraintDirection, BoneAToBoneB));
 	const float AngleDiff = FMath::RadiansToDegrees(RotationAngle) - AngleDegrees;
-
 	if (AngleDiff > 0.0f)
 	{
 		if (bUseXPBDSolver && bFinalize == false)
@@ -500,8 +513,8 @@ void FLKAnimVerletConstraint_BallSocket::Update(float DeltaTime, bool bFinalize)
 ///=========================================================================================================================================
 /// FLKAnimVerletConstraint_Sphere
 ///=========================================================================================================================================
-FLKAnimVerletConstraint_Sphere::FLKAnimVerletConstraint_Sphere(const FVector& InLocation, float InRadius, float InThickness, 
-															   TArray<FLKAnimVerletBone>* InBones, const TExcludeBoneBits& InExcludeBones, bool bInUseXPBDSolver, double InCompliance)
+FLKAnimVerletConstraint_Sphere::FLKAnimVerletConstraint_Sphere(const FVector& InLocation, float InRadius, float InThickness, TArray<FLKAnimVerletBone>* InBones, 
+															   const TExcludeBoneBits& InExcludeBones, bool bInUseXPBDSolver, double InCompliance)
 	: Location(InLocation)
 	, Radius(InRadius)
 	, Thickness(InThickness)
@@ -730,8 +743,8 @@ void FLKAnimVerletConstraint_Box::ResetSimulation()
 ///=========================================================================================================================================
 /// FLKAnimVerletConstraint_Plane
 ///=========================================================================================================================================
-FLKAnimVerletConstraint_Plane::FLKAnimVerletConstraint_Plane(const FVector& InPlaneBase, const FVector& InPlaneNormal, const FQuat& InRotation, const FVector2D& InPlaneHalfExtents, 
-															 float InThickness, TArray<FLKAnimVerletBone>* InBones, const TExcludeBoneBits& InExcludeBones, bool bInUseXPBDSolver, double InCompliance)
+FLKAnimVerletConstraint_Plane::FLKAnimVerletConstraint_Plane(const FVector& InPlaneBase, const FVector& InPlaneNormal, const FQuat& InRotation, const FVector2D& InPlaneHalfExtents, float InThickness, 
+															 TArray<FLKAnimVerletBone>* InBones, const TExcludeBoneBits& InExcludeBones, bool bInUseXPBDSolver, double InCompliance)
 	: PlaneBase(InPlaneBase)
 	, PlaneNormal(InPlaneNormal)
 	, Rotation(InRotation)

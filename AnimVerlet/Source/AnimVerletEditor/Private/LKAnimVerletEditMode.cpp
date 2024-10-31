@@ -251,10 +251,11 @@ void FLKAnimVerletEditMode::RenderPlaneColliders(FPrimitiveDrawInterface* PDI, c
 
 void FLKAnimVerletEditMode::DrawHUD(FEditorViewportClient* ViewportClient, FViewport* Viewport, const FSceneView* View, FCanvas* Canvas)
 {
-	if (AnimNode != nullptr)
-	{
-		AnimNode->DrawCanvas(*Viewport, *const_cast<FSceneView*>(View), *Canvas, GetAnimPreviewScene().GetPreviewMeshComponent());
-	}
+	FAnimNodeEditMode::DrawHUD(ViewportClient, Viewport, View, Canvas);
+	///if (AnimNode != nullptr)
+	///{
+	///	AnimNode->DrawCanvas(*Viewport, *const_cast<FSceneView*>(View), *Canvas, GetAnimPreviewScene().GetPreviewMeshComponent());
+	///}
 }
 
 bool FLKAnimVerletEditMode::HandleClick(FEditorViewportClient* InViewportClient, HHitProxy* HitProxy, const FViewportClick& Click)
@@ -289,6 +290,11 @@ bool FLKAnimVerletEditMode::GetCustomDrawingCoordinateSystem(FMatrix& InMatrix, 
 	const FTransform CurColliderT = CurCollider->GetTransform();
 	InMatrix = CurColliderT.ToMatrixNoScale().RemoveTranslation();
 	return true;
+}
+
+bool FLKAnimVerletEditMode::ShouldDrawWidget() const
+{
+	return ValidateSelection(false);
 }
 
 IPersonaPreviewScene& FLKAnimVerletEditMode::GetAnimPreviewScene() const

@@ -56,6 +56,9 @@ public:
 	bool bSleep = false;
 	float SleepTriggerElapsedTime = 0.0f;
 
+	bool bConstrainConeAngleFromParent = false;
+	float ConeAngleConstraint = 0.0f;
+
 public:
 	bool IsFakeBone() const { return bFakeBone; }
 	bool HasBoneSetup() const { return BoneReference.HasValidSetup(); }
@@ -140,6 +143,27 @@ public:
 	bool IsValidBoneIndicator() const { return AnimVerletBoneIndex != INDEX_NONE; }
 	bool HasParentSimulateBone() const { return bParentExcludedBone == false && ParentAnimVerletBoneIndex != INDEX_NONE; }
 	bool HasParentExcludedBone() const { return bParentExcludedBone && ParentAnimVerletBoneIndex != INDEX_NONE; }
+};
+///=========================================================================================================================================
+
+
+///=========================================================================================================================================
+/// FLKAnimVerletBoneIndicatorPair
+///=========================================================================================================================================
+struct FLKAnimVerletBoneIndicatorPair
+{
+public:
+	FLKAnimVerletBoneIndicator BoneA;
+	FLKAnimVerletBoneIndicator BoneB;
+
+public:
+	FLKAnimVerletBoneIndicatorPair() = default;
+	FLKAnimVerletBoneIndicatorPair(const FLKAnimVerletBoneIndicator& InBoneA, const FLKAnimVerletBoneIndicator& InBoneB)
+		: BoneA(InBoneA), BoneB(InBoneB)
+	{
+	}
+
+	bool IsValidBoneIndicatorPair() const { return BoneA.IsValidBoneIndicator() && BoneB.IsValidBoneIndicator(); }
 };
 ///=========================================================================================================================================
 

@@ -3,6 +3,27 @@
 #include "LKAnimVerletSetting.generated.h"
 
 USTRUCT(BlueprintInternalUseOnly)
+struct FLKAnimVerletBoneUnitSetting
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere)
+	FBoneReference Bone;
+
+	/** if true, Use grand parent to parent bone`s direction to constrain each bone`s cone angle. otherwise use animation pose to constrain each bone`s cone angle. (override global cone angle) */
+	UPROPERTY(EditAnywhere, Category = "Constraint")
+	bool bConstrainConeAngleFromParent = false;
+	/** each bones`s angle to use when constraining using a cone.(Ball - Socket joint constraints, override global cone angle) */
+	UPROPERTY(EditAnywhere, Category = "Constraint", meta = (ClampMin = "0.0", ClampMax = "90.0", ForceUnits = "deg"))
+	float ConeAngle = 0.0f;
+
+public:
+	bool operator==(const FBoneReference& RHS) const { return Bone == RHS; }
+};
+
+
+USTRUCT(BlueprintInternalUseOnly)
 struct FLKAnimVerletBoneSetting
 {
 	GENERATED_BODY()
@@ -13,6 +34,10 @@ public:
 
 	UPROPERTY(EditAnywhere, Category = "BoneChain")
 	TArray<FBoneReference> ExcludeBones;
+
+	/** Each VerletBone`s setting override(optional) */
+	UPROPERTY(EditAnywhere, Category = "BoneChain")
+	TArray<FLKAnimVerletBoneUnitSetting> BoneUnitSettingOverride;
 
 	/** Stretch excluded bones by referencing their simulated parent and child bone. */
 	UPROPERTY(EditAnywhere, Category = "BoneChain")

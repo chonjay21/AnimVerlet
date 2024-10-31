@@ -44,6 +44,7 @@ public:
 	virtual void DrawHUD(class FEditorViewportClient* ViewportClient, FViewport* Viewport, const FSceneView* View, FCanvas* Canvas) override;
 	virtual bool HandleClick(class FEditorViewportClient* InViewportClient, HHitProxy* HitProxy, const FViewportClick& Click) override;
 	virtual bool GetCustomDrawingCoordinateSystem(FMatrix& InMatrix, void* InData) override;
+	virtual bool ShouldDrawWidget() const override;
 	///==============================================================================================================================================
 	
 	/// IAnimationEditContext =======================================================================================================================

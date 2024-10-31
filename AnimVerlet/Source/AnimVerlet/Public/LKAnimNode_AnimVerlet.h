@@ -212,7 +212,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = "Solve")
 	bool bUseSquaredDeltaTime = false;
 
-	/** Angle to use when constraining using a cone.(Ball - Socket joint constraints) */
+	/** if true, Use grand parent to parent bone`s direction to constrain global cone angle. otherwise use animation pose to constrain global cone angle. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Constraint", meta = (PinHiddenByDefault))
+	bool bConstrainConeAngleFromParent = false;
+	/** Global angle to use when constraining using a cone.(Ball - Socket joint constraints) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Constraint", meta = (PinHiddenByDefault, ClampMin = "0.0", ClampMax = "90.0", ForceUnits = "deg"))
 	float ConeAngle = 0.0f;
 
@@ -293,9 +296,9 @@ public:
 	float RotationInertiaClampDegrees = 30.0f;
 
 private:
-	TArray<FLKAnimVerletBone> SimulateBones;							///Simulating bones(real bones + fake virtual bones)
-	TArray<FLKAnimVerletExcludedBone> ExcludedBones;					///Excluded bones in Simulating bone chain(real bones)
-	TArray<FLKAnimVerletBoneIndicator> RelevantBoneIndicators;			///Simulating real bones + Excluded real bones + fake tip bone(for bone`s rotation at PostUpdate phase)
+	TArray<FLKAnimVerletBone> SimulateBones;								///Simulating bones(real bones + fake virtual bones)
+	TArray<FLKAnimVerletExcludedBone> ExcludedBones;						///Excluded bones in Simulating bone chain(real bones)
+	TArray<FLKAnimVerletBoneIndicator> RelevantBoneIndicators;				///Simulating real bones + Excluded real bones + fake tip bone(for bone`s rotation at PostUpdate phase)
 	FLKAnimVerletCollisionShapeList SimulatingCollisionShapes;
 	///TArray<FLKAnimVerletConstraint*> Constraints;
 	/// Unroll each constratins for better solve result(considering constraint`s solving order)

@@ -28,20 +28,21 @@ void ULKAnimGraphNode_AnimVerlet::PostEditChangeProperty(FPropertyChangedEvent& 
 	FLKAnimNode_AnimVerlet* PreviewNode = GetPreviewAnimVerletNode();
 	if (PreviewNode != nullptr)
 	{
-		/// data sync from GraphNode to Preview(Runtime) node(for realtime synt without blueprint compile)
+		/// data sync from GraphNode to Preview(Runtime) node(for realtime sync without blueprint compile)
 		PreviewNode->SyncFromOtherAnimVerletNode(Node);
 		PreviewNode->ForceClearSimulateBones();
 		PreviewNode->MarkLocalColliderDirty();
 	}
 
 	Super::PostEditChangeProperty(PropertyChangedEvent);
+	ReconstructNode();
 }
 
-void ULKAnimGraphNode_AnimVerlet::PostEditChangeChainProperty(FPropertyChangedChainEvent& PropertyChangedEvent)
-{
-
-	Super::PostEditChangeChainProperty(PropertyChangedEvent);
-}
+///void ULKAnimGraphNode_AnimVerlet::PostEditChangeChainProperty(FPropertyChangedChainEvent& PropertyChangedEvent)
+///{
+///
+///	Super::PostEditChangeChainProperty(PropertyChangedEvent);
+///}
 
 FText ULKAnimGraphNode_AnimVerlet::GetNodeTitle(ENodeTitleType::Type TitleType) const
 {
@@ -149,8 +150,20 @@ void ULKAnimGraphNode_AnimVerlet::Draw(FPrimitiveDrawInterface* PDI, USkeletalMe
 			const TArray<FLKAnimVerletConstraint_BallSocket>& BallSocketConstraints = AnimVerletNode->GetBallSocketConstraints();
 			for (const FLKAnimVerletConstraint_BallSocket& CurConstraint : BallSocketConstraints)
 			{
-				const FTransform ParentBoneTransform = FTransform(FQuat::FindBetween(FVector::ForwardVector, CurConstraint.BoneB->PoseLocation - CurConstraint.BoneA->PoseLocation), CurConstraint.BoneA->Location);
-				DrawWireCone(PDI, VertexSpaceCache, ParentBoneTransform, (CurConstraint.BoneB->PoseLocation - CurConstraint.BoneA->PoseLocation).Size(), AnimVerletNode->ConeAngle, 16, FColor::Magenta, SDPG_Foreground);
+				FVector ConstraintVector = FVector::ZeroVector;
+				if (CurConstraint.GrandParentBoneNullable != nullptr && CurConstraint.ParentBoneNullable != nullptr)
+				{
+					const FVector GrandParentToParent = (CurConstraint.ParentBoneNullable->Location - CurConstraint.GrandParentBoneNullable->Location);
+					ConstraintVector = GrandParentToParent;
+				}
+				else
+				{
+					const FVector PoseAToPoseB = (CurConstraint.BoneB->PoseLocation - CurConstraint.BoneA->PoseLocation);
+					ConstraintVector = PoseAToPoseB;
+				}
+
+				const FTransform ParentBoneTransform = FTransform(FQuat::FindBetween(FVector::ForwardVector, ConstraintVector), CurConstraint.BoneA->Location);
+				DrawWireCone(PDI, VertexSpaceCache, ParentBoneTransform, ConstraintVector.Size(), CurConstraint.AngleDegrees, 16, FColor::Magenta, SDPG_Foreground);
 				VertexSpaceCache.Reset();
 			}
 			VertexSpaceCache.Reset();
