@@ -463,7 +463,7 @@ void FLKAnimVerletEditMode::DoScale(FVector& InScale)
 	if (ColliderFromRuntime == nullptr)
 		return;
 
-	FVector NewDelta = FVector::ZeroVector;
+	/*FVector NewDelta = FVector::ZeroVector;
 	if (ColliderFromRuntime->IsUseAbsoluteWorldTransform() == false && ColliderFromRuntime->GetAttachBoneName() != NAME_None)
 	{
 		const USkeletalMeshComponent* PreviewMeshComponent = GetAnimPreviewScene().GetPreviewMeshComponent();
@@ -475,8 +475,9 @@ void FLKAnimVerletEditMode::DoScale(FVector& InScale)
 	else
 	{
 		NewDelta = InScale;
-	}
+	}*/
 
+	const FVector NewDelta = InScale;
 	const FVector OriginalHalfExtents = ColliderFromRuntime->GetHalfExtents();
 	FVector NewHalfExtents = OriginalHalfExtents + NewDelta;
 	NewHalfExtents.X = FMath::Max(NewHalfExtents.X, 0.0f);
