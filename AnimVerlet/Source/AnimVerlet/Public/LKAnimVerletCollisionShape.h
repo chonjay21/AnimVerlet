@@ -13,7 +13,7 @@
 /// FLKAnimVerletCollisionShape(Base Interface)
 ///=========================================================================================================================================
 USTRUCT(BlueprintType)
-struct FLKAnimVerletCollisionShape : public FLKAnimVerletColliderInterface
+struct ANIMVERLET_API FLKAnimVerletCollisionShape : public FLKAnimVerletColliderInterface
 {
 	GENERATED_BODY()
 
@@ -53,7 +53,7 @@ public:
 /// FLKAnimVerletCollisionSphere
 ///=========================================================================================================================================
 USTRUCT(BlueprintType)
-struct FLKAnimVerletCollisionSphere : public FLKAnimVerletCollisionShape
+struct ANIMVERLET_API FLKAnimVerletCollisionSphere : public FLKAnimVerletCollisionShape
 {
 	GENERATED_BODY()
 
@@ -67,6 +67,9 @@ public:
 
 	virtual FVector GetHalfExtents() const override final { return FVector(Radius, Radius, Radius); }
 	virtual void SetHalfExtents(const FVector& InHalfExtents) override final { Radius = InHalfExtents.X; }
+
+	/// Thread unsafe
+	virtual void DebugDrawCollider(const class UWorld* InWorld, const class USkeletalMeshComponent* InMeshNullable, float LifeTime = -1.0f) const override;
 };
 ///=========================================================================================================================================
 
@@ -74,7 +77,7 @@ public:
 /// FLKAnimVerletCollisionCapsule
 ///=========================================================================================================================================
 USTRUCT(BlueprintType)
-struct FLKAnimVerletCollisionCapsule : public FLKAnimVerletCollisionShape
+struct ANIMVERLET_API FLKAnimVerletCollisionCapsule : public FLKAnimVerletCollisionShape
 {
 	GENERATED_BODY()
 
@@ -96,6 +99,9 @@ public:
 
 	virtual FVector GetHalfExtents() const override final { return FVector(Radius, Radius, HalfHeight); }
 	virtual void SetHalfExtents(const FVector& InHalfExtents) override final { Radius = InHalfExtents.X; HalfHeight = InHalfExtents.Z; }
+
+	/// Thread unsafe
+	virtual void DebugDrawCollider(const class UWorld* InWorld, const class USkeletalMeshComponent* InMeshNullable, float LifeTime = -1.0f) const override;
 };
 ///=========================================================================================================================================
 
@@ -103,7 +109,7 @@ public:
 /// FLKAnimVerletCollisionBox
 ///=========================================================================================================================================
 USTRUCT(BlueprintType)
-struct FLKAnimVerletCollisionBox : public FLKAnimVerletCollisionShape
+struct ANIMVERLET_API FLKAnimVerletCollisionBox : public FLKAnimVerletCollisionShape
 {
 	GENERATED_BODY()
 
@@ -122,6 +128,9 @@ public:
 
 	virtual FVector GetHalfExtents() const override final { return HalfExtents; }
 	virtual void SetHalfExtents(const FVector& InHalfExtents) override final { HalfExtents = InHalfExtents; }
+
+	/// Thread unsafe
+	virtual void DebugDrawCollider(const class UWorld* InWorld, const class USkeletalMeshComponent* InMeshNullable, float LifeTime = -1.0f) const override;
 };
 ///=========================================================================================================================================
 
@@ -129,7 +138,7 @@ public:
 /// FLKAnimVerletCollisionPlane
 ///=========================================================================================================================================
 USTRUCT(BlueprintType)
-struct FLKAnimVerletCollisionPlane : public FLKAnimVerletCollisionShape
+struct ANIMVERLET_API FLKAnimVerletCollisionPlane : public FLKAnimVerletCollisionShape
 {
 	GENERATED_BODY()
 
@@ -151,6 +160,9 @@ public:
 
 	virtual FVector GetHalfExtents() const override final { return bFinitePlane ? FVector(FinitePlaneHalfExtents, 0.0f) : FVector::ZeroVector; }
 	virtual void SetHalfExtents(const FVector& InHalfExtents) override final { FinitePlaneHalfExtents = bFinitePlane ? FVector2D(InHalfExtents.X, InHalfExtents.Y) : FVector2D::ZeroVector; }
+
+	/// Thread unsafe
+	virtual void DebugDrawCollider(const class UWorld* InWorld, const class USkeletalMeshComponent* InMeshNullable, float LifeTime = -1.0f) const override;
 };
 ///=========================================================================================================================================
 
@@ -159,7 +171,7 @@ public:
 /// FLKAnimVerletCollisionShapeList
 ///=========================================================================================================================================
 USTRUCT(BlueprintType)
-struct FLKAnimVerletCollisionShapeList
+struct ANIMVERLET_API FLKAnimVerletCollisionShapeList
 {
 	GENERATED_BODY()
 
@@ -181,5 +193,35 @@ public:
 		BoxCollisionShapes.Reset();
 		PlaneCollisionShapes.Reset();
 	}
+
+	bool AddShape(const FLKAnimVerletCollisionShape& NewShape);
+
+	template <typename Predicate>
+	void ForEachCollisionShape(Predicate Pred)
+	{
+		for (FLKAnimVerletCollisionSphere& CurShape : SphereCollisionShapes)
+			Pred(CurShape);
+		for (FLKAnimVerletCollisionCapsule& CurShape : CapsuleCollisionShapes)
+			Pred(CurShape);
+		for (FLKAnimVerletCollisionBox& CurShape : BoxCollisionShapes)
+			Pred(CurShape);
+		for (FLKAnimVerletCollisionPlane& CurShape : PlaneCollisionShapes)
+			Pred(CurShape);
+	}
+	template <typename Predicate>
+	void ForEachCollisionShapeConst(Predicate Pred) const
+	{
+		for (const FLKAnimVerletCollisionSphere& CurShape : SphereCollisionShapes)
+			Pred(CurShape);
+		for (const FLKAnimVerletCollisionCapsule& CurShape : CapsuleCollisionShapes)
+			Pred(CurShape);
+		for (const FLKAnimVerletCollisionBox& CurShape : BoxCollisionShapes)
+			Pred(CurShape);
+		for (const FLKAnimVerletCollisionPlane& CurShape : PlaneCollisionShapes)
+			Pred(CurShape);
+	}
+
+	/// Thread unsafe
+	void DebugDrawCollider(const class UWorld* InWorld, const class USkeletalMeshComponent* InMeshNullable, float LifeTime = -1.0f) const;
 };
 ///=========================================================================================================================================

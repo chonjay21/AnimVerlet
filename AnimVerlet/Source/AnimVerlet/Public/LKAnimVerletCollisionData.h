@@ -69,6 +69,9 @@ public:
 	virtual FVector GetHalfExtents() const override final { return FVector(Radius, Radius, Radius); }
 	virtual void SetHalfExtents(const FVector& InHalfExtents) override final { Radius = InHalfExtents.X; }
 
+	/// Thread unsafe
+	virtual void DebugDrawCollider(const class UWorld* InWorld, const class USkeletalMeshComponent* InMeshNullable, float LifeTime = -1.0f) const override;
+
 public:
 	void ConvertToShape(OUT struct FLKAnimVerletCollisionSphere& OutSphere) const;
 	void ConvertFromShape(const struct FLKAnimVerletCollisionSphere& InSphere);
@@ -102,6 +105,9 @@ public:
 	virtual FVector GetHalfExtents() const override final { return FVector(Radius, Radius, HalfHeight); }
 	virtual void SetHalfExtents(const FVector& InHalfExtents) override final { Radius = InHalfExtents.X; HalfHeight = InHalfExtents.Z; }
 
+	/// Thread unsafe
+	virtual void DebugDrawCollider(const class UWorld* InWorld, const class USkeletalMeshComponent* InMeshNullable, float LifeTime = -1.0f) const override;
+
 public:
 	void ConvertToShape(OUT struct FLKAnimVerletCollisionCapsule& OutCapsule) const;
 	void ConvertFromShape(const struct FLKAnimVerletCollisionCapsule& InCapsule);
@@ -131,6 +137,9 @@ public:
 
 	virtual FVector GetHalfExtents() const override final { return HalfExtents; }
 	virtual void SetHalfExtents(const FVector& InHalfExtents) override final { HalfExtents = InHalfExtents; }
+
+	/// Thread unsafe
+	virtual void DebugDrawCollider(const class UWorld* InWorld, const class USkeletalMeshComponent* InMeshNullable, float LifeTime = -1.0f) const override;
 
 public:
 	void ConvertToShape(OUT struct FLKAnimVerletCollisionBox& OutBox) const;
@@ -165,6 +174,9 @@ public:
 	virtual FVector GetHalfExtents() const override final { return bFinitePlane ? FVector(FinitePlaneHalfExtents, 0.0f) : FVector::ZeroVector; }
 	virtual void SetHalfExtents(const FVector& InHalfExtents) override final { FinitePlaneHalfExtents = bFinitePlane ? FVector2D(InHalfExtents.X, InHalfExtents.Y) : FVector2D::ZeroVector; }
 
+	/// Thread unsafe
+	virtual void DebugDrawCollider(const class UWorld* InWorld, const class USkeletalMeshComponent* InMeshNullable, float LifeTime = -1.0f) const override;
+
 public:
 	void ConvertToShape(OUT struct FLKAnimVerletCollisionPlane& OutPlane) const;
 	void ConvertFromShape(const struct FLKAnimVerletCollisionPlane& InPlane);
@@ -191,9 +203,38 @@ public:
 	TArray<FLKAnimVerletCollisionDataPlane> PlaneCollisionData;
 
 public:
+	template <typename Predicate>
+	void ForEachCollisionData(Predicate Pred)
+	{
+		for (FLKAnimVerletCollisionDataSphere& CurData : SphereCollisionData)
+			Pred(CurData);
+		for (FLKAnimVerletCollisionDataCapsule& CurData : CapsuleCollisionData)
+			Pred(CurData);
+		for (FLKAnimVerletCollisionDataBox& CurData : BoxCollisionData)
+			Pred(CurData);
+		for (FLKAnimVerletCollisionDataPlane& CurData : PlaneCollisionData)
+			Pred(CurData);
+	}
+	template <typename Predicate>
+	void ForEachCollisionDataConst(Predicate Pred) const
+	{
+		for (const FLKAnimVerletCollisionDataSphere& CurData : SphereCollisionData)
+			Pred(CurData);
+		for (const FLKAnimVerletCollisionDataCapsule& CurData : CapsuleCollisionData)
+			Pred(CurData);
+		for (const FLKAnimVerletCollisionDataBox& CurData : BoxCollisionData)
+			Pred(CurData);
+		for (const FLKAnimVerletCollisionDataPlane& CurData : PlaneCollisionData)
+			Pred(CurData);
+	}
+
 	void ConvertToShape(OUT struct FLKAnimVerletCollisionShapeList& OutShapeList) const;
 	void ConvertFromShape(const struct FLKAnimVerletCollisionShapeList& InShapeList);
+	bool AddData(const FLKAnimVerletCollisionData& NewData);
 	void Reset();
+
+	/// Thread unsafe
+	void DebugDrawCollider(const class UWorld* InWorld, const class USkeletalMeshComponent* InMeshNullable, float LifeTime = -1.0f) const;
 };
 ///=========================================================================================================================================
 

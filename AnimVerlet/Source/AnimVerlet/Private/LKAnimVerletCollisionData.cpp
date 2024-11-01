@@ -1,5 +1,6 @@
 #include "LKAnimVerletCollisionData.h"
 
+#include <DrawDebugHelpers.h>
 #include "LKAnimVerletCollisionShape.h"
 
 ///=========================================================================================================================================
@@ -52,6 +53,19 @@ void FLKAnimVerletCollisionDataSphere::ConvertFromShape(const FLKAnimVerletColli
 	Radius = InSphere.Radius;
 }
 
+void FLKAnimVerletCollisionDataSphere::DebugDrawCollider(const UWorld* InWorld, const USkeletalMeshComponent* InMeshNullable, float LifeTime) const
+{
+	if (IsUseAbsoluteWorldTransform())
+	{
+		DrawDebugSphere(InWorld, GetLocation(), Radius, 16, FColor::Blue, false, LifeTime);
+	}
+	else if (InMeshNullable != nullptr)
+	{
+		const FTransform WorldT = GetTransform() * InMeshNullable->GetSocketTransform(AttachBoneName, ERelativeTransformSpace::RTS_World);
+		DrawDebugSphere(InWorld, WorldT.GetLocation(), Radius, 16, FColor::Blue, false, LifeTime);
+	}
+}
+
 ///=========================================================================================================================================
 /// FLKAnimVerletCollisionDataCapsule
 ///=========================================================================================================================================
@@ -73,6 +87,19 @@ void FLKAnimVerletCollisionDataCapsule::ConvertFromShape(const FLKAnimVerletColl
 	HalfHeight = InCapsule.HalfHeight;
 }
 
+void FLKAnimVerletCollisionDataCapsule::DebugDrawCollider(const UWorld* InWorld, const USkeletalMeshComponent* InMeshNullable, float LifeTime) const
+{
+	if (IsUseAbsoluteWorldTransform())
+	{
+		DrawDebugCapsule(InWorld, GetLocation(), HalfHeight + Radius, Radius, GetRotation().Quaternion(), FColor::Blue, false, LifeTime);
+	}
+	else if (InMeshNullable != nullptr)
+	{
+		const FTransform WorldT = GetTransform() * InMeshNullable->GetSocketTransform(AttachBoneName, ERelativeTransformSpace::RTS_World);
+		DrawDebugCapsule(InWorld, WorldT.GetLocation(), HalfHeight + Radius, Radius, WorldT.GetRotation(), FColor::Blue, false, LifeTime);
+	}
+}
+
 ///=========================================================================================================================================
 /// FLKAnimVerletCollisionDataBox
 ///=========================================================================================================================================
@@ -90,6 +117,19 @@ void FLKAnimVerletCollisionDataBox::ConvertFromShape(const FLKAnimVerletCollisio
 
 	RotationOffset = InBox.RotationOffset;
 	HalfExtents = InBox.HalfExtents;
+}
+
+void FLKAnimVerletCollisionDataBox::DebugDrawCollider(const UWorld* InWorld, const USkeletalMeshComponent* InMeshNullable, float LifeTime) const
+{
+	if (IsUseAbsoluteWorldTransform())
+	{
+		DrawDebugBox(InWorld, GetLocation(), HalfExtents, GetRotation().Quaternion(), FColor::Blue, false, LifeTime);
+	}
+	else if (InMeshNullable != nullptr)
+	{
+		const FTransform WorldT = GetTransform() * InMeshNullable->GetSocketTransform(AttachBoneName, ERelativeTransformSpace::RTS_World);
+		DrawDebugBox(InWorld, WorldT.GetLocation(), HalfExtents, WorldT.GetRotation(), FColor::Blue, false, LifeTime);
+	}
 }
 
 ///=========================================================================================================================================
@@ -111,6 +151,24 @@ void FLKAnimVerletCollisionDataPlane::ConvertFromShape(const FLKAnimVerletCollis
 	RotationOffset = InPlane.RotationOffset;
 	bFinitePlane = InPlane.bFinitePlane;
 	FinitePlaneHalfExtents = InPlane.FinitePlaneHalfExtents;
+}
+
+void FLKAnimVerletCollisionDataPlane::DebugDrawCollider(const UWorld* InWorld, const USkeletalMeshComponent* InMeshNullable, float LifeTime) const
+{
+	if (IsUseAbsoluteWorldTransform())
+	{
+		const FVector HalfExtents3D = (FinitePlaneHalfExtents.IsNearlyZero() == false) ? FVector(FinitePlaneHalfExtents, 1.0f) : FVector(100.0f, 100.0f, 1.0f);
+		DrawDebugBox(InWorld, GetLocation(), HalfExtents3D, GetRotation().Quaternion(), FColor::Blue, false, LifeTime);
+		DrawDebugDirectionalArrow(InWorld, GetLocation(), GetLocation() + GetRotation().Quaternion().GetAxisZ() * 30.f, 10.0f, FColor::Blue, false, LifeTime);
+	}
+	else if (InMeshNullable != nullptr)
+	{
+		const FTransform WorldT = GetTransform() * InMeshNullable->GetSocketTransform(AttachBoneName, ERelativeTransformSpace::RTS_World);
+
+		const FVector HalfExtents3D = (FinitePlaneHalfExtents.IsNearlyZero() == false) ? FVector(FinitePlaneHalfExtents, 1.0f) : FVector(100.0f, 100.0f, 1.0f);
+		DrawDebugBox(InWorld, WorldT.GetLocation(), HalfExtents3D, WorldT.GetRotation(), FColor::Blue, false, LifeTime);
+		DrawDebugDirectionalArrow(InWorld, WorldT.GetLocation(), WorldT.GetLocation() + WorldT.GetRotation().GetAxisZ() * 30.f, 10.0f, FColor::Blue, false, LifeTime);
+	}
 }
 
 ///=========================================================================================================================================
@@ -178,12 +236,58 @@ void FLKAnimVerletCollisionDataList::ConvertFromShape(const FLKAnimVerletCollisi
 	}
 }
 
+bool FLKAnimVerletCollisionDataList::AddData(const FLKAnimVerletCollisionData& NewData)
+{
+	const ELKAnimVerletCollider NewColliderType = NewData.GetColliderType();
+	switch (NewColliderType)
+	{
+		case ELKAnimVerletCollider::Sphere:
+		{
+			const FLKAnimVerletCollisionDataSphere* SphereData = static_cast<const FLKAnimVerletCollisionDataSphere*>(&NewData);
+			SphereCollisionData.Emplace(*SphereData);
+			return true;
+		}
+
+		case ELKAnimVerletCollider::Capsule:
+		{
+			const FLKAnimVerletCollisionDataCapsule* CapsuleData = static_cast<const FLKAnimVerletCollisionDataCapsule*>(&NewData);
+			CapsuleCollisionData.Emplace(*CapsuleData);
+			return true;
+		}
+
+		case ELKAnimVerletCollider::Box:
+		{
+			const FLKAnimVerletCollisionDataBox* BoxData = static_cast<const FLKAnimVerletCollisionDataBox*>(&NewData);
+			BoxCollisionData.Emplace(*BoxData);
+			return true;
+		}
+
+		case ELKAnimVerletCollider::Plane:
+		{
+			const FLKAnimVerletCollisionDataPlane* PlaneData = static_cast<const FLKAnimVerletCollisionDataPlane*>(&NewData);
+			PlaneCollisionData.Emplace(*PlaneData);
+			return true;
+		}
+
+		default:
+			break;
+	}
+	return false;
+}
+
 void FLKAnimVerletCollisionDataList::Reset()
 {
 	SphereCollisionData.Reset();
 	CapsuleCollisionData.Reset();
 	BoxCollisionData.Reset();
 	PlaneCollisionData.Reset();
+}
+
+void FLKAnimVerletCollisionDataList::DebugDrawCollider(const UWorld* InWorld, const USkeletalMeshComponent* InMeshNullable, float LifeTime) const
+{
+	ForEachCollisionDataConst([InWorld, InMeshNullable, LifeTime](const FLKAnimVerletColliderInterface& CurCollider) {
+		CurCollider.DebugDrawCollider(InWorld, InMeshNullable, LifeTime);
+	});
 }
 
 ///=========================================================================================================================================

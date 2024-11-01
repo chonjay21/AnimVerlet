@@ -41,5 +41,7 @@ public:
 	virtual void SetRotation(const FRotator& InRotator) {}
 	virtual void SetScale(const FVector& InScale) {}
 	virtual void SetTransform(const FTransform& InTransform) { SetLocation(InTransform.GetLocation()); SetRotation(InTransform.Rotator()); SetScale(InTransform.GetScale3D()); }
+
+	virtual void DebugDrawCollider(const class UWorld* InWorld, const class USkeletalMeshComponent* InMeshNullable, float LifeTime = -1.0f) const {}
 };
 ///=========================================================================================================================================

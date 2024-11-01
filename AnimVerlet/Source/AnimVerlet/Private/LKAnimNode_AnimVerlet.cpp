@@ -69,7 +69,7 @@ void FLKAnimNode_AnimVerlet::EvaluateSkeletalControl_AnyThread(FComponentSpacePo
 	}
 
 	/// Prepare each SimulateBones
-	PrepareSimulation(Output, BoneContainer);
+	PrepareSimulation(Output, BoneContainer, CurComponentT);
 
 	/// Simulate verlet integration
 	if (DeltaTime > 0.0f)
@@ -565,98 +565,39 @@ bool FLKAnimNode_AnimVerlet::MakeSimulateBones(FComponentSpacePoseContext& PoseC
 
 	if (bTipBone)
 	{
-		if (bExcludedBone == false)
+		if (bLockTipBone == false && bMakeFakeTipBone && FakeTipBoneLength > 0.0f)
 		{
-			if (bLockTipBone == false && bMakeFakeTipBone && FakeTipBoneLength > 0.0f)
+			FLKAnimVerletBone FakeSimulateBone;
+			FakeSimulateBone.bFakeBone = true;
+			FakeSimulateBone.bTipBone = true;
+			if (FoundBoneUnitSettingNullable != nullptr)
 			{
-				FLKAnimVerletBone FakeSimulateBone;
-				FakeSimulateBone.bFakeBone = true;
-				FakeSimulateBone.bTipBone = true;
-				if (FoundBoneUnitSettingNullable != nullptr)
-				{
-					FakeSimulateBone.bConstrainConeAngleFromParent = FoundBoneUnitSettingNullable->bConstrainConeAngleFromParent;
-					FakeSimulateBone.ConeAngleConstraint = FoundBoneUnitSettingNullable->ConeAngle;
-				}
-				FakeSimulateBone.ParentVerletBoneIndex = CurSimulateBoneIndex;
-
-				FTransform FakeBoneT = FTransform::Identity;
-				MakeFakeBoneTransform(OUT FakeBoneT, CurSimulateBoneIndex);
-				FakeSimulateBone.InitializeTransform(FakeBoneT);
-
-				const int32 FakeBoneIndex = SimulateBones.Emplace(FakeSimulateBone);
-				if (BoneSetting.bFakeBone == false)
-					RelevantBoneIndicators.Emplace(FakeBoneIndex, false, bParentExcluded ? ParentExcludedBoneIndex : ParentSimulateBoneIndex, bParentExcluded);
-				if (FakeSimulateBone.ParentVerletBoneIndex != INDEX_NONE)
-				{
-					/// Add child indexes
-					FLKAnimVerletBone& CurParentVerletBone = SimulateBones[FakeSimulateBone.ParentVerletBoneIndex];
-					bool bAlreadyInSet = false;
-					CurParentVerletBone.ChildVerletBoneIndexes.Add(FakeBoneIndex, &bAlreadyInSet);
-				}
-
-				const int32 AddedFakeBoneChainLength = BoneChainIndexes[RootSimulateBoneIndex].Add(FakeBoneIndex) + 1;
-				MaxBoneChainLength = FMath::Max(MaxBoneChainLength, AddedFakeBoneChainLength);
+				FakeSimulateBone.bConstrainConeAngleFromParent = FoundBoneUnitSettingNullable->bConstrainConeAngleFromParent;
+				FakeSimulateBone.ConeAngleConstraint = FoundBoneUnitSettingNullable->ConeAngle;
 			}
-			else
+			FakeSimulateBone.ParentVerletBoneIndex = CurSimulateBoneIndex;
+
+			FTransform FakeBoneT = FTransform::Identity;
+			MakeFakeBoneTransform(OUT FakeBoneT, CurSimulateBoneIndex);
+			FakeSimulateBone.InitializeTransform(FakeBoneT);
+
+			const int32 FakeBoneIndex = SimulateBones.Emplace(FakeSimulateBone);
+			if (BoneSetting.bFakeBone == false)
+				RelevantBoneIndicators.Emplace(FakeBoneIndex, false, bNewlyExcluded ? CurExcludedBoneIndex : CurSimulateBoneIndex, bNewlyExcluded);
+			if (FakeSimulateBone.ParentVerletBoneIndex != INDEX_NONE)
 			{
-				SimulateBones[CurSimulateBoneIndex].bTipBone = true;
+				/// Add child indexes
+				FLKAnimVerletBone& CurParentVerletBone = SimulateBones[FakeSimulateBone.ParentVerletBoneIndex];
+				bool bAlreadyInSet = false;
+				CurParentVerletBone.ChildVerletBoneIndexes.Add(FakeBoneIndex, &bAlreadyInSet);
 			}
+
+			const int32 AddedFakeBoneChainLength = BoneChainIndexes[RootSimulateBoneIndex].Add(FakeBoneIndex) + 1;
+			MaxBoneChainLength = FMath::Max(MaxBoneChainLength, AddedFakeBoneChainLength);
 		}
 		else
 		{
-			if (bLockTipBone == false && bMakeFakeTipBone && FakeTipBoneLength > 0.0f)
-			{
-				FLKAnimVerletBone FakeSimulateBone;
-				FakeSimulateBone.bFakeBone = true;
-				FakeSimulateBone.bTipBone = true;
-				if (FoundBoneUnitSettingNullable != nullptr)
-				{
-					FakeSimulateBone.bConstrainConeAngleFromParent = FoundBoneUnitSettingNullable->bConstrainConeAngleFromParent;
-					FakeSimulateBone.ConeAngleConstraint = FoundBoneUnitSettingNullable->ConeAngle;
-				}
-				FakeSimulateBone.ParentVerletBoneIndex = CurSimulateBoneIndex;
-
-				FTransform FakeBoneT = FTransform::Identity;
-				MakeFakeBoneTransform(OUT FakeBoneT, CurSimulateBoneIndex);
-				FakeSimulateBone.InitializeTransform(FakeBoneT);
-
-				const int32 FakeBoneIndex = SimulateBones.Emplace(FakeSimulateBone);
-				if (BoneSetting.bFakeBone == false)
-					RelevantBoneIndicators.Emplace(FakeBoneIndex, false, bParentExcluded ? ParentExcludedBoneIndex : ParentSimulateBoneIndex, bParentExcluded);
-				if (FakeSimulateBone.ParentVerletBoneIndex != INDEX_NONE)
-				{
-					/// Add child indexes
-					FLKAnimVerletBone& CurParentVerletBone = SimulateBones[FakeSimulateBone.ParentVerletBoneIndex];
-					bool bAlreadyInSet = false;
-					CurParentVerletBone.ChildVerletBoneIndexes.Add(FakeBoneIndex, &bAlreadyInSet);
-				}
-
-				const int32 AddedFakeBoneChainLength = BoneChainIndexes[RootSimulateBoneIndex].Add(FakeBoneIndex) + 1;
-				MaxBoneChainLength = FMath::Max(MaxBoneChainLength, AddedFakeBoneChainLength);
-			}
-			else
-			{
-				SimulateBones[CurSimulateBoneIndex].bTipBone = true;
-			}
-
-			FLKAnimVerletExcludedBone NewExcludedBone(CurBoneRef, ParentSimulateBoneIndex, bParentExcluded ? ParentExcludedBoneIndex : INDEX_NONE);
-			NewExcludedBone.BoneReference.Initialize(BoneContainer);
-			if (NewExcludedBone.BoneReference.CachedCompactPoseIndex != INDEX_NONE)
-			{
-				const FTransform ReferenceBonePoseT = PoseContext.Pose.GetComponentSpaceTransform(NewExcludedBone.BoneReference.CachedCompactPoseIndex);
-				NewExcludedBone.PrepareSimulation(ReferenceBonePoseT);
-
-				if (bParentExcluded == false && ParentSimulateBoneIndex != INDEX_NONE)
-					NewExcludedBone.LengthToParent = (SimulateBones[ParentSimulateBoneIndex].PoseLocation - ReferenceBonePoseT.GetLocation()).Size();
-				else if (bParentExcluded && ParentExcludedBoneIndex != INDEX_NONE)
-					NewExcludedBone.LengthToParent = (ExcludedBones[ParentExcludedBoneIndex].PoseLocation - ReferenceBonePoseT.GetLocation()).Size();
-
-				NewExcludedBone.bStraightenExcludedBonesByParent = BoneSetting.bStraightenExcludedBonesByParent;
-				const int32 ExcludedTipBoneIndex = ExcludedBones.Emplace(NewExcludedBone);
-				if (BoneSetting.bFakeBone == false)
-					RelevantBoneIndicators.Emplace(ExcludedTipBoneIndex, true, bParentExcluded ? ParentExcludedBoneIndex : ParentSimulateBoneIndex, bParentExcluded);
-				bNewlyExcluded = true;
-			}
+			SimulateBones[CurSimulateBoneIndex].bTipBone = true;
 		}
 	}
 	return true;
@@ -692,7 +633,7 @@ void FLKAnimNode_AnimVerlet::UpdateDeltaTime(float InDeltaTime, float InTimeDila
 	DeltaTime = FMath::IsNearlyZero(FixedDeltaTime, KINDA_SMALL_NUMBER) ? FMath::Clamp(InDeltaTime, MinDeltaTime, MaxDeltaTime) : FMath::Clamp(FixedDeltaTime * InTimeDilation, MinDeltaTime, MaxDeltaTime);
 }
 
-void FLKAnimNode_AnimVerlet::PrepareSimulation(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer)
+void FLKAnimNode_AnimVerlet::PrepareSimulation(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer, const FTransform& ComponentTransform)
 {
 	/// Just make sure
 	if (DeltaTime <= 0.0f)
@@ -731,10 +672,10 @@ void FLKAnimNode_AnimVerlet::PrepareSimulation(FComponentSpacePoseContext& PoseC
 		CurExcludedBone.PrepareSimulation(CurBonePoseT);
 	}
 
-	PrepareLocalCollisionConstraints(PoseContext, BoneContainer);
+	PrepareLocalCollisionConstraints(PoseContext, BoneContainer, ComponentTransform);
 }
 
-void FLKAnimNode_AnimVerlet::PrepareLocalCollisionConstraints(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer)
+void FLKAnimNode_AnimVerlet::PrepareLocalCollisionConstraints(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer, const FTransform& ComponentTransform)
 {
 	const double Compliance = static_cast<double>(1.0 / InvCompliance);
 
@@ -753,7 +694,7 @@ void FLKAnimNode_AnimVerlet::PrepareLocalCollisionConstraints(FComponentSpacePos
 		const FLKAnimVerletCollisionSphere& CurShapeSphere = SimulatingCollisionShapes.SphereCollisionShapes[i];
 		if (CurShapeSphere.bUseAbsoluteWorldTransform)
 		{
-			const FVector BoneLocation = CurShapeSphere.LocationOffset;
+			const FVector BoneLocation = ComponentTransform.InverseTransformPosition(CurShapeSphere.LocationOffset);
 			const FLKAnimVerletConstraint_Sphere SphereConstraint(BoneLocation, CurShapeSphere.Radius, Thickness, &SimulateBones, 
 																  CurShapeSphere.ExcludeBoneBits, bUseXPBDSolver, Compliance);
 			SphereCollisionConstraints.Emplace(SphereConstraint);
@@ -780,7 +721,7 @@ void FLKAnimNode_AnimVerlet::PrepareLocalCollisionConstraints(FComponentSpacePos
 		FLKAnimVerletCollisionSphere& CurShapeSphere = DynamicCollisionShapes.SphereCollisionShapes[i];
 		if (CurShapeSphere.bUseAbsoluteWorldTransform)
 		{
-			const FVector BoneLocation = CurShapeSphere.LocationOffset;
+			const FVector BoneLocation = ComponentTransform.InverseTransformPosition(CurShapeSphere.LocationOffset);
 			const FLKAnimVerletConstraint_Sphere SphereConstraint(BoneLocation, CurShapeSphere.Radius, Thickness, &SimulateBones, 
 																  CurShapeSphere.ExcludeBoneBits, bUseXPBDSolver, Compliance);
 			SphereCollisionConstraints.Emplace(SphereConstraint);
@@ -817,8 +758,8 @@ void FLKAnimNode_AnimVerlet::PrepareLocalCollisionConstraints(FComponentSpacePos
 		const FLKAnimVerletCollisionCapsule& CurShapeCapsule = SimulatingCollisionShapes.CapsuleCollisionShapes[i];
 		if (CurShapeCapsule.bUseAbsoluteWorldTransform)
 		{
-			const FVector BoneLocation = CurShapeCapsule.LocationOffset;
-			const FQuat BoneRotation = CurShapeCapsule.RotationOffset.Quaternion();
+			const FVector BoneLocation = ComponentTransform.InverseTransformPosition(CurShapeCapsule.LocationOffset);
+			const FQuat BoneRotation = ComponentTransform.InverseTransformRotation(CurShapeCapsule.RotationOffset.Quaternion());
 			const FLKAnimVerletConstraint_Capsule CapsuleConstraint(BoneLocation, BoneRotation, CurShapeCapsule.Radius, CurShapeCapsule.HalfHeight, Thickness, 
 																	&SimulateBones, CurShapeCapsule.ExcludeBoneBits, bUseXPBDSolver, Compliance);
 			CapsuleCollisionConstraints.Emplace(CapsuleConstraint);
@@ -846,8 +787,8 @@ void FLKAnimNode_AnimVerlet::PrepareLocalCollisionConstraints(FComponentSpacePos
 		FLKAnimVerletCollisionCapsule& CurShapeCapsule = DynamicCollisionShapes.CapsuleCollisionShapes[i];
 		if (CurShapeCapsule.bUseAbsoluteWorldTransform)
 		{
-			const FVector BoneLocation = CurShapeCapsule.LocationOffset;
-			const FQuat BoneRotation = CurShapeCapsule.RotationOffset.Quaternion();
+			const FVector BoneLocation = ComponentTransform.InverseTransformPosition(CurShapeCapsule.LocationOffset);
+			const FQuat BoneRotation = ComponentTransform.InverseTransformRotation(CurShapeCapsule.RotationOffset.Quaternion());
 			const FLKAnimVerletConstraint_Capsule CapsuleConstraint(BoneLocation, BoneRotation, CurShapeCapsule.Radius, CurShapeCapsule.HalfHeight, Thickness, 
 																	&SimulateBones, CurShapeCapsule.ExcludeBoneBits, bUseXPBDSolver, Compliance);
 			CapsuleCollisionConstraints.Emplace(CapsuleConstraint);
@@ -885,8 +826,8 @@ void FLKAnimNode_AnimVerlet::PrepareLocalCollisionConstraints(FComponentSpacePos
 		const FLKAnimVerletCollisionBox& CurShapeBox = SimulatingCollisionShapes.BoxCollisionShapes[i];
 		if (CurShapeBox.bUseAbsoluteWorldTransform)
 		{
-			const FVector BoneLocation = CurShapeBox.LocationOffset;
-			const FQuat BoneRotation = CurShapeBox.RotationOffset.Quaternion();
+			const FVector BoneLocation = ComponentTransform.InverseTransformPosition(CurShapeBox.LocationOffset);
+			const FQuat BoneRotation = ComponentTransform.InverseTransformRotation(CurShapeBox.RotationOffset.Quaternion());
 
 			const FLKAnimVerletConstraint_Box BoxConstraint(BoneLocation, BoneRotation, CurShapeBox.HalfExtents, Thickness, &SimulateBones, 
 															CurShapeBox.ExcludeBoneBits, bUseXPBDSolver, Compliance);
@@ -916,8 +857,8 @@ void FLKAnimNode_AnimVerlet::PrepareLocalCollisionConstraints(FComponentSpacePos
 		FLKAnimVerletCollisionBox& CurShapeBox = DynamicCollisionShapes.BoxCollisionShapes[i];
 		if (CurShapeBox.bUseAbsoluteWorldTransform)
 		{
-			const FVector BoneLocation = CurShapeBox.LocationOffset;
-			const FQuat BoneRotation = CurShapeBox.RotationOffset.Quaternion();
+			const FVector BoneLocation = ComponentTransform.InverseTransformPosition(CurShapeBox.LocationOffset);
+			const FQuat BoneRotation = ComponentTransform.InverseTransformRotation(CurShapeBox.RotationOffset.Quaternion());
 
 			const FLKAnimVerletConstraint_Box BoxConstraint(BoneLocation, BoneRotation, CurShapeBox.HalfExtents, Thickness, &SimulateBones, 
 															CurShapeBox.ExcludeBoneBits, bUseXPBDSolver, Compliance);
@@ -957,8 +898,8 @@ void FLKAnimNode_AnimVerlet::PrepareLocalCollisionConstraints(FComponentSpacePos
 		const FLKAnimVerletCollisionPlane& CurShapePlane = SimulatingCollisionShapes.PlaneCollisionShapes[i];
 		if (CurShapePlane.bUseAbsoluteWorldTransform)
 		{
-			const FVector BoneLocation = CurShapePlane.LocationOffset;
-			const FQuat BoneRotation = CurShapePlane.RotationOffset.Quaternion();
+			const FVector BoneLocation = ComponentTransform.InverseTransformPosition(CurShapePlane.LocationOffset);
+			const FQuat BoneRotation = ComponentTransform.InverseTransformRotation(CurShapePlane.RotationOffset.Quaternion());
 			const FLKAnimVerletConstraint_Plane PlaneConstraint(BoneLocation, BoneRotation.GetUpVector(), BoneRotation,
 																CurShapePlane.bFinitePlane ? CurShapePlane.FinitePlaneHalfExtents : FVector2D::ZeroVector, Thickness,
 																&SimulateBones, CurShapePlane.ExcludeBoneBits, bUseXPBDSolver, Compliance);
@@ -989,8 +930,8 @@ void FLKAnimNode_AnimVerlet::PrepareLocalCollisionConstraints(FComponentSpacePos
 		FLKAnimVerletCollisionPlane& CurShapePlane = DynamicCollisionShapes.PlaneCollisionShapes[i];
 		if (CurShapePlane.bUseAbsoluteWorldTransform)
 		{
-			const FVector BoneLocation = CurShapePlane.LocationOffset;
-			const FQuat BoneRotation = CurShapePlane.RotationOffset.Quaternion();
+			const FVector BoneLocation = ComponentTransform.InverseTransformPosition(CurShapePlane.LocationOffset);
+			const FQuat BoneRotation = ComponentTransform.InverseTransformRotation(CurShapePlane.RotationOffset.Quaternion());
 			const FLKAnimVerletConstraint_Plane PlaneConstraint(BoneLocation, BoneRotation.GetUpVector(), BoneRotation,
 																CurShapePlane.bFinitePlane ? CurShapePlane.FinitePlaneHalfExtents : FVector2D::ZeroVector, Thickness,
 																&SimulateBones, CurShapePlane.ExcludeBoneBits, bUseXPBDSolver, Compliance);
