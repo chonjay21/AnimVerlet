@@ -128,7 +128,7 @@ void ULKAnimGraphNode_AnimVerlet::Draw(FPrimitiveDrawInterface* PDI, USkeletalMe
 		for (const FLKAnimVerletBone& CurBone : AnimVerletBones)
 		{
 			const bool bSleep = (bShowSleep && CurBone.IsSleep());
-			DrawWireSphere(PDI, CurBone.Location, bSleep ? FColor::Turquoise : (CurBone.bFakeBone ? FColor::Black : FColor::Yellow), AnimVerletNode->Thickness * BoneThicknessRenderScale, 16, SDPG_Foreground);
+			DrawWireSphere(PDI, CurBone.Location, bSleep ? FColor::Turquoise : (CurBone.bFakeBone ? FColor::Black : FColor::Yellow), CurBone.Thickness * BoneThicknessRenderScale, 16, SDPG_Foreground);
 		}
 	}
 
@@ -142,7 +142,7 @@ void ULKAnimGraphNode_AnimVerlet::Draw(FPrimitiveDrawInterface* PDI, USkeletalMe
 		{
 			const TArray<FLKAnimVerletConstraint_Pin>& PinConstraints = AnimVerletNode->GetPinConstraints();
 			for (const FLKAnimVerletConstraint_Pin& PinConstraint : PinConstraints)
-				DrawWireSphere(PDI, PinConstraint.Bone->Location, FColor::Red, AnimVerletNode->Thickness * 2, 16, SDPG_Foreground);
+				DrawWireSphere(PDI, PinConstraint.Bone->Location, FColor::Red, PinConstraint.Bone->Thickness * 2, 16, SDPG_Foreground);
 		}
 
 		if (bShowSimulatingBallSocketConstraints)

@@ -59,6 +59,7 @@ public:
 
 	bool bConstrainConeAngleFromParent = false;
 	float ConeAngleConstraint = 0.0f;
+	float Thickness = 0.0f;
 
 public:
 	bool IsFakeBone() const { return bFakeBone; }

@@ -180,7 +180,6 @@ struct FLKAnimVerletConstraint_Sphere : public FLKAnimVerletConstraint
 public:
 	FVector Location = FVector::ZeroVector;
 	float Radius = 0.0f;
-	float Thickness = 0.0f;
 	TArray<FLKAnimVerletBone>* Bones = nullptr;
 	TExcludeBoneBits ExcludeBones;
 
@@ -189,7 +188,7 @@ public:
 	TArray<double> Lambdas;			///for XPBD
 
 public:
-	FLKAnimVerletConstraint_Sphere(const FVector& InLocation, float InRadius, float InThickness, TArray<FLKAnimVerletBone>* InBones, 
+	FLKAnimVerletConstraint_Sphere(const FVector& InLocation, float InRadius, TArray<FLKAnimVerletBone>* InBones, 
 								   const TExcludeBoneBits& InExcludeBones, bool bInUseXPBDSolver, double InCompliance);
 	virtual void Update(float DeltaTime, bool bFinalize) override;
 	virtual void PostUpdate(float DeltaTime) override { Lambdas.Reset(); }
@@ -208,7 +207,6 @@ public:
 	FQuat Rotation = FQuat::Identity;
 	float Radius = 0.0f;
 	float HalfHeight = 0.0f;
-	float Thickness = 0.0f;
 	TArray<FLKAnimVerletBone>* Bones = nullptr;
 	TExcludeBoneBits ExcludeBones;
 
@@ -217,7 +215,7 @@ public:
 	TArray<double> Lambdas;			///for XPBD
 
 public:
-	FLKAnimVerletConstraint_Capsule(const FVector& InLocation, const FQuat& InRot, float InRadius, float InHalfHeight, float InThickness, 
+	FLKAnimVerletConstraint_Capsule(const FVector& InLocation, const FQuat& InRot, float InRadius, float InHalfHeight,
 									TArray<FLKAnimVerletBone>* InBones, const TExcludeBoneBits& InExcludeBones, bool bInUseXPBDSolver, double InCompliance);
 	virtual void Update(float DeltaTime, bool bFinalize) override;
 	virtual void PostUpdate(float DeltaTime) override { Lambdas.Reset(); }
@@ -235,7 +233,6 @@ public:
 	FVector Location = FVector::ZeroVector;
 	FQuat Rotation = FQuat::Identity;
 	FVector HalfExtents = FVector::ZeroVector;
-	float Thickness = 0.0f;
 	TArray<FLKAnimVerletBone>* Bones = nullptr;
 	TExcludeBoneBits ExcludeBones;
 
@@ -244,8 +241,8 @@ public:
 	TArray<double> Lambdas;			///for XPBD
 
 public:
-	FLKAnimVerletConstraint_Box(const FVector& InLocation, const FQuat& InRot, const FVector& InHalfExtents, float InThickness, 
-								TArray<FLKAnimVerletBone>* InBones, const TExcludeBoneBits& InExcludeBones, bool bInUseXPBDSolver, double InCompliance);
+	FLKAnimVerletConstraint_Box(const FVector& InLocation, const FQuat& InRot, const FVector& InHalfExtents, TArray<FLKAnimVerletBone>* InBones, 
+								const TExcludeBoneBits& InExcludeBones, bool bInUseXPBDSolver, double InCompliance);
 	virtual void Update(float DeltaTime, bool bFinalize) override;
 	virtual void PostUpdate(float DeltaTime) override;
 	virtual void ResetSimulation() override;
@@ -263,7 +260,6 @@ public:
 	FVector PlaneNormal = FVector::ZeroVector;
 	FQuat Rotation = FQuat::Identity;
 	FVector2D PlaneHalfExtents = FVector2D::ZeroVector;
-	float Thickness = 0.0f;
 	TArray<FLKAnimVerletBone>* Bones = nullptr;
 	TExcludeBoneBits ExcludeBones;
 
@@ -272,7 +268,7 @@ public:
 	TArray<double> Lambdas;			///for XPBD
 
 public:
-	FLKAnimVerletConstraint_Plane(const FVector& InPlaneBase, const FVector& InPlaneNormal, const FQuat& InRotation, const FVector2D& InPlaneHalfExtents, float InThickness, 
+	FLKAnimVerletConstraint_Plane(const FVector& InPlaneBase, const FVector& InPlaneNormal, const FQuat& InRotation, const FVector2D& InPlaneHalfExtents,
 								  TArray<FLKAnimVerletBone>* InBones, const TExcludeBoneBits& InExcludeBones, bool bInUseXPBDSolver, double InCompliance);
 	virtual void Update(float DeltaTime, bool bFinalize) override;
 	virtual void PostUpdate(float DeltaTime) override { Lambdas.Reset(); }
@@ -290,13 +286,12 @@ public:
 	TWeakObjectPtr<const class UWorld> WorldPtr = nullptr;
 	TWeakObjectPtr<class UPrimitiveComponent> SelfComponentPtr = nullptr;
 	FName WorldCollisionProfileName = NAME_None;
-	float Thickness = 0.0f;
 	TArray<FLKAnimVerletBone>* Bones = nullptr;
 	TExcludeBoneBits ExcludeBones;
 
 public:
 	FLKAnimVerletConstraint_World(const class UWorld* InWorld, class UPrimitiveComponent* InSelfComponent, const FName& InCollisionProfileName,
-								  float InThickness, TArray<FLKAnimVerletBone>* InBones, const TExcludeBoneBits& InExcludeBones);
+								  TArray<FLKAnimVerletBone>* InBones, const TExcludeBoneBits& InExcludeBones);
 	virtual void Update(float DeltaTime, bool bFinalize) override;
 	virtual void PostUpdate(float DeltaTime) override {}
 	virtual void ResetSimulation() override {}

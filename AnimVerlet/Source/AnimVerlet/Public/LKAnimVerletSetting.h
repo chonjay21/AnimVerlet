@@ -11,12 +11,27 @@ public:
 	UPROPERTY(EditAnywhere)
 	FBoneReference Bone;
 
-	/** if true, Use grand parent to parent bone`s direction to constrain each bone`s cone angle. otherwise use animation pose to constrain each bone`s cone angle. (override global cone angle) */
 	UPROPERTY(EditAnywhere, Category = "Constraint")
+	bool bOverrideConstrainConeAngleFromParent = false;
+	/** if true, Use grand parent to parent bone`s direction to constrain each bone`s cone angle. otherwise use animation pose to constrain each bone`s cone angle. (override global cone angle) */
+	UPROPERTY(EditAnywhere, Category = "Constraint", meta = (EditCondition = "bOverrideConstrainConeAngleFromParent"))
 	bool bConstrainConeAngleFromParent = false;
+	UPROPERTY(EditAnywhere, Category = "Constraint")
+	bool bOverrideConeAngle = false;
 	/** each bones`s angle to use when constraining using a cone.(Ball - Socket joint constraints, override global cone angle) */
-	UPROPERTY(EditAnywhere, Category = "Constraint", meta = (ClampMin = "0.0", ClampMax = "90.0", ForceUnits = "deg"))
+	UPROPERTY(EditAnywhere, Category = "Constraint", meta = (EditCondition = "bOverrideConeAngle", ClampMin = "0.0", ClampMax = "90.0", ForceUnits = "deg"))
 	float ConeAngle = 0.0f;
+
+	UPROPERTY(EditAnywhere, Category = "Collision")
+	bool bOverrideThickness = false;
+	/** The virtual thickness of the bone to be used in calculating various collisions and constraints.(radius) */
+	UPROPERTY(EditAnywhere, Category = "Collision", meta = (EditCondition = "bOverrideThickness", ClampMin = "0.0", ForceUnits = "cm"))
+	float Thickness = 0.3f;
+
+	UPROPERTY(EditAnywhere, Category = "Physics")
+	bool bOverrideMass = false;
+	UPROPERTY(EditAnywhere, Category = "Physics", meta = (EditCondition = "bOverrideMass", ClampMin = "0.01"))
+	float Mass = 1.0f;
 
 public:
 	bool operator==(const FBoneReference& RHS) const { return Bone == RHS; }
