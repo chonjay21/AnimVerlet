@@ -164,8 +164,6 @@ public:
 		: BoneA(InBoneA), BoneB(InBoneB)
 	{
 	}
-
-	bool IsValidBoneIndicatorPair() const { return BoneA.IsValidBoneIndicator() && BoneB.IsValidBoneIndicator(); }
 };
 ///=========================================================================================================================================
 

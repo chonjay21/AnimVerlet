@@ -222,10 +222,15 @@ public:
 	/** The virtual thickness of the bone to be used in calculating various collisions and constraints.(radius) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Collision", meta = (ClampMin = "0.0", ForceUnits = "cm"))
 	float Thickness = 0.3f;
+	/** The Capsule shape between the 2 bones is used to calculate various collisions and constraints.(otherwise a sphere shape is used) */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Collision")
+	bool bUseCapsuleCollisionForChain = true;
 
 	/** Enable collision against to world.(May cause performance impact by physics sweep test for each bone and fake bone) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Collision", meta = (PinHiddenByDefault))
 	FName WorldCollisionProfile = NAME_None;
+	UPROPERTY(EditAnywhere, Category = "Collision", meta = (PinHiddenByDefault, EditCondition = "WorldCollisionProfile != NAME_None"))
+	TArray<FBoneReference> WorldCollisionExcludeBones;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Collision", meta = (PinHiddenByDefault))
 	TArray<FLKAnimVerletCollisionSphere> SphereCollisionShapes;
@@ -299,6 +304,7 @@ private:
 	TArray<FLKAnimVerletBone> SimulateBones;								///Simulating bones(real bones + fake virtual bones)
 	TArray<FLKAnimVerletExcludedBone> ExcludedBones;						///Excluded bones in Simulating bone chain(real bones)
 	TArray<FLKAnimVerletBoneIndicator> RelevantBoneIndicators;				///Simulating real bones + Excluded real bones + fake tip bone(for bone`s rotation at PostUpdate phase)
+	TArray<FLKAnimVerletBoneIndicatorPair> SimulateBonePairIndicators;		///Simulating bone`s each distance constraints pair(for capsule collision) nearly same as DistanceConstraint
 	FLKAnimVerletCollisionShapeList SimulatingCollisionShapes;
 	///TArray<FLKAnimVerletConstraint*> Constraints;
 	/// Unroll each constratins for better solve result(considering constraint`s solving order)

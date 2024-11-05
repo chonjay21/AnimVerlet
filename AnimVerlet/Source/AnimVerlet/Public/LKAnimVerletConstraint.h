@@ -1,9 +1,8 @@
 #pragma once
 #include <CoreMinimal.h>
 #include <UObject/WeakObjectPtrTemplates.h>
-#include "LKAnimVerletBone.h"
+#include "LKAnimVerletConstraintType.h"
 
-using TExcludeBoneBits = TBitArray<TInlineAllocator<64>>;
 
 ///=========================================================================================================================================
 /// FLKAnimVerletConstraint
@@ -183,16 +182,23 @@ public:
 	TArray<FLKAnimVerletBone>* Bones = nullptr;
 	TExcludeBoneBits ExcludeBones;
 
+	bool bUseCapsuleCollisionForChain = false;
+	TArray<FLKAnimVerletBoneIndicatorPair>* BonePairs = nullptr;
+
 	bool bUseXPBDSolver = false;
 	double Compliance = 0.0;		///for XPBD
 	TArray<double> Lambdas;			///for XPBD
 
 public:
-	FLKAnimVerletConstraint_Sphere(const FVector& InLocation, float InRadius, TArray<FLKAnimVerletBone>* InBones, 
-								   const TExcludeBoneBits& InExcludeBones, bool bInUseXPBDSolver, double InCompliance);
+	FLKAnimVerletConstraint_Sphere(const FVector& InLocation, float InRadius, const FLKAnimVerletCollisionConstraintInput& InCollisionInput);
 	virtual void Update(float DeltaTime, bool bFinalize) override;
 	virtual void PostUpdate(float DeltaTime) override { Lambdas.Reset(); }
 	virtual void ResetSimulation() override { Lambdas.Reset(); }
+
+private:
+	bool CheckSphereSphere(IN OUT FLKAnimVerletBone& CurVerletBone, float DeltaTime, bool bFinalize, int32 LambdaIndex);
+	void CheckSphereSphere(float DeltaTime, bool bFinalize);
+	void CheckSphereCapsule(float DeltaTime, bool bFinalize);
 };
 ///=========================================================================================================================================
 
@@ -210,16 +216,24 @@ public:
 	TArray<FLKAnimVerletBone>* Bones = nullptr;
 	TExcludeBoneBits ExcludeBones;
 
+	bool bUseCapsuleCollisionForChain = false;
+	TArray<FLKAnimVerletBoneIndicatorPair>* BonePairs = nullptr;
+
 	bool bUseXPBDSolver = false;
 	double Compliance = 0.0;		///for XPBD
 	TArray<double> Lambdas;			///for XPBD
 
 public:
-	FLKAnimVerletConstraint_Capsule(const FVector& InLocation, const FQuat& InRot, float InRadius, float InHalfHeight,
-									TArray<FLKAnimVerletBone>* InBones, const TExcludeBoneBits& InExcludeBones, bool bInUseXPBDSolver, double InCompliance);
+	FLKAnimVerletConstraint_Capsule(const FVector& InLocation, const FQuat& InRot, float InRadius, 
+									float InHalfHeight, const FLKAnimVerletCollisionConstraintInput& InCollisionInput);
 	virtual void Update(float DeltaTime, bool bFinalize) override;
 	virtual void PostUpdate(float DeltaTime) override { Lambdas.Reset(); }
 	virtual void ResetSimulation() override { Lambdas.Reset(); }
+
+private:
+	bool CheckCapsuleSphere(IN OUT FLKAnimVerletBone& CurVerletBone, float DeltaTime, bool bFinalize, const FVector& CapsuleStart, const FVector& CapsuleEnd, int32 LambdaIndex);
+	void CheckCapsuleSphere(float DeltaTime, bool bFinalize);
+	void CheckCapsuleCapsule(float DeltaTime, bool bFinalize);
 };
 ///=========================================================================================================================================
 
@@ -236,16 +250,25 @@ public:
 	TArray<FLKAnimVerletBone>* Bones = nullptr;
 	TExcludeBoneBits ExcludeBones;
 
+	bool bUseCapsuleCollisionForChain = false;
+	TArray<FLKAnimVerletBoneIndicatorPair>* BonePairs = nullptr;
+
 	bool bUseXPBDSolver = false;
 	double Compliance = 0.0;		///for XPBD
 	TArray<double> Lambdas;			///for XPBD
 
 public:
-	FLKAnimVerletConstraint_Box(const FVector& InLocation, const FQuat& InRot, const FVector& InHalfExtents, TArray<FLKAnimVerletBone>* InBones, 
-								const TExcludeBoneBits& InExcludeBones, bool bInUseXPBDSolver, double InCompliance);
+	FLKAnimVerletConstraint_Box(const FVector& InLocation, const FQuat& InRot, const FVector& InHalfExtents, const FLKAnimVerletCollisionConstraintInput& InCollisionInput);
 	virtual void Update(float DeltaTime, bool bFinalize) override;
-	virtual void PostUpdate(float DeltaTime) override;
-	virtual void ResetSimulation() override;
+	virtual void PostUpdate(float DeltaTime) override { Lambdas.Reset(); }
+	virtual void ResetSimulation() override { Lambdas.Reset(); }
+
+private:
+	bool IntersectOriginAabbSphere(OUT FVector& OutCollisionNormal, OUT float& OutPenetrationDepth, IN OUT FLKAnimVerletBone& CurVerletBone, const FVector& SphereLocation);
+	bool IntersectObbSphere(OUT FVector& OutCollisionNormal, OUT float& OutPenetrationDepth, IN OUT FLKAnimVerletBone& CurVerletBone, const FVector& SphereLocation, const FQuat& InvRotation);
+	bool CheckBoxSphere(IN OUT FLKAnimVerletBone& CurVerletBone, float DeltaTime, bool bFinalize, const FVector& SphereLocation, const FQuat& InvRotation, int32 LambdaIndex);
+	void CheckBoxSphere(float DeltaTime, bool bFinalize);
+	void CheckBoxCapsule(float DeltaTime, bool bFinalize);
 };
 ///=========================================================================================================================================
 
@@ -263,16 +286,24 @@ public:
 	TArray<FLKAnimVerletBone>* Bones = nullptr;
 	TExcludeBoneBits ExcludeBones;
 
+	bool bUseCapsuleCollisionForChain = false;
+	TArray<FLKAnimVerletBoneIndicatorPair>* BonePairs = nullptr;
+
 	bool bUseXPBDSolver = false;
 	double Compliance = 0.0;		///for XPBD
 	TArray<double> Lambdas;			///for XPBD
 
 public:
-	FLKAnimVerletConstraint_Plane(const FVector& InPlaneBase, const FVector& InPlaneNormal, const FQuat& InRotation, const FVector2D& InPlaneHalfExtents,
-								  TArray<FLKAnimVerletBone>* InBones, const TExcludeBoneBits& InExcludeBones, bool bInUseXPBDSolver, double InCompliance);
+	FLKAnimVerletConstraint_Plane(const FVector& InPlaneBase, const FVector& InPlaneNormal, const FQuat& InRotation, 
+								  const FVector2D& InPlaneHalfExtents, const FLKAnimVerletCollisionConstraintInput& InCollisionInput);
 	virtual void Update(float DeltaTime, bool bFinalize) override;
 	virtual void PostUpdate(float DeltaTime) override { Lambdas.Reset(); }
 	virtual void ResetSimulation() override { Lambdas.Reset(); }
+
+private:
+	bool CheckPlaneSphere(IN OUT FLKAnimVerletBone& CurVerletBone, float DeltaTime, bool bFinalize, bool bFinitePlane, const FQuat& InvRotation, int32 LambdaIndex);
+	void CheckPlaneSphere(float DeltaTime, bool bFinalize);
+	void CheckPlaneCapsule(float DeltaTime, bool bFinalize);
 };
 ///=========================================================================================================================================
 
@@ -289,11 +320,19 @@ public:
 	TArray<FLKAnimVerletBone>* Bones = nullptr;
 	TExcludeBoneBits ExcludeBones;
 
+	bool bUseCapsuleCollisionForChain = false;
+	TArray<FLKAnimVerletBoneIndicatorPair>* BonePairs = nullptr;
+
 public:
-	FLKAnimVerletConstraint_World(const class UWorld* InWorld, class UPrimitiveComponent* InSelfComponent, const FName& InCollisionProfileName,
-								  TArray<FLKAnimVerletBone>* InBones, const TExcludeBoneBits& InExcludeBones);
+	FLKAnimVerletConstraint_World(const class UWorld* InWorld, class UPrimitiveComponent* InSelfComponent, const FName& InCollisionProfileName, const FLKAnimVerletCollisionConstraintInput& InCollisionInput);
 	virtual void Update(float DeltaTime, bool bFinalize) override;
 	virtual void PostUpdate(float DeltaTime) override {}
 	virtual void ResetSimulation() override {}
+
+private:
+	bool CheckWorldSphere(IN OUT FLKAnimVerletBone& CurVerletBone, float DeltaTime, bool bFinalize, const UWorld* World,
+						  const FCollisionQueryParams& CollisionQueryParams, const FTransform& ComponentTransform, int32 LambdaIndex);
+	void CheckWorldSphere(float DeltaTime, bool bFinalize);
+	void CheckWorldCapsule(float DeltaTime, bool bFinalize);
 };
 ///=========================================================================================================================================
