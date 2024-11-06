@@ -57,9 +57,12 @@ public:
 	bool bSleep = false;
 	float SleepTriggerElapsedTime = 0.0f;
 
+	bool bPinned = false;
+	float PinMargin = 0.0f;
 	bool bConstrainConeAngleFromParent = false;
 	float ConeAngleConstraint = 0.0f;
 	float Thickness = 0.0f;
+	bool bOverrideToUseSphereCollisionForChain = false;
 
 public:
 	bool IsFakeBone() const { return bFakeBone; }
@@ -67,6 +70,7 @@ public:
 	bool HasParentBone() const { return ParentVerletBoneIndex != INDEX_NONE; }
 	bool IsTipBone() const { return bTipBone; }
 	bool IsSleep() const { return bSleep; }
+	bool IsPinned() const { return bPinned; }
 	FTransform MakeCurrentTransform() const { return FTransform(Rotation, Location, PoseScale); }
 	FTransform MakePoseTransform() const { return FTransform(PoseRotation, PoseLocation, PoseScale); }
 	FVector MakeFakeBonePoseLocation(const FTransform& PoseT) const;

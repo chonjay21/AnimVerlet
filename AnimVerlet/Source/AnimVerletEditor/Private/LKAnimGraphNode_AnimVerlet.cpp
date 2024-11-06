@@ -130,6 +130,24 @@ void ULKAnimGraphNode_AnimVerlet::Draw(FPrimitiveDrawInterface* PDI, USkeletalMe
 			const bool bSleep = (bShowSleep && CurBone.IsSleep());
 			DrawWireSphere(PDI, CurBone.Location, bSleep ? FColor::Turquoise : (CurBone.bFakeBone ? FColor::Black : FColor::Yellow), CurBone.Thickness * BoneThicknessRenderScale, 16, SDPG_Foreground);
 		}
+
+		if (bShowCapsuleBoneChainConstraints && AnimVerletNode->bUseCapsuleCollisionForChain)
+		{
+			const TArray<FLKAnimVerletBoneIndicatorPair>& AnimVerletBoneIndicatorPairList = AnimVerletNode->GetSimulateBonePairIndicators();
+			for (const FLKAnimVerletBoneIndicatorPair& CurPair : AnimVerletBoneIndicatorPairList)
+			{
+				if (CurPair.BoneB.IsValidBoneIndicator() == false || AnimVerletBones.IsValidIndex(CurPair.BoneB.AnimVerletBoneIndex) == false)
+					continue;
+
+				const FLKAnimVerletBone& CurVerletBone = AnimVerletBones[CurPair.BoneB.AnimVerletBoneIndex];
+				if (CurPair.BoneA.IsValidBoneIndicator() == false || CurVerletBone.bOverrideToUseSphereCollisionForChain)
+					continue;
+
+				const FLKAnimVerletBone& ParentVerletBone = AnimVerletBones[CurPair.BoneA.AnimVerletBoneIndex];
+				const FQuat CapsuleRotation = FRotationMatrix::MakeFromZ(ParentVerletBone.Location - CurVerletBone.Location).ToQuat();
+				DrawWireCapsule(PDI, (CurVerletBone.Location + ParentVerletBone.Location) * 0.5f, CapsuleRotation.GetAxisX(), CapsuleRotation.GetAxisY(), CapsuleRotation.GetAxisZ(), FColor::Emerald, CurVerletBone.Thickness * BoneThicknessRenderScale, ((CurVerletBone.Location - ParentVerletBone.Location).Size() * 0.5f) + CurVerletBone.Thickness * BoneThicknessRenderScale, 16, SDPG_Foreground);
+			}
+		}
 	}
 
 	if (bShowConstraints)

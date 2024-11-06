@@ -173,6 +173,9 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 
 			const FLKAnimVerletConstraint_Pin PinConstraint(&CurSimulateBone, StartBoneLockMargin);
 			PinConstraints.Emplace(PinConstraint);
+
+			CurSimulateBone.bPinned = true;
+			CurSimulateBone.PinMargin = StartBoneLockMargin;
 		}
 		else
 		{
@@ -218,12 +221,23 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 				BallSocketConstraints.Emplace(BallSocketConstraint);
 			}
 
-			if (bLockTipBone)
+			/// Force Lock
+			if (CurSimulateBone.IsPinned())
+			{
+				const FLKAnimVerletConstraint_Pin PinConstraint(&CurSimulateBone, CurSimulateBone.PinMargin);
+				PinConstraints.Emplace(PinConstraint);
+
+				CurSimulateBone.bPinned = true;
+			}
+			else if (bLockTipBone)
 			{
 				if (CurSimulateBone.IsTipBone())
 				{
 					const FLKAnimVerletConstraint_Pin PinConstraint(&CurSimulateBone, TipBoneLockMargin);
 					PinConstraints.Emplace(PinConstraint);
+
+					CurSimulateBone.bPinned = true;
+					CurSimulateBone.PinMargin = TipBoneLockMargin;
 				}
 			}
 
@@ -523,6 +537,13 @@ bool FLKAnimNode_AnimVerlet::MakeSimulateBones(FComponentSpacePoseContext& PoseC
 				NewSimulateBone.InvMass = FMath::IsNearlyZero(FoundBoneUnitSettingNullable->Mass, KINDA_SMALL_NUMBER) ? 1.0f : 1.0f / FoundBoneUnitSettingNullable->Mass;
 			if (FoundBoneUnitSettingNullable->bOverrideThickness)
 				NewSimulateBone.Thickness = FoundBoneUnitSettingNullable->Thickness;
+			NewSimulateBone.bOverrideToUseSphereCollisionForChain = FoundBoneUnitSettingNullable->bOverrideToUseSphereCollisionForChain;
+
+			if (FoundBoneUnitSettingNullable->bLockBone)
+			{
+				NewSimulateBone.bPinned = true;	///Reserve
+				NewSimulateBone.PinMargin = FoundBoneUnitSettingNullable->LockMargin;
+			}
 		}
 
 		if (NewSimulateBone.bFakeBone)
@@ -632,6 +653,13 @@ bool FLKAnimNode_AnimVerlet::MakeSimulateBones(FComponentSpacePoseContext& PoseC
 					FakeSimulateBone.InvMass = FMath::IsNearlyZero(FoundBoneUnitSettingNullable->Mass, KINDA_SMALL_NUMBER) ? 1.0f : 1.0f / FoundBoneUnitSettingNullable->Mass;
 				if (FoundBoneUnitSettingNullable->bOverrideThickness)
 					FakeSimulateBone.Thickness = FoundBoneUnitSettingNullable->Thickness;
+				FakeSimulateBone.bOverrideToUseSphereCollisionForChain = FoundBoneUnitSettingNullable->bOverrideToUseSphereCollisionForChain;
+
+				if (FoundBoneUnitSettingNullable->bLockBone)
+				{
+					FakeSimulateBone.bPinned = true;	///Reserve
+					FakeSimulateBone.PinMargin = FoundBoneUnitSettingNullable->LockMargin;
+				}
 			}
 			FakeSimulateBone.ParentVerletBoneIndex = CurSimulateBoneIndex;
 
@@ -1698,6 +1726,25 @@ void FLKAnimNode_AnimVerlet::DebugDrawAnimVerlet(const FComponentSpacePoseContex
 		const bool bSleep = CurBone.IsSleep();
 		AnimInstanceProxy->AnimDrawDebugSphere(WorldLocation, CurBone.Thickness, 16, bSleep ? FColor::Turquoise : (CurBone.bFakeBone ? FColor::Black : FColor::Yellow), false, -1.0f, 0.0f, SDPG_Foreground);
 	}
+
+#if (ENGINE_MINOR_VERSION >= 4)
+	for (const FLKAnimVerletBoneIndicatorPair& CurPair : SimulateBonePairIndicators)
+	{
+		if (CurPair.BoneB.IsValidBoneIndicator() == false || SimulateBones.IsValidIndex(CurPair.BoneB.AnimVerletBoneIndex) == false)
+			continue;
+
+		const FLKAnimVerletBone& CurVerletBone = SimulateBones[CurPair.BoneB.AnimVerletBoneIndex];
+		if (CurPair.BoneA.IsValidBoneIndicator() == false || CurVerletBone.bOverrideToUseSphereCollisionForChain)
+			continue;
+
+		const FLKAnimVerletBone& ParentVerletBone = SimulateBones[CurPair.BoneA.AnimVerletBoneIndex];
+
+		const FVector WorldLocation = ComponentToWorld.TransformPosition((CurVerletBone.Location + ParentVerletBone.Location) * 0.5f);
+		const FQuat CapsuleRotation = FRotationMatrix::MakeFromZ(ParentVerletBone.Location - CurVerletBone.Location).ToQuat();
+		const FQuat WorldRotation = ComponentToWorld.TransformRotation(CapsuleRotation);
+		AnimInstanceProxy->AnimDrawDebugCapsule(WorldLocation, (CurVerletBone.Location - ParentVerletBone.Location).Size() * 0.5f + CurVerletBone.Thickness, CurVerletBone.Thickness, WorldRotation.Rotator(), FColor::Blue, false, -1.0f, SDPG_Foreground);
+	}
+#endif
 
 	for (const FLKAnimVerletConstraint_Distance& CurConstraint : DistanceConstraints)
 	{

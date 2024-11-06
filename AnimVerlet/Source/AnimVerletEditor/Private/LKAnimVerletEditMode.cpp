@@ -286,8 +286,8 @@ bool FLKAnimVerletEditMode::GetCustomDrawingCoordinateSystem(FMatrix& InMatrix, 
 	if (CurCollider == nullptr)
 		return false;
 
-	///const FTransform CurColliderT = GetColliderWorldT(*CurCollider);
-	const FTransform CurColliderT = CurCollider->GetTransform();
+	const FTransform CurColliderT = GetColliderWorldT(*CurCollider);
+	///const FTransform CurColliderT = CurCollider->GetTransform();
 	InMatrix = CurColliderT.ToMatrixNoScale().RemoveTranslation();
 	return true;
 }

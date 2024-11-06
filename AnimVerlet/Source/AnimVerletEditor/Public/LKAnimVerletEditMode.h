@@ -55,7 +55,7 @@ public:
 	
 	/// IAnimNodeEditMode ===========================================================================================================================
 	/** Returns the coordinate system that should be used for this bone */
-	virtual ECoordSystem GetWidgetCoordinateSystem() const override { return ECoordSystem::COORD_Local; }
+	virtual ECoordSystem GetWidgetCoordinateSystem() const override { return ECoordSystem::COORD_World; }
 	/** @return current widget mode this anim graph node supports */
 	virtual LK_UEWIDGET::EWidgetMode GetWidgetMode() const override;
 	/** Called when the user changed widget mode by pressing "Space" key */

@@ -12,6 +12,11 @@ public:
 	FBoneReference Bone;
 
 	UPROPERTY(EditAnywhere, Category = "Constraint")
+	bool bLockBone = false;
+	UPROPERTY(EditAnywhere, Category = "Constraint", meta = (EditCondition = "bLockBone", ClampMin = "0.0", ForceUnits = "cm"))
+	float LockMargin = 0.0f;
+
+	UPROPERTY(EditAnywhere, Category = "Constraint")
 	bool bOverrideConstrainConeAngleFromParent = false;
 	/** if true, Use grand parent to parent bone`s direction to constrain each bone`s cone angle. otherwise use animation pose to constrain each bone`s cone angle. (override global cone angle) */
 	UPROPERTY(EditAnywhere, Category = "Constraint", meta = (EditCondition = "bOverrideConstrainConeAngleFromParent"))
@@ -27,6 +32,9 @@ public:
 	/** The virtual thickness of the bone to be used in calculating various collisions and constraints.(radius) */
 	UPROPERTY(EditAnywhere, Category = "Collision", meta = (EditCondition = "bOverrideThickness", ClampMin = "0.0", ForceUnits = "cm"))
 	float Thickness = 0.3f;
+	/** For each bone unit, override the bUseCapsuleCollisionForChain option of the AnimVerlet node.(This option has no effect if bUseCapsuleCollisionForChain is unchecked.) */
+	UPROPERTY(EditAnywhere, Category = "Collision")
+	bool bOverrideToUseSphereCollisionForChain = false;
 
 	UPROPERTY(EditAnywhere, Category = "Physics")
 	bool bOverrideMass = false;

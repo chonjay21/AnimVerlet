@@ -60,6 +60,8 @@ public:
 	bool bShowBones = true;
 	UPROPERTY(EditAnywhere, Category = "Preview", meta = (EditCondition = "bShowBones", EditConditionHides, ClampMin = "0.0"))
 	float BoneThicknessRenderScale = 1.0f;
+	UPROPERTY(EditAnywhere, Category = "Preview", meta = (EditCondition = "bShowBones"))
+	bool bShowCapsuleBoneChainConstraints = true;
 	UPROPERTY(EditAnywhere, Category = "Preview", meta = (EditCondition = "bShowBones", EditConditionHides))
 	bool bShowSleep = true;
 

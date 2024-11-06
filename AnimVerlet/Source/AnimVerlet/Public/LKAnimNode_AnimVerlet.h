@@ -1,10 +1,10 @@
 #pragma once
 #include <CoreMinimal.h>
 #include <BoneControllers/AnimNode_SkeletalControlBase.h>
-#include "LKAnimverletBone.h"
+#include "LKAnimVerletBone.h"
 #include "LKAnimVerletCollisionShape.h"
-#include "LKAnimverletConstraint.h"
-#include "LKAnimverletSetting.h"
+#include "LKAnimVerletConstraint.h"
+#include "LKAnimVerletSetting.h"
 #include "LKAnimNode_AnimVerlet.generated.h"
 
 #if ENABLE_ANIM_DEBUG && ENABLE_VISUAL_LOG
@@ -61,6 +61,7 @@ private:
 
 public:
 	const TArray<FLKAnimVerletBone>& GetSimulateBones() const { return SimulateBones; }
+	const TArray<FLKAnimVerletBoneIndicatorPair>& GetSimulateBonePairIndicators() const { return SimulateBonePairIndicators; }
 	const TArray<FLKAnimVerletConstraint_Distance>& GetDistanceConstraints() const { return DistanceConstraints; }
 	const TArray<FLKAnimVerletConstraint_BallSocket>& GetBallSocketConstraints() const { return BallSocketConstraints; }
 	const TArray<FLKAnimVerletConstraint_Pin>& GetPinConstraints() const { return PinConstraints; }
