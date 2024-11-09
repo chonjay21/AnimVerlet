@@ -64,6 +64,12 @@ public:
 	bool bShowCapsuleBoneChainConstraints = true;
 	UPROPERTY(EditAnywhere, Category = "Preview", meta = (EditCondition = "bShowBones", EditConditionHides))
 	bool bShowSleep = true;
+	UPROPERTY(EditAnywhere, Category = "Preview")
+	bool bShowBoneBounds = false;
+	UPROPERTY(EditAnywhere, Category = "Preview")
+	bool bShowBroadphaseRootBound = false;
+	UPROPERTY(EditAnywhere, Category = "Preview")
+	bool bDumpBroadphaseStat = false;
 
 	/** Show simulating(applying) constraints */
 	UPROPERTY(EditAnywhere, Category = "Preview")
@@ -75,9 +81,15 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Preview", meta = (EditCondition = "bShowConstraints", EditConditionHides))
 	bool bShowSimulatingSphereCollisionConstraints = false;
 	UPROPERTY(EditAnywhere, Category = "Preview", meta = (EditCondition = "bShowConstraints", EditConditionHides))
+	bool bShowSimulatingSphereCollisionConstraintsBounds = false;
+	UPROPERTY(EditAnywhere, Category = "Preview", meta = (EditCondition = "bShowConstraints", EditConditionHides))
 	bool bShowSimulatingCapsuleCollisionConstraints = false;
 	UPROPERTY(EditAnywhere, Category = "Preview", meta = (EditCondition = "bShowConstraints", EditConditionHides))
+	bool bShowSimulatingCapsuleCollisionConstraintsBounds = false;
+	UPROPERTY(EditAnywhere, Category = "Preview", meta = (EditCondition = "bShowConstraints", EditConditionHides))
 	bool bShowSimulatingBoxCollisionConstraints = false;
+	UPROPERTY(EditAnywhere, Category = "Preview", meta = (EditCondition = "bShowConstraints", EditConditionHides))
+	bool bShowSimulatingBoxCollisionConstraintsBounds = false;
 	UPROPERTY(EditAnywhere, Category = "Preview", meta = (EditCondition = "bShowConstraints", EditConditionHides))
 	bool bShowSimulatingPlaneCollisionConstraints = false;
 

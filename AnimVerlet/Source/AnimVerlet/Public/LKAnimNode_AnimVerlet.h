@@ -2,16 +2,20 @@
 #include <CoreMinimal.h>
 #include <BoneControllers/AnimNode_SkeletalControlBase.h>
 #include "LKAnimVerletBone.h"
+#include "LKAnimVerletBoneTree.h"
 #include "LKAnimVerletCollisionShape.h"
 #include "LKAnimVerletConstraint.h"
+#include "LKAnimVerletConstraintType.h"
 #include "LKAnimVerletSetting.h"
 #include "LKAnimNode_AnimVerlet.generated.h"
 
 #if ENABLE_ANIM_DEBUG && ENABLE_VISUAL_LOG
-#define LK_ENABLE_ANIMVERLET_DEBUG 1
+#define LK_ENABLE_ANIMVERLET_DEBUG	(1)
 #else
-#define LK_ENABLE_ANIMVERLET_DEBUG 0
+#define LK_ENABLE_ANIMVERLET_DEBUG	(0)
 #endif
+
+#define LK_ENABLE_STAT	(1)
 
 
 USTRUCT(BlueprintInternalUseOnly)
@@ -50,6 +54,8 @@ private:
 	void SimulateVerlet(const UWorld* World, float InDeltaTime, const FTransform& ComponentTransform, const FTransform& PrevComponentTransform);
 	void PreUpdateBones(const UWorld* World, float InDeltaTime, const FTransform& ComponentTransform, const FTransform& PrevComponentTransform);
 	void SolveConstraints(float InDeltaTime);
+	void MakeBroadphaseInput(OUT FLKAnimVerletBroadphaseInput& OutBroadphaseInput);
+	void UpdateBroadphase();
 	void UpdateSleep(float InDeltaTime);
 	void PostUpdateBones(float InDeltaTime);
 	void ApplyResult(OUT TArray<FBoneTransform>& OutBoneTransforms, const FBoneContainer& BoneContainer);
@@ -69,6 +75,7 @@ public:
 	const TArray<FLKAnimVerletConstraint_Capsule>& GetCapsuleCollisionConstraints() const { return CapsuleCollisionConstraints; }
 	const TArray<FLKAnimVerletConstraint_Box>& GetBoxCollisionConstraints() const { return BoxCollisionConstraints; }
 	const TArray<FLKAnimVerletConstraint_Plane>& GetPlaneCollisionConstraints() const { return PlaneCollisionConstraints; }
+	const LKOctree& GetBroadphaseTree() const { return BroadphaseTree; };
 
 	void SetDynamicCollisionShapes(const FLKAnimVerletCollisionShapeList& InDynamicCollisionShapes) { DynamicCollisionShapes = InDynamicCollisionShapes; }
 	void ForceClearSimulateBones() { ClearSimulateBones(); }	/// for live editor preview
@@ -197,6 +204,13 @@ public:
 	*/
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = "Solve", meta = (ClampMin = "1"))
 	int32 SolveIteration = 4;
+
+	/**
+		Use Broadphase for local collision constraints(against collision shapes)
+		There is additional cost involved in creating a container for broadphase, but solving local collision constraints can be faster.
+	*/
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = "Solve")
+	bool bUseBroadphaseCollisionDetection = false;
 
 	/** Use a fixed DeltaTime instead of real delta time if > 0. (It can help to obtain a consistent result regardless of the frame rate.) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = "Solve", meta = (ClampMin = "0.0", ForceUnits = "s"))
@@ -327,4 +341,6 @@ private:
 	bool bLocalColliderDirty = false;
 	float DeltaTime = 0.0f;
 	FTransform PrevComponentT = FTransform::Identity;
+	LKOctree BroadphaseTree;
+	FLKAnimVerletBroadphaseSpace BroadphaseSpace;
 };

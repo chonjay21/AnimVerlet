@@ -1,6 +1,7 @@
 #pragma once
 #include <CoreMinimal.h>
 #include <Animation/BoneReference.h>
+#include "LKAnimVerletBound.h"
 
 ///=========================================================================================================================================
 /// FLKAnimVerletBoneBase
@@ -76,6 +77,9 @@ public:
 	FVector MakeFakeBonePoseLocation(const FTransform& PoseT) const;
 	FTransform MakeFakeBonePoseTransform(const FTransform& PoseT) const;
 
+	inline static FLKAnimVerletBound MakeBound(const FVector& InLocation, float InThickness) { return FLKAnimVerletBound::MakeBoundFromCenterHalfExtents(InLocation, FVector(InThickness, InThickness, InThickness)); }
+	inline FLKAnimVerletBound MakeBound() const { return MakeBound(Location, Thickness); }
+
 public:
 	void InitializeTransform(const FTransform& InitialT);
 	void SetFakeBoneOffset(const FVector& InLocationOffset);
@@ -149,6 +153,10 @@ public:
 	bool IsValidBoneIndicator() const { return AnimVerletBoneIndex != INDEX_NONE; }
 	bool HasParentSimulateBone() const { return bParentExcludedBone == false && ParentAnimVerletBoneIndex != INDEX_NONE; }
 	bool HasParentExcludedBone() const { return bParentExcludedBone && ParentAnimVerletBoneIndex != INDEX_NONE; }
+	
+	inline bool operator==(const FLKAnimVerletBoneIndicator& RHS) const { return (AnimVerletBoneIndex == RHS.AnimVerletBoneIndex && bExcludedBone == RHS.bExcludedBone && 
+																				  ParentAnimVerletBoneIndex == RHS.ParentAnimVerletBoneIndex && bParentExcludedBone == RHS.bParentExcludedBone); }
+	inline friend uint32 GetTypeHash(const FLKAnimVerletBoneIndicator& Indicator) { return GetTypeHash(TTuple<int32, bool, int32, bool>(Indicator.AnimVerletBoneIndex, Indicator.bExcludedBone, Indicator.ParentAnimVerletBoneIndex, Indicator.bParentExcludedBone)); }
 };
 ///=========================================================================================================================================
 
@@ -168,6 +176,9 @@ public:
 		: BoneA(InBoneA), BoneB(InBoneB)
 	{
 	}
+
+	inline bool operator==(const FLKAnimVerletBoneIndicatorPair& RHS) const { return (BoneA == RHS.BoneA && BoneB == RHS.BoneB); }
+	inline friend uint32 GetTypeHash(const FLKAnimVerletBoneIndicatorPair& InPair) { return GetTypeHash(TPair<FLKAnimVerletBoneIndicator, FLKAnimVerletBoneIndicator>(InPair.BoneA, InPair.BoneB)); }
 };
 ///=========================================================================================================================================
 
@@ -185,10 +196,12 @@ public:
 	inline bool operator==(const FLKAnimVerletExcludedBone& RHS) const { return (BoneReference == RHS.BoneReference); }
 
 public:
+	inline friend bool operator==(const FLKAnimVerletBoneKey& LHS, const FLKAnimVerletBone& RHS) { return (LHS.BoneReference == RHS.BoneReference); }
+	inline friend bool operator==(const FLKAnimVerletBoneKey& LHS, const FLKAnimVerletExcludedBone& RHS) { return (LHS.BoneReference == RHS.BoneReference); }
+	inline friend bool operator==(const FLKAnimVerletBone& LHS, const FLKAnimVerletBoneKey& RHS) { return (LHS.BoneReference == RHS.BoneReference); }
+	inline friend bool operator==(const FLKAnimVerletExcludedBone& LHS, const FLKAnimVerletBoneKey& RHS) { return (LHS.BoneReference == RHS.BoneReference); }
+
+public:
 	const FBoneReference& BoneReference;
 };
-inline bool operator==(const FLKAnimVerletBoneKey& LHS, const FLKAnimVerletBone& RHS) { return (LHS.BoneReference == RHS.BoneReference); }
-inline bool operator==(const FLKAnimVerletBoneKey& LHS, const FLKAnimVerletExcludedBone& RHS) { return (LHS.BoneReference == RHS.BoneReference); }
-inline bool operator==(const FLKAnimVerletBone& LHS, const FLKAnimVerletBoneKey& RHS) { return (LHS.BoneReference == RHS.BoneReference); }
-inline bool operator==(const FLKAnimVerletExcludedBone& LHS, const FLKAnimVerletBoneKey& RHS) { return (LHS.BoneReference == RHS.BoneReference); }
 ///=========================================================================================================================================

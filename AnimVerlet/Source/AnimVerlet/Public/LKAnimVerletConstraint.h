@@ -1,13 +1,14 @@
 #pragma once
 #include <CoreMinimal.h>
 #include <UObject/WeakObjectPtrTemplates.h>
+#include "LKAnimVerletBound.h"
 #include "LKAnimVerletConstraintType.h"
 
 
 ///=========================================================================================================================================
 /// FLKAnimVerletConstraint
 ///=========================================================================================================================================
-struct FLKAnimVerletConstraint
+struct ANIMVERLET_API FLKAnimVerletConstraint
 {
 public:
 	virtual ~FLKAnimVerletConstraint() {}
@@ -20,7 +21,7 @@ public:
 ///=========================================================================================================================================
 /// FLKAnimVerletConstraint_Pin
 ///=========================================================================================================================================
-struct FLKAnimVerletConstraint_Pin : public FLKAnimVerletConstraint
+struct ANIMVERLET_API FLKAnimVerletConstraint_Pin : public FLKAnimVerletConstraint
 {
 public:
 	struct FLKAnimVerletBone* Bone = nullptr;
@@ -40,7 +41,7 @@ public:
 ///=========================================================================================================================================
 /// FLKAnimVerletConstraint_Distance
 ///=========================================================================================================================================
-struct FLKAnimVerletConstraint_Distance : public FLKAnimVerletConstraint
+struct ANIMVERLET_API FLKAnimVerletConstraint_Distance : public FLKAnimVerletConstraint
 {
 public:
 	struct FLKAnimVerletBone* BoneA = nullptr;
@@ -66,7 +67,7 @@ public:
 ///=========================================================================================================================================
 /// FLKAnimVerletConstraint_IsometricBending
 ///=========================================================================================================================================
-struct FLKAnimVerletConstraint_IsometricBending : public FLKAnimVerletConstraint
+struct ANIMVERLET_API FLKAnimVerletConstraint_IsometricBending : public FLKAnimVerletConstraint
 {
 public:
 	struct FLKAnimVerletBone* BoneA = nullptr;
@@ -97,7 +98,7 @@ private:
 ///=========================================================================================================================================
 /// FLKAnimVerletConstraint_Straighten
 ///=========================================================================================================================================
-struct FLKAnimVerletConstraint_Straighten : public FLKAnimVerletConstraint
+struct ANIMVERLET_API FLKAnimVerletConstraint_Straighten : public FLKAnimVerletConstraint
 {
 public:
 	struct FLKAnimVerletBone* BoneA = nullptr;
@@ -120,7 +121,7 @@ public:
 ///=========================================================================================================================================
 /// FLKAnimVerletConstraint_FixedDistance
 ///=========================================================================================================================================
-struct FLKAnimVerletConstraint_FixedDistance : public FLKAnimVerletConstraint
+struct ANIMVERLET_API FLKAnimVerletConstraint_FixedDistance : public FLKAnimVerletConstraint
 {
 public:
 	struct FLKAnimVerletBone* BoneA = nullptr;
@@ -145,7 +146,7 @@ public:
 ///=========================================================================================================================================
 /// FLKAnimVerletConstraint_BallSocket
 ///=========================================================================================================================================
-struct FLKAnimVerletConstraint_BallSocket : public FLKAnimVerletConstraint
+struct ANIMVERLET_API FLKAnimVerletConstraint_BallSocket : public FLKAnimVerletConstraint
 {
 public:
 	struct FLKAnimVerletBone* BoneA = nullptr;
@@ -174,7 +175,7 @@ public:
 /// CollisionConstraint
 /// FLKAnimVerletConstraint_Sphere
 ///=========================================================================================================================================
-struct FLKAnimVerletConstraint_Sphere : public FLKAnimVerletConstraint
+struct ANIMVERLET_API FLKAnimVerletConstraint_Sphere : public FLKAnimVerletConstraint
 {
 public:
 	FVector Location = FVector::ZeroVector;
@@ -185,6 +186,7 @@ public:
 	bool bUseCapsuleCollisionForChain = false;
 	TArray<FLKAnimVerletBoneIndicatorPair>* BonePairs = nullptr;
 
+	FLKAnimVerletBroadphaseInput BroadphaseInput;
 	bool bUseXPBDSolver = false;
 	double Compliance = 0.0;		///for XPBD
 	TArray<double> Lambdas;			///for XPBD
@@ -194,6 +196,8 @@ public:
 	virtual void Update(float DeltaTime, bool bFinalize) override;
 	virtual void PostUpdate(float DeltaTime) override { Lambdas.Reset(); }
 	virtual void ResetSimulation() override { Lambdas.Reset(); }
+
+	inline FLKAnimVerletBound MakeBound() const { return FLKAnimVerletBound::MakeBoundFromCenterHalfExtents(Location, FVector(Radius, Radius, Radius)); }
 
 private:
 	bool CheckSphereSphere(IN OUT FLKAnimVerletBone& CurVerletBone, float DeltaTime, bool bFinalize, int32 LambdaIndex);
@@ -206,7 +210,7 @@ private:
 /// CollisionConstraint
 /// FLKAnimVerletConstraint_Capsule
 ///=========================================================================================================================================
-struct FLKAnimVerletConstraint_Capsule : public FLKAnimVerletConstraint
+struct ANIMVERLET_API FLKAnimVerletConstraint_Capsule : public FLKAnimVerletConstraint
 {
 public:
 	FVector Location = FVector::ZeroVector;
@@ -219,6 +223,7 @@ public:
 	bool bUseCapsuleCollisionForChain = false;
 	TArray<FLKAnimVerletBoneIndicatorPair>* BonePairs = nullptr;
 
+	FLKAnimVerletBroadphaseInput BroadphaseInput;
 	bool bUseXPBDSolver = false;
 	double Compliance = 0.0;		///for XPBD
 	TArray<double> Lambdas;			///for XPBD
@@ -229,6 +234,8 @@ public:
 	virtual void Update(float DeltaTime, bool bFinalize) override;
 	virtual void PostUpdate(float DeltaTime) override { Lambdas.Reset(); }
 	virtual void ResetSimulation() override { Lambdas.Reset(); }
+
+	FLKAnimVerletBound MakeBound() const;
 
 private:
 	bool CheckCapsuleSphere(IN OUT FLKAnimVerletBone& CurVerletBone, float DeltaTime, bool bFinalize, const FVector& CapsuleStart, const FVector& CapsuleEnd, int32 LambdaIndex);
@@ -241,7 +248,7 @@ private:
 /// CollisionConstraint
 /// FLKAnimVerletConstraint_Box
 ///=========================================================================================================================================
-struct FLKAnimVerletConstraint_Box : public FLKAnimVerletConstraint
+struct ANIMVERLET_API FLKAnimVerletConstraint_Box : public FLKAnimVerletConstraint
 {
 public:
 	FVector Location = FVector::ZeroVector;
@@ -253,6 +260,7 @@ public:
 	bool bUseCapsuleCollisionForChain = false;
 	TArray<FLKAnimVerletBoneIndicatorPair>* BonePairs = nullptr;
 
+	FLKAnimVerletBroadphaseInput BroadphaseInput;
 	bool bUseXPBDSolver = false;
 	double Compliance = 0.0;		///for XPBD
 	TArray<double> Lambdas;			///for XPBD
@@ -262,6 +270,8 @@ public:
 	virtual void Update(float DeltaTime, bool bFinalize) override;
 	virtual void PostUpdate(float DeltaTime) override { Lambdas.Reset(); }
 	virtual void ResetSimulation() override { Lambdas.Reset(); }
+
+	FLKAnimVerletBound MakeBound() const;
 
 private:
 	bool IntersectOriginAabbSphere(OUT FVector& OutCollisionNormal, OUT float& OutPenetrationDepth, IN OUT FLKAnimVerletBone& CurVerletBone, const FVector& SphereLocation);
@@ -276,7 +286,7 @@ private:
 /// CollisionConstraint
 /// FLKAnimVerletConstraint_Plane
 ///=========================================================================================================================================
-struct FLKAnimVerletConstraint_Plane : public FLKAnimVerletConstraint
+struct ANIMVERLET_API FLKAnimVerletConstraint_Plane : public FLKAnimVerletConstraint
 {
 public:
 	FVector PlaneBase = FVector::ZeroVector;	/// Point on the plane
@@ -311,7 +321,7 @@ private:
 /// CollisionConstraint
 /// FLKAnimVerletConstraint_World
 ///=========================================================================================================================================
-struct FLKAnimVerletConstraint_World : public FLKAnimVerletConstraint
+struct ANIMVERLET_API FLKAnimVerletConstraint_World : public FLKAnimVerletConstraint
 {
 public:
 	TWeakObjectPtr<const class UWorld> WorldPtr = nullptr;

@@ -4,6 +4,38 @@
 
 using TExcludeBoneBits = TBitArray<TInlineAllocator<64>>;
 
+struct FLKAnimVerletBroadphaseSpace
+{
+public:
+	TArray<FLKAnimVerletBoneIndicatorPair> BonePairIndicatorSpace;
+
+public:
+	void ResetBroadphaseSpace()
+	{
+		BonePairIndicatorSpace.Reset();
+	}
+};
+
+struct FLKAnimVerletBroadphaseInput
+{
+public:
+	bool bUseBroadphase = false;
+	TArray<FLKAnimVerletBoneIndicatorPair>* TargetBonePairIndicators = nullptr;
+
+	TArray<FLKAnimVerletBoneIndicatorPair>* BonePairIndicatorSpace = nullptr;
+	class LKOctree* BroadphaseTree = nullptr;
+
+public:
+	void ResetBroadphaseInput()
+	{
+		bUseBroadphase = false;
+		TargetBonePairIndicators = nullptr;
+
+		BonePairIndicatorSpace = nullptr;
+		BroadphaseTree = nullptr;
+	}
+};
+
 
 struct FLKAnimVerletCollisionConstraintInput
 {
@@ -14,6 +46,7 @@ public:
 	bool bUseCapsuleCollisionForChain = false;
 	TArray<FLKAnimVerletBoneIndicatorPair>* SimulateBonePairIndicators = nullptr;
 
+	FLKAnimVerletBroadphaseInput BroadphaseInput;
 	bool bUseXPBDSolver = false;
 	double Compliance = 0.0;
 };

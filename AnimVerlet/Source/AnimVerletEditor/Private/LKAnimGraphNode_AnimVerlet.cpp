@@ -150,6 +150,70 @@ void ULKAnimGraphNode_AnimVerlet::Draw(FPrimitiveDrawInterface* PDI, USkeletalMe
 		}
 	}
 
+	if (bShowBoneBounds)
+	{
+		const TArray<FLKAnimVerletBone>& AnimVerletBones = AnimVerletNode->GetSimulateBones();
+		if (AnimVerletNode->bUseCapsuleCollisionForChain == false)
+		{
+			for (const FLKAnimVerletBone& CurBone : AnimVerletBones)
+			{
+				const FLKAnimVerletBound CurBound = CurBone.MakeBound();
+				const FTransform BoxT(FQuat::Identity, CurBound.GetCenter());
+				const FMatrix BoxMat = BoxT.ToMatrixNoScale();
+				const FBox Box(-CurBound.GetHalfExtents(), CurBound.GetHalfExtents());
+				DrawWireBox(PDI, BoxMat, Box, FColor::Green, SDPG_Foreground);
+			}
+		}
+		else
+		{
+			const TArray<FLKAnimVerletBoneIndicatorPair>& AnimVerletBoneIndicatorPairList = AnimVerletNode->GetSimulateBonePairIndicators();
+			for (const FLKAnimVerletBoneIndicatorPair& CurPair : AnimVerletBoneIndicatorPairList)
+			{
+				if (CurPair.BoneB.IsValidBoneIndicator() == false || AnimVerletBones.IsValidIndex(CurPair.BoneB.AnimVerletBoneIndex) == false)
+					continue;
+
+				const FLKAnimVerletBone& CurVerletBone = AnimVerletBones[CurPair.BoneB.AnimVerletBoneIndex];
+				if (CurPair.BoneA.IsValidBoneIndicator() == false || CurVerletBone.bOverrideToUseSphereCollisionForChain)
+				{
+					const FLKAnimVerletBound CurBound = CurVerletBone.MakeBound();
+					const FTransform BoxT(FQuat::Identity, CurBound.GetCenter());
+					const FMatrix BoxMat = BoxT.ToMatrixNoScale();
+					const FBox Box(-CurBound.GetHalfExtents(), CurBound.GetHalfExtents());
+					DrawWireBox(PDI, BoxMat, Box, FColor::Green, SDPG_Foreground);
+
+					continue;
+				}
+
+				const FLKAnimVerletBone& ParentVerletBone = AnimVerletBones[CurPair.BoneA.AnimVerletBoneIndex];
+				
+				const FLKAnimVerletBound ParentBound = FLKAnimVerletBone::MakeBound(ParentVerletBone.Location, CurVerletBone.Thickness);
+				FLKAnimVerletBound CurBound = CurVerletBone.MakeBound();
+				CurBound.Expand(ParentBound);
+
+				const FTransform BoxT(FQuat::Identity, CurBound.GetCenter());
+				const FMatrix BoxMat = BoxT.ToMatrixNoScale();
+				const FBox Box(-CurBound.GetHalfExtents(), CurBound.GetHalfExtents());
+				DrawWireBox(PDI, BoxMat, Box, FColor::Green, SDPG_Foreground);
+			}
+		}
+	}
+	
+	if (bShowBroadphaseRootBound)
+	{
+		const LKOctree& BroadphaseTree = AnimVerletNode->GetBroadphaseTree();
+		const FLKAnimVerletBound RootBound = BroadphaseTree.GetRootBounds();
+		
+		const FTransform BoxT(FQuat::Identity, RootBound.GetCenter());
+		const FMatrix BoxMat = BoxT.ToMatrixNoScale();
+		const FBox Box(-RootBound.GetHalfExtents(), RootBound.GetHalfExtents());
+		DrawWireBox(PDI, BoxMat, Box, FColor::Green, SDPG_Foreground);
+	}
+	if (bDumpBroadphaseStat)
+	{
+		const LKOctree& BroadphaseTree = AnimVerletNode->GetBroadphaseTree();
+		BroadphaseTree.DumpStats();
+	}
+
 	if (bShowConstraints)
 	{
 		const TArray<FLKAnimVerletConstraint_Distance>& DistanceConstraints = AnimVerletNode->GetDistanceConstraints();
@@ -194,12 +258,38 @@ void ULKAnimGraphNode_AnimVerlet::Draw(FPrimitiveDrawInterface* PDI, USkeletalMe
 			for (const FLKAnimVerletConstraint_Sphere& CurConstraint : SphereCollisionConstraints)
 				DrawWireSphere(PDI, CurConstraint.Location, FColor::Blue, CurConstraint.Radius, 16, SDPG_Foreground);
 		}
+		if (bShowSimulatingSphereCollisionConstraintsBounds)
+		{
+			const TArray<FLKAnimVerletConstraint_Sphere>& SphereCollisionConstraints = AnimVerletNode->GetSphereCollisionConstraints();
+			for (const FLKAnimVerletConstraint_Sphere& CurConstraint : SphereCollisionConstraints)
+			{
+				const FLKAnimVerletBound CurBound = CurConstraint.MakeBound();
+				const FTransform BoxT(FQuat::Identity, CurBound.GetCenter());
+				const FMatrix BoxMat = BoxT.ToMatrixNoScale();
+				const FBox Box(-CurBound.GetHalfExtents(), CurBound.GetHalfExtents());
+				DrawWireBox(PDI, BoxMat, Box, FColor::Green, SDPG_Foreground);
+			}
+		}
+
 		if (bShowSimulatingCapsuleCollisionConstraints)
 		{
 			const TArray<FLKAnimVerletConstraint_Capsule>& CapsuleCollisionConstraints = AnimVerletNode->GetCapsuleCollisionConstraints();
 			for (const FLKAnimVerletConstraint_Capsule& CurConstraint : CapsuleCollisionConstraints)
 				DrawWireCapsule(PDI, CurConstraint.Location, CurConstraint.Rotation.GetAxisX(), CurConstraint.Rotation.GetAxisY(), CurConstraint.Rotation.GetAxisZ(), FColor::Blue, CurConstraint.Radius, CurConstraint.HalfHeight + CurConstraint.Radius, 16, SDPG_Foreground);
 		}
+		if (bShowSimulatingCapsuleCollisionConstraintsBounds)
+		{
+			const TArray<FLKAnimVerletConstraint_Capsule>& CapsuleCollisionConstraints = AnimVerletNode->GetCapsuleCollisionConstraints();
+			for (const FLKAnimVerletConstraint_Capsule& CurConstraint : CapsuleCollisionConstraints)
+			{
+				const FLKAnimVerletBound CurBound = CurConstraint.MakeBound();
+				const FTransform BoxT(FQuat::Identity, CurBound.GetCenter());
+				const FMatrix BoxMat = BoxT.ToMatrixNoScale();
+				const FBox Box(-CurBound.GetHalfExtents(), CurBound.GetHalfExtents());
+				DrawWireBox(PDI, BoxMat, Box, FColor::Green, SDPG_Foreground);
+			}
+		}
+
 		if (bShowSimulatingBoxCollisionConstraints)
 		{
 			const TArray<FLKAnimVerletConstraint_Box>& BoxCollisionConstraints = AnimVerletNode->GetBoxCollisionConstraints();
@@ -211,6 +301,19 @@ void ULKAnimGraphNode_AnimVerlet::Draw(FPrimitiveDrawInterface* PDI, USkeletalMe
 				DrawWireBox(PDI, BoxMat, Box, FColor::Blue, SDPG_Foreground);
 			}
 		}
+		if (bShowSimulatingBoxCollisionConstraintsBounds)
+		{
+			const TArray<FLKAnimVerletConstraint_Box>& BoxCollisionConstraints = AnimVerletNode->GetBoxCollisionConstraints();
+			for (const FLKAnimVerletConstraint_Box& CurConstraint : BoxCollisionConstraints)
+			{
+				const FLKAnimVerletBound CurBound = CurConstraint.MakeBound();
+				const FTransform BoxT(FQuat::Identity, CurBound.GetCenter());
+				const FMatrix BoxMat = BoxT.ToMatrixNoScale();
+				const FBox Box(-CurBound.GetHalfExtents(), CurBound.GetHalfExtents());
+				DrawWireBox(PDI, BoxMat, Box, FColor::Green, SDPG_Foreground);
+			}
+		}
+
 		if (bShowSimulatingPlaneCollisionConstraints)
 		{
 			const TArray<FLKAnimVerletConstraint_Plane>& PlaneCollisionConstraints = AnimVerletNode->GetPlaneCollisionConstraints();
