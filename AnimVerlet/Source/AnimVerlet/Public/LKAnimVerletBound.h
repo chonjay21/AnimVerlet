@@ -22,6 +22,8 @@ public:
 	FORCEINLINE const FVector& GetMin() const { return Min; }
 	FORCEINLINE const FVector& GetMax() const { return Max; }
 
+	FORCEINLINE bool IsNearlyEqual(const FLKAnimVerletBound& Other, float InEpsilon = KINDA_SMALL_NUMBER) const { return Min.Equals(Other.Min, InEpsilon) && Max.Equals(Other.Max, InEpsilon); }
+
 	FORCEINLINE FLKAnimVerletBound& Expand(float Thickness)
 	{
 		Min -= FVector(Thickness);
