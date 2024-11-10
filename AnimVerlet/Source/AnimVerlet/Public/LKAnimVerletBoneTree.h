@@ -15,6 +15,7 @@ public:
 	
 	void SetElementIdImpl(const FLKOctreeElement& InElement, FOctreeElementId2 Id);
 	const FOctreeElementId2* FindElementID(const FLKAnimVerletBoneIndicatorPair& InKey) const { return ObjectToOctreeID.Find(InKey); }
+	void ResetOctree() { ObjectToOctreeID.Reset(); }
 
 private:
 	TMap<FLKAnimVerletBoneIndicatorPair, FOctreeElementId2> ObjectToOctreeID;
@@ -48,6 +49,7 @@ public:
 	void ResetOctree()
 	{
 		verify(OctreeData != nullptr);
+		OctreeData->ResetOctree();
 		OctreeData->Destroy();
 	}
 
@@ -109,6 +111,25 @@ public:
 	/** Accesses an octree element by ID. */
 	inline FLKOctreeElement& GetElementById(FOctreeElementId2 ElementId) { verify(OctreeData != nullptr); return OctreeData->GetElementById(ElementId); }
 	inline const FLKOctreeElement& GetElementById(FOctreeElementId2 ElementId) const { verify(OctreeData != nullptr); return OctreeData->GetElementById(ElementId); }
+
+	/*inline FLKOctreeElement* FindElementByIndicatorPair(const FLKAnimVerletBoneIndicatorPair& InIndicator) 
+	{ 
+		verify(OctreeData != nullptr); 
+		const FOctreeElementId2* FoundElementID = OctreeData->FindElementID(InIndicator);
+		if (FoundElementID == nullptr)
+			return nullptr;
+
+		return &OctreeData->GetElementById(*FoundElementID);
+	}
+	inline const FLKOctreeElement* FindElementByIndicatorPair(const FLKAnimVerletBoneIndicatorPair& InIndicator) const
+	{ 
+		verify(OctreeData != nullptr);
+		const FOctreeElementId2* FoundElementID = OctreeData->FindElementID(InIndicator);
+		if (FoundElementID == nullptr)
+			return nullptr;
+
+		return &OctreeData->GetElementById(*FoundElementID);
+	}*/
 
 	/**
 	 * check if a FOctreeElementId2 is valid.
