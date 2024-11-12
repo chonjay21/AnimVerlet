@@ -66,10 +66,6 @@ public:
 	bool bShowSleep = true;
 	UPROPERTY(EditAnywhere, Category = "Preview")
 	bool bShowBoneBounds = false;
-	UPROPERTY(EditAnywhere, Category = "Preview")
-	bool bShowBroadphaseRootBound = false;
-	UPROPERTY(EditAnywhere, Category = "Preview")
-	bool bDumpBroadphaseStat = false;
 
 	/** Show simulating(applying) constraints */
 	UPROPERTY(EditAnywhere, Category = "Preview")

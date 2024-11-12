@@ -1,7 +1,6 @@
 #include "LKAnimVerletConstraint.h"
 
 #include "LKAnimVerletBone.h"
-#include "LKAnimVerletBroadphaseContainer.h"
 
 ///=========================================================================================================================================
 /// FLKAnimVerletConstraint_Pin
@@ -538,7 +537,6 @@ FLKAnimVerletConstraint_Sphere::FLKAnimVerletConstraint_Sphere(const FVector& In
 	, ExcludeBones(InCollisionInput.ExcludeBones)
 	, bUseCapsuleCollisionForChain(InCollisionInput.bUseCapsuleCollisionForChain)
 	, BonePairs(InCollisionInput.SimulateBonePairIndicators)
-	, BroadphaseInput(InCollisionInput.BroadphaseInput)
 	, bUseXPBDSolver(InCollisionInput.bUseXPBDSolver)
 	, Compliance(InCollisionInput.Compliance)
 {
@@ -619,49 +617,21 @@ bool FLKAnimVerletConstraint_Sphere::CheckSphereSphere(IN OUT FLKAnimVerletBone&
 
 void FLKAnimVerletConstraint_Sphere::CheckSphereSphere(float DeltaTime, bool bFinalize)
 {
-	if (BroadphaseInput.bUseBroadphase)
-	{
-		verify(BroadphaseInput.BonePairIndicatorSpace == BroadphaseInput.TargetBonePairIndicators);
-		BroadphaseInput.BonePairIndicatorSpace->Reset();
-
-		const FLKBroadphaseElementFinder BroadphaseFinder(BroadphaseInput.BonePairIndicatorSpace);
-		BroadphaseInput.BroadphaseContainer->FindElements(MakeBound(), BroadphaseFinder);
-	}
-
-	for (int32 i = 0; i < BroadphaseInput.TargetBonePairIndicators->Num(); ++i)
+	for (int32 i = 0; i < Bones->Num(); ++i)
 	{
 		if (ExcludeBones.IsValidIndex(i) && ExcludeBones[i])
 			continue;
 
-		const FLKAnimVerletBoneIndicatorPair& CurPair = (*BroadphaseInput.TargetBonePairIndicators)[i];
-		verify(CurPair.BoneB.IsValidBoneIndicator());
-		verify(Bones->IsValidIndex(CurPair.BoneB.AnimVerletBoneIndex));
-		FLKAnimVerletBone& CurVerletBone = (*Bones)[CurPair.BoneB.AnimVerletBoneIndex];
-
-		const FVector CurOldLocation = CurVerletBone.Location;
+		FLKAnimVerletBone& CurVerletBone = (*Bones)[i];
 		CheckSphereSphere(IN OUT CurVerletBone, DeltaTime, bFinalize, i);
-
-		if (BroadphaseInput.bUseBroadphase && CurVerletBone.Location.Equals(CurOldLocation, KINDA_SMALL_NUMBER) == false)
-		{
-			BroadphaseInput.BroadphaseContainer->UpdateElement(CurPair, CurVerletBone.MakeBound());
-		}
 	}
 }
 
 void FLKAnimVerletConstraint_Sphere::CheckSphereCapsule(float DeltaTime, bool bFinalize)
 {
-	if (BroadphaseInput.bUseBroadphase)
+	for (int32 i = 0; i < BonePairs->Num(); ++i)
 	{
-		verify(BroadphaseInput.BonePairIndicatorSpace == BroadphaseInput.TargetBonePairIndicators);
-		BroadphaseInput.BonePairIndicatorSpace->Reset();
-
-		const FLKBroadphaseElementFinder BroadphaseFinder(BroadphaseInput.BonePairIndicatorSpace);
-		BroadphaseInput.BroadphaseContainer->FindElements(MakeBound(), BroadphaseFinder);
-	}
-
-	for (int32 i = 0; i < BroadphaseInput.TargetBonePairIndicators->Num(); ++i)
-	{
-		const FLKAnimVerletBoneIndicatorPair& CurPair = (*BroadphaseInput.TargetBonePairIndicators)[i];
+		const FLKAnimVerletBoneIndicatorPair& CurPair = (*BonePairs)[i];
 		if (ExcludeBones.IsValidIndex(CurPair.BoneB.AnimVerletBoneIndex) && ExcludeBones[CurPair.BoneB.AnimVerletBoneIndex])
 			continue;
 
@@ -670,13 +640,7 @@ void FLKAnimVerletConstraint_Sphere::CheckSphereCapsule(float DeltaTime, bool bF
 		FLKAnimVerletBone& CurVerletBone = (*Bones)[CurPair.BoneB.AnimVerletBoneIndex];
 		if (CurPair.BoneA.IsValidBoneIndicator() == false || CurVerletBone.bOverrideToUseSphereCollisionForChain)
 		{
-			const FVector CurOldLocation = CurVerletBone.Location;
 			CheckSphereSphere(IN OUT CurVerletBone, DeltaTime, bFinalize, i);
-
-			if (BroadphaseInput.bUseBroadphase && CurVerletBone.Location.Equals(CurOldLocation, KINDA_SMALL_NUMBER) == false)
-			{
-				BroadphaseInput.BroadphaseContainer->UpdateElement(CurPair, CurVerletBone.MakeBound());
-			}
 			continue;
 		}
 
@@ -690,9 +654,6 @@ void FLKAnimVerletConstraint_Sphere::CheckSphereCapsule(float DeltaTime, bool bF
 		const float SphereToBoneSQ = SphereToBoneVec.SizeSquared();
 		if (SphereToBoneSQ < ConstraintDistanceSQ)
 		{
-			const FVector CurOldLocation = CurVerletBone.Location;
-			const FVector ParentOldLocation = ParentVerletBone.Location;
-
 			FVector DirFromParent = FVector::ZeroVector;
 			float DistFromParent = 0.0f;
 			(CurVerletBone.Location - ParentVerletBone.Location).ToDirectionAndLength(OUT DirFromParent, OUT DistFromParent);
@@ -736,18 +697,6 @@ void FLKAnimVerletConstraint_Sphere::CheckSphereCapsule(float DeltaTime, bool bF
 				if (CurVerletBone.IsPinned() == false)
 					CurVerletBone.Location = CurVerletBone.Location + (SphereToBoneDir * PenetrationDepth * ChildMoveAlpha);
 			}
-
-			if (BroadphaseInput.bUseBroadphase)
-			{
-				if (CurVerletBone.Location.Equals(CurOldLocation, KINDA_SMALL_NUMBER) == false || ParentVerletBone.Location.Equals(ParentOldLocation, KINDA_SMALL_NUMBER) == false)
-				{
-					const FLKAnimVerletBound ParentBound = FLKAnimVerletBone::MakeBound(ParentVerletBone.Location, CurVerletBone.Thickness);
-					FLKAnimVerletBound CurBound = CurVerletBone.MakeBound();
-					CurBound.Expand(ParentBound);
-
-					BroadphaseInput.BroadphaseContainer->UpdateElement(CurPair, CurBound);
-				}
-			}
 		}
 	}
 }
@@ -766,7 +715,6 @@ FLKAnimVerletConstraint_Capsule::FLKAnimVerletConstraint_Capsule(const FVector& 
 	, ExcludeBones(InCollisionInput.ExcludeBones)
 	, bUseCapsuleCollisionForChain(InCollisionInput.bUseCapsuleCollisionForChain)
 	, BonePairs(InCollisionInput.SimulateBonePairIndicators)
-	, BroadphaseInput(InCollisionInput.BroadphaseInput)
 	, bUseXPBDSolver(InCollisionInput.bUseXPBDSolver)
 	, Compliance(InCollisionInput.Compliance)
 {
@@ -859,56 +807,28 @@ bool FLKAnimVerletConstraint_Capsule::CheckCapsuleSphere(IN OUT FLKAnimVerletBon
 
 void FLKAnimVerletConstraint_Capsule::CheckCapsuleSphere(float DeltaTime, bool bFinalize)
 {
-	if (BroadphaseInput.bUseBroadphase)
-	{
-		verify(BroadphaseInput.BonePairIndicatorSpace == BroadphaseInput.TargetBonePairIndicators);
-		BroadphaseInput.BonePairIndicatorSpace->Reset();
-
-		const FLKBroadphaseElementFinder BroadphaseFinder(BroadphaseInput.BonePairIndicatorSpace);
-		BroadphaseInput.BroadphaseContainer->FindElements(MakeBound(), BroadphaseFinder);
-	}
-
 	const FVector CapsuleHeightDir = Rotation.GetUpVector();
 	const FVector CapsuleStart = Location - CapsuleHeightDir * HalfHeight;
 	const FVector CapsuleEnd = Location + CapsuleHeightDir * HalfHeight;
-	for (int32 i = 0; i < BroadphaseInput.TargetBonePairIndicators->Num(); ++i)
+	for (int32 i = 0; i < Bones->Num(); ++i)
 	{
 		if (ExcludeBones.IsValidIndex(i) && ExcludeBones[i])
 			continue;
 
-		const FLKAnimVerletBoneIndicatorPair& CurPair = (*BroadphaseInput.TargetBonePairIndicators)[i];
-		verify(CurPair.BoneB.IsValidBoneIndicator());
-		verify(Bones->IsValidIndex(CurPair.BoneB.AnimVerletBoneIndex));
-		FLKAnimVerletBone& CurVerletBone = (*Bones)[CurPair.BoneB.AnimVerletBoneIndex];
-
-		const FVector CurOldLocation = CurVerletBone.Location;
+		FLKAnimVerletBone& CurVerletBone = (*Bones)[i];
 		CheckCapsuleSphere(IN OUT CurVerletBone, DeltaTime, bFinalize, CapsuleStart, CapsuleEnd, i);
-
-		if (BroadphaseInput.bUseBroadphase && CurVerletBone.Location.Equals(CurOldLocation, KINDA_SMALL_NUMBER) == false)
-		{
-			BroadphaseInput.BroadphaseContainer->UpdateElement(CurPair, CurVerletBone.MakeBound());
-		}
 	}
 }
 
 void FLKAnimVerletConstraint_Capsule::CheckCapsuleCapsule(float DeltaTime, bool bFinalize)
 {
-	if (BroadphaseInput.bUseBroadphase)
-	{
-		verify(BroadphaseInput.BonePairIndicatorSpace == BroadphaseInput.TargetBonePairIndicators);
-		BroadphaseInput.BonePairIndicatorSpace->Reset();
-
-		const FLKBroadphaseElementFinder BroadphaseFinder(BroadphaseInput.BonePairIndicatorSpace);
-		BroadphaseInput.BroadphaseContainer->FindElements(MakeBound(), BroadphaseFinder);
-	}
-
 	const FVector CapsuleHeightDir = Rotation.GetUpVector();
 	const FVector CapsuleStart = Location - CapsuleHeightDir * HalfHeight;
 	const FVector CapsuleEnd = Location + CapsuleHeightDir * HalfHeight;
 
-	for (int32 i = 0; i < BroadphaseInput.TargetBonePairIndicators->Num(); ++i)
+	for (int32 i = 0; i < BonePairs->Num(); ++i)
 	{
-		const FLKAnimVerletBoneIndicatorPair& CurPair = (*BroadphaseInput.TargetBonePairIndicators)[i];
+		const FLKAnimVerletBoneIndicatorPair& CurPair = (*BonePairs)[i];
 		if (ExcludeBones.IsValidIndex(CurPair.BoneB.AnimVerletBoneIndex) && ExcludeBones[CurPair.BoneB.AnimVerletBoneIndex])
 			continue;
 
@@ -917,13 +837,7 @@ void FLKAnimVerletConstraint_Capsule::CheckCapsuleCapsule(float DeltaTime, bool 
 		FLKAnimVerletBone& CurVerletBone = (*Bones)[CurPair.BoneB.AnimVerletBoneIndex];
 		if (CurPair.BoneA.IsValidBoneIndicator() == false || CurVerletBone.bOverrideToUseSphereCollisionForChain)
 		{
-			const FVector CurOldLocation = CurVerletBone.Location;
 			CheckCapsuleSphere(IN OUT CurVerletBone, DeltaTime, bFinalize, CapsuleStart, CapsuleEnd, i);
-
-			if (BroadphaseInput.bUseBroadphase && CurVerletBone.Location.Equals(CurOldLocation, KINDA_SMALL_NUMBER) == false)
-			{
-				BroadphaseInput.BroadphaseContainer->UpdateElement(CurPair, CurVerletBone.MakeBound());
-			}
 			continue;
 		}
 
@@ -943,9 +857,6 @@ void FLKAnimVerletConstraint_Capsule::CheckCapsuleCapsule(float DeltaTime, bool 
 		const float CapsuleToBoneSQ = (ClosestOnBone - ClosestOnCapsule).SizeSquared();
 		if (CapsuleToBoneSQ < ConstraintDistanceSQ)
 		{
-			const FVector CurOldLocation = CurVerletBone.Location;
-			const FVector ParentOldLocation = ParentVerletBone.Location;
-
 			float CapsuleToBoneDist = 0.0f;
 			FVector CapsuleToBoneDir = FVector::ZeroVector;
 			(ClosestOnBone - ClosestOnCapsule).ToDirectionAndLength(OUT CapsuleToBoneDir, OUT CapsuleToBoneDist);
@@ -987,18 +898,6 @@ void FLKAnimVerletConstraint_Capsule::CheckCapsuleCapsule(float DeltaTime, bool 
 				if (CurVerletBone.IsPinned() == false)
 					CurVerletBone.Location = CurVerletBone.Location + (CapsuleToBoneDir * PenetrationDepth * ChildMoveAlpha);
 			}
-
-			if (BroadphaseInput.bUseBroadphase)
-			{
-				if (CurVerletBone.Location.Equals(CurOldLocation, KINDA_SMALL_NUMBER) == false || ParentVerletBone.Location.Equals(ParentOldLocation, KINDA_SMALL_NUMBER) == false)
-				{
-					const FLKAnimVerletBound ParentBound = FLKAnimVerletBone::MakeBound(ParentVerletBone.Location, CurVerletBone.Thickness);
-					FLKAnimVerletBound CurBound = CurVerletBone.MakeBound();
-					CurBound.Expand(ParentBound);
-
-					BroadphaseInput.BroadphaseContainer->UpdateElement(CurPair, CurBound);
-				}
-			}
 		}
 	}
 }
@@ -1015,7 +914,6 @@ FLKAnimVerletConstraint_Box::FLKAnimVerletConstraint_Box(const FVector& InLocati
 	, ExcludeBones(InCollisionInput.ExcludeBones)
 	, bUseCapsuleCollisionForChain(InCollisionInput.bUseCapsuleCollisionForChain)
 	, BonePairs(InCollisionInput.SimulateBonePairIndicators)
-	, BroadphaseInput(InCollisionInput.BroadphaseInput)
 	, bUseXPBDSolver(InCollisionInput.bUseXPBDSolver)
 	, Compliance(InCollisionInput.Compliance)
 {
@@ -1162,52 +1060,24 @@ bool FLKAnimVerletConstraint_Box::CheckBoxSphere(IN OUT FLKAnimVerletBone& CurVe
 
 void FLKAnimVerletConstraint_Box::CheckBoxSphere(float DeltaTime, bool bFinalize)
 {
-	if (BroadphaseInput.bUseBroadphase)
-	{
-		verify(BroadphaseInput.BonePairIndicatorSpace == BroadphaseInput.TargetBonePairIndicators);
-		BroadphaseInput.BonePairIndicatorSpace->Reset();
-
-		const FLKBroadphaseElementFinder BroadphaseFinder(BroadphaseInput.BonePairIndicatorSpace);
-		BroadphaseInput.BroadphaseContainer->FindElements(MakeBound(), BroadphaseFinder);
-	}
-
 	const FQuat InvRotation = Rotation.Inverse();
-	for (int32 i = 0; i < BroadphaseInput.TargetBonePairIndicators->Num(); ++i)
+	for (int32 i = 0; i < Bones->Num(); ++i)
 	{
 		if (ExcludeBones.IsValidIndex(i) && ExcludeBones[i])
 			continue;
 
-		const FLKAnimVerletBoneIndicatorPair& CurPair = (*BroadphaseInput.TargetBonePairIndicators)[i];
-		verify(CurPair.BoneB.IsValidBoneIndicator());
-		verify(Bones->IsValidIndex(CurPair.BoneB.AnimVerletBoneIndex));
-		FLKAnimVerletBone& CurVerletBone = (*Bones)[CurPair.BoneB.AnimVerletBoneIndex];
-
-		const FVector CurOldLocation = CurVerletBone.Location;
+		FLKAnimVerletBone& CurVerletBone = (*Bones)[i];
 		CheckBoxSphere(CurVerletBone, DeltaTime, bFinalize, CurVerletBone.Location, InvRotation, i);
-
-		if (BroadphaseInput.bUseBroadphase && CurVerletBone.Location.Equals(CurOldLocation, KINDA_SMALL_NUMBER) == false)
-		{
-			BroadphaseInput.BroadphaseContainer->UpdateElement(CurPair, CurVerletBone.MakeBound());
-		}
 	}
 }
 
 void FLKAnimVerletConstraint_Box::CheckBoxCapsule(float DeltaTime, bool bFinalize)
 {
-	if (BroadphaseInput.bUseBroadphase)
-	{
-		verify(BroadphaseInput.BonePairIndicatorSpace == BroadphaseInput.TargetBonePairIndicators);
-		BroadphaseInput.BonePairIndicatorSpace->Reset();
-
-		const FLKBroadphaseElementFinder BroadphaseFinder(BroadphaseInput.BonePairIndicatorSpace);
-		BroadphaseInput.BroadphaseContainer->FindElements(MakeBound(), BroadphaseFinder);
-	}
-
 	/// OBB - Capsule version
 	const FQuat InvRotation = Rotation.Inverse();
-	for (int32 i = 0; i < BroadphaseInput.TargetBonePairIndicators->Num(); ++i)
+	for (int32 i = 0; i < BonePairs->Num(); ++i)
 	{
-		const FLKAnimVerletBoneIndicatorPair& CurPair = (*BroadphaseInput.TargetBonePairIndicators)[i];
+		const FLKAnimVerletBoneIndicatorPair& CurPair = (*BonePairs)[i];
 		if (ExcludeBones.IsValidIndex(CurPair.BoneB.AnimVerletBoneIndex) && ExcludeBones[CurPair.BoneB.AnimVerletBoneIndex])
 			continue;
 
@@ -1216,13 +1086,7 @@ void FLKAnimVerletConstraint_Box::CheckBoxCapsule(float DeltaTime, bool bFinaliz
 		FLKAnimVerletBone& CurVerletBone = (*Bones)[CurPair.BoneB.AnimVerletBoneIndex];
 		if (CurPair.BoneA.IsValidBoneIndicator() == false || CurVerletBone.bOverrideToUseSphereCollisionForChain)
 		{
-			const FVector CurOldLocation = CurVerletBone.Location;
 			CheckBoxSphere(IN OUT CurVerletBone, DeltaTime, bFinalize, CurVerletBone.Location, InvRotation, i);
-
-			if (BroadphaseInput.bUseBroadphase && CurVerletBone.Location.Equals(CurOldLocation, KINDA_SMALL_NUMBER) == false)
-			{
-				BroadphaseInput.BroadphaseContainer->UpdateElement(CurPair, CurVerletBone.MakeBound());
-			}
 			continue;
 		}
 
@@ -1249,9 +1113,6 @@ void FLKAnimVerletConstraint_Box::CheckBoxCapsule(float DeltaTime, bool bFinaliz
 		FVector CollisionNormal = FVector::ZeroVector;
 		if (IntersectOriginAabbSphere(OUT CollisionNormal, OUT PenetrationDepth, CurVerletBone, ClosestOnBoneLocal))
 		{
-			const FVector CurOldLocation = CurVerletBone.Location;
-			const FVector ParentOldLocation = ParentVerletBone.Location;
-
 			CollisionNormal = Rotation.RotateVector(CollisionNormal);
 			const FVector ClosestOnBone = Rotation.RotateVector(ClosestOnBoneLocal) + Location;
 
@@ -1295,26 +1156,14 @@ void FLKAnimVerletConstraint_Box::CheckBoxCapsule(float DeltaTime, bool bFinaliz
 				if (CurVerletBone.IsPinned() == false)
 					CurVerletBone.Location = CurVerletBone.Location + (CollisionNormal * PenetrationDepth * ChildMoveAlpha);
 			}
-
-			if (BroadphaseInput.bUseBroadphase)
-			{
-				if (CurVerletBone.Location.Equals(CurOldLocation, KINDA_SMALL_NUMBER) == false || ParentVerletBone.Location.Equals(ParentOldLocation, KINDA_SMALL_NUMBER) == false)
-				{
-					const FLKAnimVerletBound ParentBound = FLKAnimVerletBone::MakeBound(ParentVerletBone.Location, CurVerletBone.Thickness);
-					FLKAnimVerletBound CurBound = CurVerletBone.MakeBound();
-					CurBound.Expand(ParentBound);
-
-					BroadphaseInput.BroadphaseContainer->UpdateElement(CurPair, CurBound);
-				}
-			}
 		}
 	}
 
 	/// OBB - OBB version
 	/*const FQuat InvRotation = Rotation.Inverse();
-	for (int32 i = 0; i < BroadphaseInput.TargetBonePairIndicators->Num(); ++i)
+	for (int32 i = 0; i < BonePairs->Num(); ++i)
 	{
-		const FLKAnimVerletBoneIndicatorPair& CurPair = (*BroadphaseInput.TargetBonePairIndicators)[i];
+		const FLKAnimVerletBoneIndicatorPair& CurPair = (*BonePairs)[i];
 		if (ExcludeBones.IsValidIndex(CurPair.BoneB.AnimVerletBoneIndex) && ExcludeBones[CurPair.BoneB.AnimVerletBoneIndex])
 			continue;
 
@@ -1323,13 +1172,7 @@ void FLKAnimVerletConstraint_Box::CheckBoxCapsule(float DeltaTime, bool bFinaliz
 		FLKAnimVerletBone& CurVerletBone = (*Bones)[CurPair.BoneB.AnimVerletBoneIndex];
 		if (CurPair.BoneA.IsValidBoneIndicator() == false || CurVerletBone.bOverrideToUseSphereCollisionForChain)
 		{
-			const FVector CurOldLocation = CurVerletBone.Location;
 			CheckBoxSphere(IN OUT CurVerletBone, DeltaTime, bFinalize, CurVerletBone.Location, InvRotation, i);
-
-			if (BroadphaseInput.bUseBroadphase && CurVerletBone.Location.Equals(CurOldLocation, KINDA_SMALL_NUMBER) == false)
-			{
-				BroadphaseInput.BroadphaseContainer->UpdateElement(CurPair, CurVerletBone.MakeBound());
-			}
 			continue;
 		}
 
@@ -1404,9 +1247,6 @@ void FLKAnimVerletConstraint_Box::CheckBoxCapsule(float DeltaTime, bool bFinaliz
 		const FVector ContactPointBone = BoneBoxLocation - CollisionNormal * (BoneBoxHalfExtents.X + BoneBoxHalfExtents.Y + BoneBoxHalfExtents.Z);
 		const FVector ClosestOnBone = FMath::ClosestPointOnSegment(ContactPointBone, CurVerletBone.Location, ParentVerletBone.Location);
 		{
-			const FVector CurOldLocation = CurVerletBone.Location;
-			const FVector ParentOldLocation = ParentVerletBone.Location;
-
 			if (bUseXPBDSolver && bFinalize == false)
 			{
 				double& CurLambda = Lambdas[i];
@@ -1442,18 +1282,6 @@ void FLKAnimVerletConstraint_Box::CheckBoxCapsule(float DeltaTime, bool bFinaliz
 					ParentVerletBone.Location = ParentVerletBone.Location + (CollisionNormal * PenetrationDepth * (1.0f - ChildMoveAlpha));
 				if (CurVerletBone.IsPinned() == false)
 					CurVerletBone.Location = CurVerletBone.Location + (CollisionNormal * PenetrationDepth * ChildMoveAlpha);
-			}
-
-			if (BroadphaseInput.bUseBroadphase)
-			{
-				if (CurVerletBone.Location.Equals(CurOldLocation, KINDA_SMALL_NUMBER) == false || ParentVerletBone.Location.Equals(ParentOldLocation, KINDA_SMALL_NUMBER) == false)
-				{
-					const FLKAnimVerletBound ParentBound = FLKAnimVerletBone::MakeBound(ParentVerletBone.Location, CurVerletBone.Thickness);
-					FLKAnimVerletBound CurBound = CurVerletBone.MakeBound();
-					CurBound.Expand(ParentBound);
-
-					BroadphaseInput.BroadphaseContainer->UpdateElement(CurPair, CurBound);
-				}
 			}
 		}
 	}*/

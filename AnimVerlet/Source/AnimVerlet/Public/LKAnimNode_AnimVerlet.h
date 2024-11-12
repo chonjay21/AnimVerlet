@@ -2,7 +2,6 @@
 #include <CoreMinimal.h>
 #include <BoneControllers/AnimNode_SkeletalControlBase.h>
 #include "LKAnimVerletBone.h"
-#include "LKAnimVerletBroadphaseContainer.h"
 #include "LKAnimVerletCollisionShape.h"
 #include "LKAnimVerletConstraint.h"
 #include "LKAnimVerletConstraintType.h"
@@ -54,8 +53,6 @@ private:
 	void SimulateVerlet(const UWorld* World, float InDeltaTime, const FTransform& ComponentTransform, const FTransform& PrevComponentTransform);
 	void PreUpdateBones(const UWorld* World, float InDeltaTime, const FTransform& ComponentTransform, const FTransform& PrevComponentTransform);
 	void SolveConstraints(float InDeltaTime);
-	void MakeBroadphaseInput(OUT FLKAnimVerletBroadphaseInput& OutBroadphaseInput);
-	void UpdateBroadphase();
 	void UpdateSleep(float InDeltaTime);
 	void PostUpdateBones(float InDeltaTime);
 	void ApplyResult(OUT TArray<FBoneTransform>& OutBoneTransforms, const FBoneContainer& BoneContainer);
@@ -75,7 +72,6 @@ public:
 	const TArray<FLKAnimVerletConstraint_Capsule>& GetCapsuleCollisionConstraints() const { return CapsuleCollisionConstraints; }
 	const TArray<FLKAnimVerletConstraint_Box>& GetBoxCollisionConstraints() const { return BoxCollisionConstraints; }
 	const TArray<FLKAnimVerletConstraint_Plane>& GetPlaneCollisionConstraints() const { return PlaneCollisionConstraints; }
-	const LKAnimVerletBroadphaseContainer& GetBroadphaseContainer() const { return BroadphaseContainer; };
 
 	void SetDynamicCollisionShapes(const FLKAnimVerletCollisionShapeList& InDynamicCollisionShapes) { DynamicCollisionShapes = InDynamicCollisionShapes; }
 	void ForceClearSimulateBones() { ClearSimulateBones(); }	/// for live editor preview
@@ -204,13 +200,6 @@ public:
 	*/
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = "Solve", meta = (ClampMin = "1"))
 	int32 SolveIteration = 4;
-
-	/**
-		Use Broadphase for local collision constraints(against collision shapes)
-		There is additional cost involved in creating a container for broadphase, but solving local collision constraints can be faster.
-	*/
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = "Solve")
-	bool bUseBroadphaseCollisionDetection = false;
 
 	/** Use a fixed DeltaTime instead of real delta time if > 0. (It can help to obtain a consistent result regardless of the frame rate.) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = "Solve", meta = (ClampMin = "0.0", ForceUnits = "s"))
@@ -341,6 +330,4 @@ private:
 	bool bLocalColliderDirty = false;
 	float DeltaTime = 0.0f;
 	FTransform PrevComponentT = FTransform::Identity;
-	LKAnimVerletBroadphaseContainer BroadphaseContainer;
-	FLKAnimVerletBroadphaseSpace BroadphaseSpace;
 };

@@ -186,7 +186,6 @@ public:
 	bool bUseCapsuleCollisionForChain = false;
 	TArray<FLKAnimVerletBoneIndicatorPair>* BonePairs = nullptr;
 
-	FLKAnimVerletBroadphaseInput BroadphaseInput;
 	bool bUseXPBDSolver = false;
 	double Compliance = 0.0;		///for XPBD
 	TArray<double> Lambdas;			///for XPBD
@@ -223,7 +222,6 @@ public:
 	bool bUseCapsuleCollisionForChain = false;
 	TArray<FLKAnimVerletBoneIndicatorPair>* BonePairs = nullptr;
 
-	FLKAnimVerletBroadphaseInput BroadphaseInput;
 	bool bUseXPBDSolver = false;
 	double Compliance = 0.0;		///for XPBD
 	TArray<double> Lambdas;			///for XPBD
@@ -260,7 +258,6 @@ public:
 	bool bUseCapsuleCollisionForChain = false;
 	TArray<FLKAnimVerletBoneIndicatorPair>* BonePairs = nullptr;
 
-	FLKAnimVerletBroadphaseInput BroadphaseInput;
 	bool bUseXPBDSolver = false;
 	double Compliance = 0.0;		///for XPBD
 	TArray<double> Lambdas;			///for XPBD

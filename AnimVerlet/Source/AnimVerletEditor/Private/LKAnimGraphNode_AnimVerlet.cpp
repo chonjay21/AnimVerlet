@@ -197,22 +197,6 @@ void ULKAnimGraphNode_AnimVerlet::Draw(FPrimitiveDrawInterface* PDI, USkeletalMe
 			}
 		}
 	}
-	
-	if (bShowBroadphaseRootBound)
-	{
-		const LKAnimVerletBroadphaseContainer& BroadphaseContainer = AnimVerletNode->GetBroadphaseContainer();
-		const FLKAnimVerletBound RootBound = BroadphaseContainer.GetRootBounds();
-		
-		const FTransform BoxT(FQuat::Identity, RootBound.GetCenter());
-		const FMatrix BoxMat = BoxT.ToMatrixNoScale();
-		const FBox Box(-RootBound.GetHalfExtents(), RootBound.GetHalfExtents());
-		DrawWireBox(PDI, BoxMat, Box, FColor::Green, SDPG_Foreground);
-	}
-	if (bDumpBroadphaseStat)
-	{
-		const LKAnimVerletBroadphaseContainer& BroadphaseContainer = AnimVerletNode->GetBroadphaseContainer();
-		BroadphaseContainer.DumpStats();
-	}
 
 	if (bShowConstraints)
 	{
