@@ -1,7 +1,7 @@
 #include "LKAnimVerletConstraint.h"
 
 #include "LKAnimVerletBone.h"
-#include "LKAnimVerletBoneTree.h"
+#include "LKAnimVerletBroadphaseContainer.h"
 
 ///=========================================================================================================================================
 /// FLKAnimVerletConstraint_Pin
@@ -624,8 +624,8 @@ void FLKAnimVerletConstraint_Sphere::CheckSphereSphere(float DeltaTime, bool bFi
 		verify(BroadphaseInput.BonePairIndicatorSpace == BroadphaseInput.TargetBonePairIndicators);
 		BroadphaseInput.BonePairIndicatorSpace->Reset();
 
-		const FLKOctreeElementFinder BroadphaseFinder(BroadphaseInput.BonePairIndicatorSpace);
-		BroadphaseInput.BroadphaseTree->FindElements(MakeBound(), BroadphaseFinder);
+		const FLKBroadphaseElementFinder BroadphaseFinder(BroadphaseInput.BonePairIndicatorSpace);
+		BroadphaseInput.BroadphaseContainer->FindElements(MakeBound(), BroadphaseFinder);
 	}
 
 	for (int32 i = 0; i < BroadphaseInput.TargetBonePairIndicators->Num(); ++i)
@@ -643,7 +643,7 @@ void FLKAnimVerletConstraint_Sphere::CheckSphereSphere(float DeltaTime, bool bFi
 
 		if (BroadphaseInput.bUseBroadphase && CurVerletBone.Location.Equals(CurOldLocation, KINDA_SMALL_NUMBER) == false)
 		{
-			BroadphaseInput.BroadphaseTree->UpdateElement(CurPair, CurVerletBone.MakeBound());
+			BroadphaseInput.BroadphaseContainer->UpdateElement(CurPair, CurVerletBone.MakeBound());
 		}
 	}
 }
@@ -655,8 +655,8 @@ void FLKAnimVerletConstraint_Sphere::CheckSphereCapsule(float DeltaTime, bool bF
 		verify(BroadphaseInput.BonePairIndicatorSpace == BroadphaseInput.TargetBonePairIndicators);
 		BroadphaseInput.BonePairIndicatorSpace->Reset();
 
-		const FLKOctreeElementFinder BroadphaseFinder(BroadphaseInput.BonePairIndicatorSpace);
-		BroadphaseInput.BroadphaseTree->FindElements(MakeBound(), BroadphaseFinder);
+		const FLKBroadphaseElementFinder BroadphaseFinder(BroadphaseInput.BonePairIndicatorSpace);
+		BroadphaseInput.BroadphaseContainer->FindElements(MakeBound(), BroadphaseFinder);
 	}
 
 	for (int32 i = 0; i < BroadphaseInput.TargetBonePairIndicators->Num(); ++i)
@@ -675,7 +675,7 @@ void FLKAnimVerletConstraint_Sphere::CheckSphereCapsule(float DeltaTime, bool bF
 
 			if (BroadphaseInput.bUseBroadphase && CurVerletBone.Location.Equals(CurOldLocation, KINDA_SMALL_NUMBER) == false)
 			{
-				BroadphaseInput.BroadphaseTree->UpdateElement(CurPair, CurVerletBone.MakeBound());
+				BroadphaseInput.BroadphaseContainer->UpdateElement(CurPair, CurVerletBone.MakeBound());
 			}
 			continue;
 		}
@@ -745,7 +745,7 @@ void FLKAnimVerletConstraint_Sphere::CheckSphereCapsule(float DeltaTime, bool bF
 					FLKAnimVerletBound CurBound = CurVerletBone.MakeBound();
 					CurBound.Expand(ParentBound);
 
-					BroadphaseInput.BroadphaseTree->UpdateElement(CurPair, CurBound);
+					BroadphaseInput.BroadphaseContainer->UpdateElement(CurPair, CurBound);
 				}
 			}
 		}
@@ -864,8 +864,8 @@ void FLKAnimVerletConstraint_Capsule::CheckCapsuleSphere(float DeltaTime, bool b
 		verify(BroadphaseInput.BonePairIndicatorSpace == BroadphaseInput.TargetBonePairIndicators);
 		BroadphaseInput.BonePairIndicatorSpace->Reset();
 
-		const FLKOctreeElementFinder BroadphaseFinder(BroadphaseInput.BonePairIndicatorSpace);
-		BroadphaseInput.BroadphaseTree->FindElements(MakeBound(), BroadphaseFinder);
+		const FLKBroadphaseElementFinder BroadphaseFinder(BroadphaseInput.BonePairIndicatorSpace);
+		BroadphaseInput.BroadphaseContainer->FindElements(MakeBound(), BroadphaseFinder);
 	}
 
 	const FVector CapsuleHeightDir = Rotation.GetUpVector();
@@ -886,7 +886,7 @@ void FLKAnimVerletConstraint_Capsule::CheckCapsuleSphere(float DeltaTime, bool b
 
 		if (BroadphaseInput.bUseBroadphase && CurVerletBone.Location.Equals(CurOldLocation, KINDA_SMALL_NUMBER) == false)
 		{
-			BroadphaseInput.BroadphaseTree->UpdateElement(CurPair, CurVerletBone.MakeBound());
+			BroadphaseInput.BroadphaseContainer->UpdateElement(CurPair, CurVerletBone.MakeBound());
 		}
 	}
 }
@@ -898,8 +898,8 @@ void FLKAnimVerletConstraint_Capsule::CheckCapsuleCapsule(float DeltaTime, bool 
 		verify(BroadphaseInput.BonePairIndicatorSpace == BroadphaseInput.TargetBonePairIndicators);
 		BroadphaseInput.BonePairIndicatorSpace->Reset();
 
-		const FLKOctreeElementFinder BroadphaseFinder(BroadphaseInput.BonePairIndicatorSpace);
-		BroadphaseInput.BroadphaseTree->FindElements(MakeBound(), BroadphaseFinder);
+		const FLKBroadphaseElementFinder BroadphaseFinder(BroadphaseInput.BonePairIndicatorSpace);
+		BroadphaseInput.BroadphaseContainer->FindElements(MakeBound(), BroadphaseFinder);
 	}
 
 	const FVector CapsuleHeightDir = Rotation.GetUpVector();
@@ -922,7 +922,7 @@ void FLKAnimVerletConstraint_Capsule::CheckCapsuleCapsule(float DeltaTime, bool 
 
 			if (BroadphaseInput.bUseBroadphase && CurVerletBone.Location.Equals(CurOldLocation, KINDA_SMALL_NUMBER) == false)
 			{
-				BroadphaseInput.BroadphaseTree->UpdateElement(CurPair, CurVerletBone.MakeBound());
+				BroadphaseInput.BroadphaseContainer->UpdateElement(CurPair, CurVerletBone.MakeBound());
 			}
 			continue;
 		}
@@ -996,7 +996,7 @@ void FLKAnimVerletConstraint_Capsule::CheckCapsuleCapsule(float DeltaTime, bool 
 					FLKAnimVerletBound CurBound = CurVerletBone.MakeBound();
 					CurBound.Expand(ParentBound);
 
-					BroadphaseInput.BroadphaseTree->UpdateElement(CurPair, CurBound);
+					BroadphaseInput.BroadphaseContainer->UpdateElement(CurPair, CurBound);
 				}
 			}
 		}
@@ -1167,8 +1167,8 @@ void FLKAnimVerletConstraint_Box::CheckBoxSphere(float DeltaTime, bool bFinalize
 		verify(BroadphaseInput.BonePairIndicatorSpace == BroadphaseInput.TargetBonePairIndicators);
 		BroadphaseInput.BonePairIndicatorSpace->Reset();
 
-		const FLKOctreeElementFinder BroadphaseFinder(BroadphaseInput.BonePairIndicatorSpace);
-		BroadphaseInput.BroadphaseTree->FindElements(MakeBound(), BroadphaseFinder);
+		const FLKBroadphaseElementFinder BroadphaseFinder(BroadphaseInput.BonePairIndicatorSpace);
+		BroadphaseInput.BroadphaseContainer->FindElements(MakeBound(), BroadphaseFinder);
 	}
 
 	const FQuat InvRotation = Rotation.Inverse();
@@ -1187,7 +1187,7 @@ void FLKAnimVerletConstraint_Box::CheckBoxSphere(float DeltaTime, bool bFinalize
 
 		if (BroadphaseInput.bUseBroadphase && CurVerletBone.Location.Equals(CurOldLocation, KINDA_SMALL_NUMBER) == false)
 		{
-			BroadphaseInput.BroadphaseTree->UpdateElement(CurPair, CurVerletBone.MakeBound());
+			BroadphaseInput.BroadphaseContainer->UpdateElement(CurPair, CurVerletBone.MakeBound());
 		}
 	}
 }
@@ -1199,8 +1199,8 @@ void FLKAnimVerletConstraint_Box::CheckBoxCapsule(float DeltaTime, bool bFinaliz
 		verify(BroadphaseInput.BonePairIndicatorSpace == BroadphaseInput.TargetBonePairIndicators);
 		BroadphaseInput.BonePairIndicatorSpace->Reset();
 
-		const FLKOctreeElementFinder BroadphaseFinder(BroadphaseInput.BonePairIndicatorSpace);
-		BroadphaseInput.BroadphaseTree->FindElements(MakeBound(), BroadphaseFinder);
+		const FLKBroadphaseElementFinder BroadphaseFinder(BroadphaseInput.BonePairIndicatorSpace);
+		BroadphaseInput.BroadphaseContainer->FindElements(MakeBound(), BroadphaseFinder);
 	}
 
 	/// OBB - Capsule version
@@ -1221,7 +1221,7 @@ void FLKAnimVerletConstraint_Box::CheckBoxCapsule(float DeltaTime, bool bFinaliz
 
 			if (BroadphaseInput.bUseBroadphase && CurVerletBone.Location.Equals(CurOldLocation, KINDA_SMALL_NUMBER) == false)
 			{
-				BroadphaseInput.BroadphaseTree->UpdateElement(CurPair, CurVerletBone.MakeBound());
+				BroadphaseInput.BroadphaseContainer->UpdateElement(CurPair, CurVerletBone.MakeBound());
 			}
 			continue;
 		}
@@ -1304,7 +1304,7 @@ void FLKAnimVerletConstraint_Box::CheckBoxCapsule(float DeltaTime, bool bFinaliz
 					FLKAnimVerletBound CurBound = CurVerletBone.MakeBound();
 					CurBound.Expand(ParentBound);
 
-					BroadphaseInput.BroadphaseTree->UpdateElement(CurPair, CurBound);
+					BroadphaseInput.BroadphaseContainer->UpdateElement(CurPair, CurBound);
 				}
 			}
 		}
@@ -1328,7 +1328,7 @@ void FLKAnimVerletConstraint_Box::CheckBoxCapsule(float DeltaTime, bool bFinaliz
 
 			if (BroadphaseInput.bUseBroadphase && CurVerletBone.Location.Equals(CurOldLocation, KINDA_SMALL_NUMBER) == false)
 			{
-				BroadphaseInput.BroadphaseTree->UpdateElement(CurPair, CurVerletBone.MakeBound());
+				BroadphaseInput.BroadphaseContainer->UpdateElement(CurPair, CurVerletBone.MakeBound());
 			}
 			continue;
 		}
@@ -1452,7 +1452,7 @@ void FLKAnimVerletConstraint_Box::CheckBoxCapsule(float DeltaTime, bool bFinaliz
 					FLKAnimVerletBound CurBound = CurVerletBone.MakeBound();
 					CurBound.Expand(ParentBound);
 
-					BroadphaseInput.BroadphaseTree->UpdateElement(CurPair, CurBound);
+					BroadphaseInput.BroadphaseContainer->UpdateElement(CurPair, CurBound);
 				}
 			}
 		}

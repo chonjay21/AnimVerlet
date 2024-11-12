@@ -23,7 +23,7 @@ public:
 	TArray<FLKAnimVerletBoneIndicatorPair>* TargetBonePairIndicators = nullptr;
 
 	TArray<FLKAnimVerletBoneIndicatorPair>* BonePairIndicatorSpace = nullptr;
-	class LKOctree* BroadphaseTree = nullptr;
+	class LKAnimVerletBroadphaseContainer* BroadphaseContainer = nullptr;
 
 public:
 	void ResetBroadphaseInput()
@@ -32,7 +32,7 @@ public:
 		TargetBonePairIndicators = nullptr;
 
 		BonePairIndicatorSpace = nullptr;
-		BroadphaseTree = nullptr;
+		BroadphaseContainer = nullptr;
 	}
 };
 

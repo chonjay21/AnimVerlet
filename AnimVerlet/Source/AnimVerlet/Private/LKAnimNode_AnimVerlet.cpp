@@ -5,7 +5,7 @@
 #include <Animation/AnimTypes.h>
 #include <DrawDebugHelpers.h>
 #include <Kismet/KismetSystemLibrary.h>
-#include "LKAnimVerletBoneTree.h"
+#include "LKAnimVerletBroadphaseContainer.h"
 #include "LKAnimVerletCollisionData.h"
 
 #if LK_ENABLE_ANIMVERLET_DEBUG
@@ -185,11 +185,16 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 
 	/// Create constraints
 	FLKAnimVerletBound BoneBound;
+	FLKAnimVerletBound BoneMaxBound;
 	const double Compliance = static_cast<double>(1.0 / InvCompliance);
 	for (int32 i = 0; i < SimulateBones.Num(); ++i)
 	{
 		FLKAnimVerletBone& CurSimulateBone = SimulateBones[i];
-		BoneBound.Expand(CurSimulateBone.MakeBound());
+		const FLKAnimVerletBound CurBound = CurSimulateBone.MakeBound();
+		BoneBound.Expand(CurBound);
+
+		if (CurBound.GetHalfExtents().SizeSquared() > BoneMaxBound.GetHalfExtents().SizeSquared())
+			BoneMaxBound = CurBound;
 
 		if (CurSimulateBone.HasParentBone() == false)
 		{
@@ -485,7 +490,7 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 
 	const float BoundExtentMax = BoneBound.GetHalfExtents().GetMax();
 	BoneBound.Expand(BoundExtentMax);
-	BroadphaseTree.InitOctree(BoneBound.GetCenter(), BoneBound.GetHalfExtents().GetMax());
+	BroadphaseContainer.Initialize(BoneBound.GetCenter(), BoneBound.GetHalfExtents(), BoneMaxBound.GetHalfExtents() * 30.0f);
 }
 
 void FLKAnimNode_AnimVerlet::InitializeLocalCollisionConstraints(const FBoneContainer& BoneContainer)
@@ -1418,7 +1423,7 @@ void FLKAnimNode_AnimVerlet::MakeBroadphaseInput(OUT FLKAnimVerletBroadphaseInpu
 	OutBroadphaseInput.ResetBroadphaseInput();
 	
 	OutBroadphaseInput.bUseBroadphase = bUseBroadphaseCollisionDetection;
-	OutBroadphaseInput.BroadphaseTree = &BroadphaseTree;
+	OutBroadphaseInput.BroadphaseContainer = &BroadphaseContainer;
 	OutBroadphaseInput.BonePairIndicatorSpace = &BroadphaseSpace.BonePairIndicatorSpace;
 	if (OutBroadphaseInput.bUseBroadphase)
 	{
@@ -1439,7 +1444,7 @@ void FLKAnimNode_AnimVerlet::UpdateBroadphase()
 	if (bUseBroadphaseCollisionDetection == false)
 		return;
 
-	BroadphaseTree.ResetOctree();
+	BroadphaseContainer.Reset();
 	if (bUseCapsuleCollisionForChain)
 	{
 		for (int32 i = 0; i < SimulateBonePairIndicators.Num(); ++i)
@@ -1452,8 +1457,8 @@ void FLKAnimNode_AnimVerlet::UpdateBroadphase()
 
 			if (CurPair.BoneA.IsValidBoneIndicator() == false || CurVerletBone.bOverrideToUseSphereCollisionForChain)
 			{
-				const FLKOctreeElement BroadphaseTreeElem(CurPair, CurVerletBone.MakeBound());
-				BroadphaseTree.AddElement(BroadphaseTreeElem);
+				const FLKBroadphaseElement BroadphaseTreeElem(CurPair, CurVerletBone.MakeBound());
+				BroadphaseContainer.AddElement(BroadphaseTreeElem);
 			}
 			else
 			{
@@ -1464,8 +1469,8 @@ void FLKAnimNode_AnimVerlet::UpdateBroadphase()
 				FLKAnimVerletBound CurBound = CurVerletBone.MakeBound();
 				CurBound.Expand(ParentBound);
 
-				const FLKOctreeElement BroadphaseTreeElem(CurPair, CurBound);
-				BroadphaseTree.AddElement(BroadphaseTreeElem);
+				const FLKBroadphaseElement BroadphaseTreeElem(CurPair, CurBound);
+				BroadphaseContainer.AddElement(BroadphaseTreeElem);
 			}
 		}
 	}
@@ -1474,8 +1479,8 @@ void FLKAnimNode_AnimVerlet::UpdateBroadphase()
 		for (int32 i = 0; i < SimulateBones.Num(); ++i)
 		{
 			const FLKAnimVerletBone& CurVerletBone = SimulateBones[i];
-			const FLKOctreeElement BroadphaseTreeElem(CurVerletBone, i, CurVerletBone.MakeBound());
-			BroadphaseTree.AddElement(BroadphaseTreeElem);
+			const FLKBroadphaseElement BroadphaseTreeElem(CurVerletBone, i, CurVerletBone.MakeBound());
+			BroadphaseContainer.AddElement(BroadphaseTreeElem);
 		}
 	}
 }
@@ -1697,7 +1702,7 @@ void FLKAnimNode_AnimVerlet::ClearSimulateBones()
 	BoneChainIndexes.Reset();
 	MaxBoneChainLength = 0;
 	BroadphaseSpace.ResetBroadphaseSpace();
-	BroadphaseTree.DestroyOctree();
+	BroadphaseContainer.Destroy();
 	RelevantBoneIndicators.Reset();
 	SimulateBonePairIndicators.Reset();
 	ExcludedBones.Reset();
@@ -1869,6 +1874,7 @@ void FLKAnimNode_AnimVerlet::SyncFromOtherAnimVerletNode(const FLKAnimNode_AnimV
 	StraightenBendedBoneStrength = Other.StraightenBendedBoneStrength;
 
 	SolveIteration = Other.SolveIteration;
+	bUseBroadphaseCollisionDetection = Other.bUseBroadphaseCollisionDetection;
 
 	FixedDeltaTime = Other.FixedDeltaTime;
 	MinDeltaTime = Other.MinDeltaTime;

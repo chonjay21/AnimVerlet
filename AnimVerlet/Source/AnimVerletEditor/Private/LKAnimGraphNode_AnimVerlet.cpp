@@ -200,8 +200,8 @@ void ULKAnimGraphNode_AnimVerlet::Draw(FPrimitiveDrawInterface* PDI, USkeletalMe
 	
 	if (bShowBroadphaseRootBound)
 	{
-		const LKOctree& BroadphaseTree = AnimVerletNode->GetBroadphaseTree();
-		const FLKAnimVerletBound RootBound = BroadphaseTree.GetRootBounds();
+		const LKAnimVerletBroadphaseContainer& BroadphaseContainer = AnimVerletNode->GetBroadphaseContainer();
+		const FLKAnimVerletBound RootBound = BroadphaseContainer.GetRootBounds();
 		
 		const FTransform BoxT(FQuat::Identity, RootBound.GetCenter());
 		const FMatrix BoxMat = BoxT.ToMatrixNoScale();
@@ -210,8 +210,8 @@ void ULKAnimGraphNode_AnimVerlet::Draw(FPrimitiveDrawInterface* PDI, USkeletalMe
 	}
 	if (bDumpBroadphaseStat)
 	{
-		const LKOctree& BroadphaseTree = AnimVerletNode->GetBroadphaseTree();
-		BroadphaseTree.DumpStats();
+		const LKAnimVerletBroadphaseContainer& BroadphaseContainer = AnimVerletNode->GetBroadphaseContainer();
+		BroadphaseContainer.DumpStats();
 	}
 
 	if (bShowConstraints)

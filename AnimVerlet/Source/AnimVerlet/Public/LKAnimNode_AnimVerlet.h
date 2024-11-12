@@ -2,7 +2,7 @@
 #include <CoreMinimal.h>
 #include <BoneControllers/AnimNode_SkeletalControlBase.h>
 #include "LKAnimVerletBone.h"
-#include "LKAnimVerletBoneTree.h"
+#include "LKAnimVerletBroadphaseContainer.h"
 #include "LKAnimVerletCollisionShape.h"
 #include "LKAnimVerletConstraint.h"
 #include "LKAnimVerletConstraintType.h"
@@ -75,7 +75,7 @@ public:
 	const TArray<FLKAnimVerletConstraint_Capsule>& GetCapsuleCollisionConstraints() const { return CapsuleCollisionConstraints; }
 	const TArray<FLKAnimVerletConstraint_Box>& GetBoxCollisionConstraints() const { return BoxCollisionConstraints; }
 	const TArray<FLKAnimVerletConstraint_Plane>& GetPlaneCollisionConstraints() const { return PlaneCollisionConstraints; }
-	const LKOctree& GetBroadphaseTree() const { return BroadphaseTree; };
+	const LKAnimVerletBroadphaseContainer& GetBroadphaseContainer() const { return BroadphaseContainer; };
 
 	void SetDynamicCollisionShapes(const FLKAnimVerletCollisionShapeList& InDynamicCollisionShapes) { DynamicCollisionShapes = InDynamicCollisionShapes; }
 	void ForceClearSimulateBones() { ClearSimulateBones(); }	/// for live editor preview
@@ -341,6 +341,6 @@ private:
 	bool bLocalColliderDirty = false;
 	float DeltaTime = 0.0f;
 	FTransform PrevComponentT = FTransform::Identity;
-	LKOctree BroadphaseTree;
+	LKAnimVerletBroadphaseContainer BroadphaseContainer;
 	FLKAnimVerletBroadphaseSpace BroadphaseSpace;
 };
