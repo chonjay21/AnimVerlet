@@ -201,6 +201,7 @@ public:
 private:
 	bool CheckSphereSphere(IN OUT FLKAnimVerletBone& CurVerletBone, float DeltaTime, bool bFinalize, int32 LambdaIndex);
 	void CheckSphereSphere(float DeltaTime, bool bFinalize);
+	bool CheckSphereCapsule(IN OUT FLKAnimVerletBone& CurVerletBone, IN OUT FLKAnimVerletBone& ParentVerletBone, float DeltaTime, bool bFinalize, int32 LambdaIndex);
 	void CheckSphereCapsule(float DeltaTime, bool bFinalize);
 };
 ///=========================================================================================================================================
@@ -238,6 +239,7 @@ public:
 private:
 	bool CheckCapsuleSphere(IN OUT FLKAnimVerletBone& CurVerletBone, float DeltaTime, bool bFinalize, const FVector& CapsuleStart, const FVector& CapsuleEnd, int32 LambdaIndex);
 	void CheckCapsuleSphere(float DeltaTime, bool bFinalize);
+	bool CheckCapsuleCapsule(IN OUT FLKAnimVerletBone& CurVerletBone, IN OUT FLKAnimVerletBone& ParentVerletBone, float DeltaTime, bool bFinalize, const FVector& CapsuleStart, const FVector& CapsuleEnd, int32 LambdaIndex);
 	void CheckCapsuleCapsule(float DeltaTime, bool bFinalize);
 };
 ///=========================================================================================================================================
@@ -275,7 +277,10 @@ private:
 	bool IntersectObbSphere(OUT FVector& OutCollisionNormal, OUT float& OutPenetrationDepth, IN OUT FLKAnimVerletBone& CurVerletBone, const FVector& SphereLocation, const FQuat& InvRotation);
 	bool CheckBoxSphere(IN OUT FLKAnimVerletBone& CurVerletBone, float DeltaTime, bool bFinalize, const FVector& SphereLocation, const FQuat& InvRotation, int32 LambdaIndex);
 	void CheckBoxSphere(float DeltaTime, bool bFinalize);
+	bool CheckBoxCapsule(IN OUT FLKAnimVerletBone& CurVerletBone, IN OUT FLKAnimVerletBone& ParentVerletBone, float DeltaTime, bool bFinalize, const FQuat& InvRotation, int32 LambdaIndex);
 	void CheckBoxCapsule(float DeltaTime, bool bFinalize);
+
+	bool CheckBoxBox(IN OUT FLKAnimVerletBone& CurVerletBone, IN OUT FLKAnimVerletBone& ParentVerletBone, float DeltaTime, bool bFinalize, const FQuat& InvRotation, int32 LambdaIndex);
 };
 ///=========================================================================================================================================
 
@@ -310,6 +315,7 @@ public:
 private:
 	bool CheckPlaneSphere(IN OUT FLKAnimVerletBone& CurVerletBone, float DeltaTime, bool bFinalize, bool bFinitePlane, const FQuat& InvRotation, int32 LambdaIndex);
 	void CheckPlaneSphere(float DeltaTime, bool bFinalize);
+	bool CheckPlaneCapsule(IN OUT FLKAnimVerletBone& CurVerletBone, IN OUT FLKAnimVerletBone& ParentVerletBone, float DeltaTime, bool bFinalize, bool bFinitePlane, const FQuat& InvRotation, int32 LambdaIndex);
 	void CheckPlaneCapsule(float DeltaTime, bool bFinalize);
 };
 ///=========================================================================================================================================
@@ -340,6 +346,8 @@ private:
 	bool CheckWorldSphere(IN OUT FLKAnimVerletBone& CurVerletBone, float DeltaTime, bool bFinalize, const UWorld* World,
 						  const FCollisionQueryParams& CollisionQueryParams, const FTransform& ComponentTransform, int32 LambdaIndex);
 	void CheckWorldSphere(float DeltaTime, bool bFinalize);
+	bool CheckWorldCapsule(IN OUT FLKAnimVerletBone& CurVerletBone, IN OUT FLKAnimVerletBone& ParentVerletBone, float DeltaTime, bool bFinalize, 
+						   const UWorld* World, const FCollisionQueryParams& CollisionQueryParams, const FTransform& ComponentTransform, int32 LambdaIndex);
 	void CheckWorldCapsule(float DeltaTime, bool bFinalize);
 };
 ///=========================================================================================================================================

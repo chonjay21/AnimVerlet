@@ -627,6 +627,64 @@ void FLKAnimVerletConstraint_Sphere::CheckSphereSphere(float DeltaTime, bool bFi
 	}
 }
 
+bool FLKAnimVerletConstraint_Sphere::CheckSphereCapsule(IN OUT FLKAnimVerletBone& CurVerletBone, IN OUT FLKAnimVerletBone& ParentVerletBone, float DeltaTime, bool bFinalize, int32 LambdaIndex)
+{
+	const float ConstraintDistance = CurVerletBone.Thickness + Radius;
+	const float ConstraintDistanceSQ = FMath::Square(ConstraintDistance);
+
+	const FVector ClosestOnBone = FMath::ClosestPointOnSegment(Location, ParentVerletBone.Location, CurVerletBone.Location);
+	const FVector SphereToBoneVec = (ClosestOnBone - Location);
+	const float SphereToBoneSQ = SphereToBoneVec.SizeSquared();
+	if (SphereToBoneSQ < ConstraintDistanceSQ)
+	{
+		FVector DirFromParent = FVector::ZeroVector;
+		float DistFromParent = 0.0f;
+		(CurVerletBone.Location - ParentVerletBone.Location).ToDirectionAndLength(OUT DirFromParent, OUT DistFromParent);
+
+		const float SphereToBoneDist = FMath::Sqrt(SphereToBoneSQ);
+		const FVector SphereToBoneDir = SphereToBoneDist > KINDA_SMALL_NUMBER ? (SphereToBoneVec / SphereToBoneDist) : FVector::ZeroVector;
+		const float PenetrationDepth = ConstraintDistance - SphereToBoneDist;
+		if (bUseXPBDSolver && bFinalize == false)
+		{
+			double& CurLambda = Lambdas[LambdaIndex];
+			const float C = -PenetrationDepth;
+			const double Alpha = Compliance / (DeltaTime * DeltaTime);
+			const double DeltaLambda = -(C + Alpha * CurLambda) / (CurVerletBone.InvMass + ParentVerletBone.InvMass + Alpha);
+			CurLambda += DeltaLambda;
+
+			float ChildMoveAlpha = (ClosestOnBone - ParentVerletBone.Location).Size() / DistFromParent;
+			ChildMoveAlpha = ChildMoveAlpha * (2.0f - ChildMoveAlpha);	///EaseOutQuad for better movement(heuristic center of mass)
+
+			if (ParentVerletBone.IsPinned())
+				ChildMoveAlpha = 1.0f;
+			if (CurVerletBone.IsPinned())
+				ChildMoveAlpha = 0.0f;
+
+			if (ParentVerletBone.IsPinned() == false)
+				ParentVerletBone.Location = ParentVerletBone.Location + (SphereToBoneDir * DeltaLambda * (1.0f - ChildMoveAlpha));
+			if (CurVerletBone.IsPinned() == false)
+				CurVerletBone.Location = CurVerletBone.Location + (SphereToBoneDir * DeltaLambda * ChildMoveAlpha);
+		}
+		else
+		{
+			float ChildMoveAlpha = (ClosestOnBone - ParentVerletBone.Location).Size() / DistFromParent;
+			ChildMoveAlpha = ChildMoveAlpha * (2.0f - ChildMoveAlpha);	///EaseOutQuad for better movement(heuristic center of mass)
+
+			if (ParentVerletBone.IsPinned())
+				ChildMoveAlpha = 1.0f;
+			if (CurVerletBone.IsPinned())
+				ChildMoveAlpha = 0.0f;
+
+			if (ParentVerletBone.IsPinned() == false)
+				ParentVerletBone.Location = ParentVerletBone.Location + (SphereToBoneDir * PenetrationDepth * (1.0f - ChildMoveAlpha));
+			if (CurVerletBone.IsPinned() == false)
+				CurVerletBone.Location = CurVerletBone.Location + (SphereToBoneDir * PenetrationDepth * ChildMoveAlpha);
+		}
+		return true;
+	}
+	return false;
+}
+
 void FLKAnimVerletConstraint_Sphere::CheckSphereCapsule(float DeltaTime, bool bFinalize)
 {
 	for (int32 i = 0; i < BonePairs->Num(); ++i)
@@ -646,58 +704,8 @@ void FLKAnimVerletConstraint_Sphere::CheckSphereCapsule(float DeltaTime, bool bF
 
 		verify(Bones->IsValidIndex(CurPair.BoneA.AnimVerletBoneIndex));
 		FLKAnimVerletBone& ParentVerletBone = (*Bones)[CurPair.BoneA.AnimVerletBoneIndex];
-		const float ConstraintDistance = CurVerletBone.Thickness + Radius;
-		const float ConstraintDistanceSQ = FMath::Square(ConstraintDistance);
 
-		const FVector ClosestOnBone = FMath::ClosestPointOnSegment(Location, ParentVerletBone.Location, CurVerletBone.Location);
-		const FVector SphereToBoneVec = (ClosestOnBone - Location);
-		const float SphereToBoneSQ = SphereToBoneVec.SizeSquared();
-		if (SphereToBoneSQ < ConstraintDistanceSQ)
-		{
-			FVector DirFromParent = FVector::ZeroVector;
-			float DistFromParent = 0.0f;
-			(CurVerletBone.Location - ParentVerletBone.Location).ToDirectionAndLength(OUT DirFromParent, OUT DistFromParent);
-
-			const float SphereToBoneDist = FMath::Sqrt(SphereToBoneSQ);
-			const FVector SphereToBoneDir = SphereToBoneDist > KINDA_SMALL_NUMBER ? (SphereToBoneVec / SphereToBoneDist) : FVector::ZeroVector;
-			const float PenetrationDepth = ConstraintDistance - SphereToBoneDist;
-			if (bUseXPBDSolver && bFinalize == false)
-			{
-				double& CurLambda = Lambdas[i];
-				const float C = -PenetrationDepth;
-				const double Alpha = Compliance / (DeltaTime * DeltaTime);
-				const double DeltaLambda = -(C + Alpha * CurLambda) / (CurVerletBone.InvMass + ParentVerletBone.InvMass + Alpha);
-				CurLambda += DeltaLambda;
-
-				float ChildMoveAlpha = (ClosestOnBone - ParentVerletBone.Location).Size() / DistFromParent;
-				ChildMoveAlpha = ChildMoveAlpha * (2.0f - ChildMoveAlpha);	///EaseOutQuad for better movement(heuristic center of mass)
-
-				if (ParentVerletBone.IsPinned())
-					ChildMoveAlpha = 1.0f;
-				if (CurVerletBone.IsPinned())
-					ChildMoveAlpha = 0.0f;
-
-				if (ParentVerletBone.IsPinned() == false)
-					ParentVerletBone.Location = ParentVerletBone.Location + (SphereToBoneDir * DeltaLambda * (1.0f - ChildMoveAlpha));
-				if (CurVerletBone.IsPinned() == false)
-					CurVerletBone.Location = CurVerletBone.Location + (SphereToBoneDir * DeltaLambda * ChildMoveAlpha);
-			}
-			else
-			{
-				float ChildMoveAlpha = (ClosestOnBone - ParentVerletBone.Location).Size() / DistFromParent;
-				ChildMoveAlpha = ChildMoveAlpha * (2.0f - ChildMoveAlpha);	///EaseOutQuad for better movement(heuristic center of mass)
-
-				if (ParentVerletBone.IsPinned())
-					ChildMoveAlpha = 1.0f;
-				if (CurVerletBone.IsPinned())
-					ChildMoveAlpha = 0.0f;
-
-				if (ParentVerletBone.IsPinned() == false)
-					ParentVerletBone.Location = ParentVerletBone.Location + (SphereToBoneDir * PenetrationDepth * (1.0f - ChildMoveAlpha));
-				if (CurVerletBone.IsPinned() == false)
-					CurVerletBone.Location = CurVerletBone.Location + (SphereToBoneDir * PenetrationDepth * ChildMoveAlpha);
-			}
-		}
+		CheckSphereCapsule(IN OUT CurVerletBone, IN OUT ParentVerletBone, DeltaTime, bFinalize, i);
 	}
 }
 ///=========================================================================================================================================
@@ -820,6 +828,68 @@ void FLKAnimVerletConstraint_Capsule::CheckCapsuleSphere(float DeltaTime, bool b
 	}
 }
 
+bool FLKAnimVerletConstraint_Capsule::CheckCapsuleCapsule(IN OUT FLKAnimVerletBone& CurVerletBone, IN OUT FLKAnimVerletBone& ParentVerletBone, float DeltaTime, bool bFinalize, const FVector& CapsuleStart, const FVector& CapsuleEnd, int32 LambdaIndex)
+{
+	const float ConstraintDistance = CurVerletBone.Thickness + Radius;
+	const float ConstraintDistanceSQ = FMath::Square(ConstraintDistance);
+
+	FVector DirFromParent = FVector::ZeroVector;
+	float DistFromParent = 0.0f;
+	(CurVerletBone.Location - ParentVerletBone.Location).ToDirectionAndLength(OUT DirFromParent, OUT DistFromParent);
+
+	FVector ClosestOnBone = FVector::ZeroVector;
+	FVector ClosestOnCapsule = FVector::ZeroVector;
+	FMath::SegmentDistToSegment(ParentVerletBone.Location, CurVerletBone.Location, CapsuleStart, CapsuleEnd, OUT ClosestOnBone, OUT ClosestOnCapsule);
+
+	const float CapsuleToBoneSQ = (ClosestOnBone - ClosestOnCapsule).SizeSquared();
+	if (CapsuleToBoneSQ < ConstraintDistanceSQ)
+	{
+		float CapsuleToBoneDist = 0.0f;
+		FVector CapsuleToBoneDir = FVector::ZeroVector;
+		(ClosestOnBone - ClosestOnCapsule).ToDirectionAndLength(OUT CapsuleToBoneDir, OUT CapsuleToBoneDist);
+
+		const float PenetrationDepth = ConstraintDistance - CapsuleToBoneDist;
+		if (bUseXPBDSolver && bFinalize == false)
+		{
+			double& CurLambda = Lambdas[LambdaIndex];
+			const float C = -PenetrationDepth;
+			const double Alpha = Compliance / (DeltaTime * DeltaTime);
+			const double DeltaLambda = -(C + Alpha * CurLambda) / (CurVerletBone.InvMass + ParentVerletBone.InvMass + Alpha);
+			CurLambda += DeltaLambda;
+
+			float ChildMoveAlpha = (ClosestOnBone - ParentVerletBone.Location).Size() / DistFromParent;
+			ChildMoveAlpha = ChildMoveAlpha * (2.0f - ChildMoveAlpha);	///EaseOutQuad for better movement(heuristic center of mass)
+
+			if (ParentVerletBone.IsPinned())
+				ChildMoveAlpha = 1.0f;
+			if (CurVerletBone.IsPinned())
+				ChildMoveAlpha = 0.0f;
+
+			if (ParentVerletBone.IsPinned() == false)
+				ParentVerletBone.Location = ParentVerletBone.Location + (CapsuleToBoneDir * DeltaLambda * (1.0f - ChildMoveAlpha));
+			if (CurVerletBone.IsPinned() == false)
+				CurVerletBone.Location = CurVerletBone.Location + (CapsuleToBoneDir * DeltaLambda * ChildMoveAlpha);
+		}
+		else
+		{
+			float ChildMoveAlpha = (ClosestOnBone - ParentVerletBone.Location).Size() / DistFromParent;
+			ChildMoveAlpha = ChildMoveAlpha * (2.0f - ChildMoveAlpha);	///EaseOutQuad for better movement(heuristic center of mass)
+
+			if (ParentVerletBone.IsPinned())
+				ChildMoveAlpha = 1.0f;
+			if (CurVerletBone.IsPinned())
+				ChildMoveAlpha = 0.0f;
+
+			if (ParentVerletBone.IsPinned() == false)
+				ParentVerletBone.Location = ParentVerletBone.Location + (CapsuleToBoneDir * PenetrationDepth * (1.0f - ChildMoveAlpha));
+			if (CurVerletBone.IsPinned() == false)
+				CurVerletBone.Location = CurVerletBone.Location + (CapsuleToBoneDir * PenetrationDepth * ChildMoveAlpha);
+		}
+		return true;
+	}
+	return false;
+}
+
 void FLKAnimVerletConstraint_Capsule::CheckCapsuleCapsule(float DeltaTime, bool bFinalize)
 {
 	const FVector CapsuleHeightDir = Rotation.GetUpVector();
@@ -843,62 +913,8 @@ void FLKAnimVerletConstraint_Capsule::CheckCapsuleCapsule(float DeltaTime, bool 
 
 		verify(Bones->IsValidIndex(CurPair.BoneA.AnimVerletBoneIndex));
 		FLKAnimVerletBone& ParentVerletBone = (*Bones)[CurPair.BoneA.AnimVerletBoneIndex];
-		const float ConstraintDistance = CurVerletBone.Thickness + Radius;
-		const float ConstraintDistanceSQ = FMath::Square(ConstraintDistance);
-
-		FVector DirFromParent = FVector::ZeroVector;
-		float DistFromParent = 0.0f;
-		(CurVerletBone.Location - ParentVerletBone.Location).ToDirectionAndLength(OUT DirFromParent, OUT DistFromParent);
-
-		FVector ClosestOnBone = FVector::ZeroVector;
-		FVector ClosestOnCapsule = FVector::ZeroVector;
-		FMath::SegmentDistToSegment(ParentVerletBone.Location, CurVerletBone.Location, CapsuleStart, CapsuleEnd, OUT ClosestOnBone, OUT ClosestOnCapsule);
-
-		const float CapsuleToBoneSQ = (ClosestOnBone - ClosestOnCapsule).SizeSquared();
-		if (CapsuleToBoneSQ < ConstraintDistanceSQ)
-		{
-			float CapsuleToBoneDist = 0.0f;
-			FVector CapsuleToBoneDir = FVector::ZeroVector;
-			(ClosestOnBone - ClosestOnCapsule).ToDirectionAndLength(OUT CapsuleToBoneDir, OUT CapsuleToBoneDist);
-
-			const float PenetrationDepth = ConstraintDistance - CapsuleToBoneDist;
-			if (bUseXPBDSolver && bFinalize == false)
-			{
-				double& CurLambda = Lambdas[i];
-				const float C = -PenetrationDepth;
-				const double Alpha = Compliance / (DeltaTime * DeltaTime);
-				const double DeltaLambda = -(C + Alpha * CurLambda) / (CurVerletBone.InvMass + ParentVerletBone.InvMass + Alpha);
-				CurLambda += DeltaLambda;
-
-				float ChildMoveAlpha = (ClosestOnBone - ParentVerletBone.Location).Size() / DistFromParent;
-				ChildMoveAlpha = ChildMoveAlpha * (2.0f - ChildMoveAlpha);	///EaseOutQuad for better movement(heuristic center of mass)
-
-				if (ParentVerletBone.IsPinned())
-					ChildMoveAlpha = 1.0f;
-				if (CurVerletBone.IsPinned())
-					ChildMoveAlpha = 0.0f;
-
-				if (ParentVerletBone.IsPinned() == false)
-					ParentVerletBone.Location = ParentVerletBone.Location + (CapsuleToBoneDir * DeltaLambda * (1.0f - ChildMoveAlpha));
-				if (CurVerletBone.IsPinned() == false)
-					CurVerletBone.Location = CurVerletBone.Location + (CapsuleToBoneDir * DeltaLambda * ChildMoveAlpha);
-			}
-			else
-			{
-				float ChildMoveAlpha = (ClosestOnBone - ParentVerletBone.Location).Size() / DistFromParent;
-				ChildMoveAlpha = ChildMoveAlpha * (2.0f - ChildMoveAlpha);	///EaseOutQuad for better movement(heuristic center of mass)
-
-				if (ParentVerletBone.IsPinned())
-					ChildMoveAlpha = 1.0f;
-				if (CurVerletBone.IsPinned())
-					ChildMoveAlpha = 0.0f;
-
-				if (ParentVerletBone.IsPinned() == false)
-					ParentVerletBone.Location = ParentVerletBone.Location + (CapsuleToBoneDir * PenetrationDepth * (1.0f - ChildMoveAlpha));
-				if (CurVerletBone.IsPinned() == false)
-					CurVerletBone.Location = CurVerletBone.Location + (CapsuleToBoneDir * PenetrationDepth * ChildMoveAlpha);
-			}
-		}
+		
+		CheckCapsuleCapsule(CurVerletBone, ParentVerletBone, DeltaTime, bFinalize, CapsuleStart, CapsuleEnd, i);
 	}
 }
 ///=========================================================================================================================================
@@ -1071,6 +1087,186 @@ void FLKAnimVerletConstraint_Box::CheckBoxSphere(float DeltaTime, bool bFinalize
 	}
 }
 
+bool FLKAnimVerletConstraint_Box::CheckBoxCapsule(IN OUT FLKAnimVerletBone& CurVerletBone, IN OUT FLKAnimVerletBone& ParentVerletBone, float DeltaTime, bool bFinalize, const FQuat& InvRotation, int32 LambdaIndex)
+{
+	const FVector ParentBoneLocationInBoxLocal = InvRotation.RotateVector(ParentVerletBone.Location - Location);
+	const FVector CurBoneLocationInBoxLocal = InvRotation.RotateVector(CurVerletBone.Location - Location);
+
+	FVector ClosestDummyOnBone = FVector::ZeroVector;
+	FVector ClosestX = FVector::ZeroVector;
+	FMath::SegmentDistToSegment(-FVector::XAxisVector * HalfExtents.X, FVector::XAxisVector * HalfExtents.X, CurBoneLocationInBoxLocal, ParentBoneLocationInBoxLocal, OUT ClosestX, OUT ClosestDummyOnBone);
+
+	FVector ClosestY = FVector::ZeroVector;
+	FMath::SegmentDistToSegment(-FVector::YAxisVector * HalfExtents.Y, FVector::YAxisVector * HalfExtents.Y, CurBoneLocationInBoxLocal, ParentBoneLocationInBoxLocal, OUT ClosestY, OUT ClosestDummyOnBone);
+
+	FVector ClosestZ = FVector::ZeroVector;
+	FMath::SegmentDistToSegment(-FVector::ZAxisVector * HalfExtents.Z, FVector::ZAxisVector * HalfExtents.Z, CurBoneLocationInBoxLocal, ParentBoneLocationInBoxLocal, OUT ClosestZ, OUT ClosestDummyOnBone);
+
+	const FVector ClosestOnBoxLocal(ClosestX.X, ClosestY.Y, ClosestZ.Z);
+	const FVector ClosestOnBoneLocal = FMath::ClosestPointOnSegment(ClosestOnBoxLocal, CurBoneLocationInBoxLocal, ParentBoneLocationInBoxLocal);
+
+	float PenetrationDepth = 0.0f;
+	FVector CollisionNormal = FVector::ZeroVector;
+	if (IntersectOriginAabbSphere(OUT CollisionNormal, OUT PenetrationDepth, CurVerletBone, ClosestOnBoneLocal))
+	{
+		CollisionNormal = Rotation.RotateVector(CollisionNormal);
+		const FVector ClosestOnBone = Rotation.RotateVector(ClosestOnBoneLocal) + Location;
+
+		FVector DirFromParent = FVector::ZeroVector;
+		float DistFromParent = 0.0f;
+		(CurVerletBone.Location - ParentVerletBone.Location).ToDirectionAndLength(OUT DirFromParent, OUT DistFromParent);
+
+		if (bUseXPBDSolver && bFinalize == false)
+		{
+			double& CurLambda = Lambdas[LambdaIndex];
+			const float C = -PenetrationDepth;
+			const double Alpha = Compliance / (DeltaTime * DeltaTime);
+			const double DeltaLambda = -(C + Alpha * CurLambda) / (CurVerletBone.InvMass + ParentVerletBone.InvMass + Alpha);
+			CurLambda += DeltaLambda;
+
+			float ChildMoveAlpha = (ClosestOnBone - ParentVerletBone.Location).Size() / DistFromParent;
+			ChildMoveAlpha = ChildMoveAlpha * (2.0f - ChildMoveAlpha);	///EaseOutQuad for better movement(heuristic center of mass)
+
+			if (ParentVerletBone.IsPinned())
+				ChildMoveAlpha = 1.0f;
+			if (CurVerletBone.IsPinned())
+				ChildMoveAlpha = 0.0f;
+
+			if (ParentVerletBone.IsPinned() == false)
+				ParentVerletBone.Location = ParentVerletBone.Location + (CollisionNormal * DeltaLambda * (1.0f - ChildMoveAlpha));
+			if (CurVerletBone.IsPinned() == false)
+				CurVerletBone.Location = CurVerletBone.Location + (CollisionNormal * DeltaLambda * ChildMoveAlpha);
+		}
+		else
+		{
+			float ChildMoveAlpha = (ClosestOnBone - ParentVerletBone.Location).Size() / DistFromParent;
+			ChildMoveAlpha = ChildMoveAlpha * (2.0f - ChildMoveAlpha);	///EaseOutQuad for better movement(heuristic center of mass)
+
+			if (ParentVerletBone.IsPinned())
+				ChildMoveAlpha = 1.0f;
+			if (CurVerletBone.IsPinned())
+				ChildMoveAlpha = 0.0f;
+
+			if (ParentVerletBone.IsPinned() == false)
+				ParentVerletBone.Location = ParentVerletBone.Location + (CollisionNormal * PenetrationDepth * (1.0f - ChildMoveAlpha));
+			if (CurVerletBone.IsPinned() == false)
+				CurVerletBone.Location = CurVerletBone.Location + (CollisionNormal * PenetrationDepth * ChildMoveAlpha);
+		}
+		return true;
+	}
+	return false;
+}
+
+bool FLKAnimVerletConstraint_Box::CheckBoxBox(IN OUT FLKAnimVerletBone& CurVerletBone, IN OUT FLKAnimVerletBone& ParentVerletBone, float DeltaTime, bool bFinalize, const FQuat& InvRotation, int32 LambdaIndex)
+{
+	/// Consider BoneLine to OBB
+	FVector DirFromParent = FVector::ZeroVector;
+	float DistFromParent = 0.0f;
+	(CurVerletBone.Location - ParentVerletBone.Location).ToDirectionAndLength(OUT DirFromParent, OUT DistFromParent);
+	const FVector BoneBoxLocation = (CurVerletBone.Location + ParentVerletBone.Location) * 0.5f;
+
+	const FVector BoxAxisX = Rotation.GetAxisX();
+	const FVector BoxAxisY = Rotation.GetAxisY();
+	const FVector BoxAxisZ = Rotation.GetAxisZ();
+	const FVector BoxAxes[3]{ BoxAxisX, BoxAxisY, BoxAxisZ };
+
+	const FQuat BoneBoxQuat = FRotationMatrix::MakeFromZ(DirFromParent).ToQuat();
+	const FVector BoneBoxAxisX = BoneBoxQuat.GetAxisX();
+	const FVector BoneBoxAxisY = BoneBoxQuat.GetAxisY();
+	const FVector BoneBoxAxisZ = BoneBoxQuat.GetAxisZ();
+	const FVector BoneBoxAxes[3]{ BoneBoxAxisX, BoneBoxAxisY, BoneBoxAxisZ };
+	const FVector BoneBoxHalfExtents(CurVerletBone.Thickness, CurVerletBone.Thickness, (DistFromParent * 0.5f + CurVerletBone.Thickness));
+
+	const FVector SATAxes[15] = { BoxAxisX, BoxAxisY, BoxAxisZ, BoneBoxAxisX, BoneBoxAxisY, BoneBoxAxisZ,
+		BoxAxisX.Cross(BoneBoxAxisX), BoxAxisX.Cross(BoneBoxAxisY), BoxAxisX.Cross(BoneBoxAxisZ),
+		BoxAxisY.Cross(BoneBoxAxisX), BoxAxisY.Cross(BoneBoxAxisY), BoxAxisY.Cross(BoneBoxAxisZ),
+		BoxAxisZ.Cross(BoneBoxAxisX), BoxAxisZ.Cross(BoneBoxAxisY), BoxAxisZ.Cross(BoneBoxAxisZ) };
+
+	bool bNoCollision = false;
+	float PenetrationDepth = TNumericLimits<float>::Max();
+	FVector CollisionNormal = FVector::ZeroVector;
+	for (const FVector& CurAxis : SATAxes)
+	{
+		if (FMath::IsNearlyZero(CurAxis.SizeSquared(), KINDA_SMALL_NUMBER))
+			continue;
+
+		const FVector NormalizedAxis = CurAxis.GetSafeNormal();
+
+		float ProjA = 0.0f;
+		for (int32 CurAxisI = 0; CurAxisI < 3; ++CurAxisI)
+		{
+			ProjA += FMath::Abs((BoxAxes[CurAxisI] * HalfExtents[CurAxisI]).Dot(NormalizedAxis));
+		}
+
+		float ProjB = 0.0f;
+		for (int32 CurAxisI = 0; CurAxisI < 3; ++CurAxisI)
+		{
+			ProjB += FMath::Abs((BoneBoxAxes[CurAxisI] * BoneBoxHalfExtents[CurAxisI]).Dot(NormalizedAxis));
+		}
+
+		const float Distance = (BoneBoxLocation - Location).Dot(NormalizedAxis);
+		const float Overlap = ProjA + ProjB - FMath::Abs(Distance);
+
+		if (Overlap <= 0.0f)
+		{
+			bNoCollision = true;
+			break;
+		}
+
+		if (Overlap < PenetrationDepth)
+		{
+			PenetrationDepth = Overlap;
+			CollisionNormal = Distance < 0.0f ? -NormalizedAxis : NormalizedAxis;
+		}
+	}
+
+	if (bNoCollision)
+		return false;
+
+	///const FVector ContactPointBox = Location + CollisionNormal * (HalfExtents.X + HalfExtents.Y + HalfExtents.Z);
+	const FVector ContactPointBone = BoneBoxLocation - CollisionNormal * (BoneBoxHalfExtents.X + BoneBoxHalfExtents.Y + BoneBoxHalfExtents.Z);
+	const FVector ClosestOnBone = FMath::ClosestPointOnSegment(ContactPointBone, CurVerletBone.Location, ParentVerletBone.Location);
+	{
+		if (bUseXPBDSolver && bFinalize == false)
+		{
+			double& CurLambda = Lambdas[LambdaIndex];
+			const float C = -PenetrationDepth;
+			const double Alpha = Compliance / (DeltaTime * DeltaTime);
+			const double DeltaLambda = -(C + Alpha * CurLambda) / (CurVerletBone.InvMass + ParentVerletBone.InvMass + Alpha);
+			CurLambda += DeltaLambda;
+
+			float ChildMoveAlpha = (ClosestOnBone - ParentVerletBone.Location).Size() / DistFromParent;
+			ChildMoveAlpha = ChildMoveAlpha * (2.0f - ChildMoveAlpha);	///EaseOutQuad for better movement(heuristic center of mass)
+
+			if (ParentVerletBone.IsPinned())
+				ChildMoveAlpha = 1.0f;
+			if (CurVerletBone.IsPinned())
+				ChildMoveAlpha = 0.0f;
+
+			if (ParentVerletBone.IsPinned() == false)
+				ParentVerletBone.Location = ParentVerletBone.Location + (CollisionNormal * DeltaLambda * (1.0f - ChildMoveAlpha));
+			if (CurVerletBone.IsPinned() == false)
+				CurVerletBone.Location = CurVerletBone.Location + (CollisionNormal * DeltaLambda * ChildMoveAlpha);
+		}
+		else
+		{
+			float ChildMoveAlpha = (ClosestOnBone - ParentVerletBone.Location).Size() / DistFromParent;
+			ChildMoveAlpha = ChildMoveAlpha * (2.0f - ChildMoveAlpha);	///EaseOutQuad for better movement(heuristic center of mass)
+
+			if (ParentVerletBone.IsPinned())
+				ChildMoveAlpha = 1.0f;
+			if (CurVerletBone.IsPinned())
+				ChildMoveAlpha = 0.0f;
+
+			if (ParentVerletBone.IsPinned() == false)
+				ParentVerletBone.Location = ParentVerletBone.Location + (CollisionNormal * PenetrationDepth * (1.0f - ChildMoveAlpha));
+			if (CurVerletBone.IsPinned() == false)
+				CurVerletBone.Location = CurVerletBone.Location + (CollisionNormal * PenetrationDepth * ChildMoveAlpha);
+		}
+	}
+	return true;
+}
+
 void FLKAnimVerletConstraint_Box::CheckBoxCapsule(float DeltaTime, bool bFinalize)
 {
 	/// OBB - Capsule version
@@ -1093,198 +1289,12 @@ void FLKAnimVerletConstraint_Box::CheckBoxCapsule(float DeltaTime, bool bFinaliz
 		verify(Bones->IsValidIndex(CurPair.BoneA.AnimVerletBoneIndex));
 		FLKAnimVerletBone& ParentVerletBone = (*Bones)[CurPair.BoneA.AnimVerletBoneIndex];
 
-		const FVector ParentBoneLocationInBoxLocal = InvRotation.RotateVector(ParentVerletBone.Location - Location);
-		const FVector CurBoneLocationInBoxLocal = InvRotation.RotateVector(CurVerletBone.Location - Location);
+		CheckBoxCapsule(IN OUT CurVerletBone, IN OUT ParentVerletBone, DeltaTime, bFinalize, InvRotation, i);
 
-		FVector ClosestDummyOnBone = FVector::ZeroVector;
-		FVector ClosestX = FVector::ZeroVector;
-		FMath::SegmentDistToSegment(-FVector::XAxisVector * HalfExtents.X, FVector::XAxisVector * HalfExtents.X, CurBoneLocationInBoxLocal, ParentBoneLocationInBoxLocal, OUT ClosestX, OUT ClosestDummyOnBone);
-
-		FVector ClosestY = FVector::ZeroVector;
-		FMath::SegmentDistToSegment(-FVector::YAxisVector * HalfExtents.Y, FVector::YAxisVector * HalfExtents.Y, CurBoneLocationInBoxLocal, ParentBoneLocationInBoxLocal, OUT ClosestY, OUT ClosestDummyOnBone);
-
-		FVector ClosestZ = FVector::ZeroVector;
-		FMath::SegmentDistToSegment(-FVector::ZAxisVector * HalfExtents.Z, FVector::ZAxisVector * HalfExtents.Z, CurBoneLocationInBoxLocal, ParentBoneLocationInBoxLocal, OUT ClosestZ, OUT ClosestDummyOnBone);
-
-		const FVector ClosestOnBoxLocal(ClosestX.X, ClosestY.Y, ClosestZ.Z);
-		const FVector ClosestOnBoneLocal = FMath::ClosestPointOnSegment(ClosestOnBoxLocal, CurBoneLocationInBoxLocal, ParentBoneLocationInBoxLocal);
-
-		float PenetrationDepth = 0.0f;
-		FVector CollisionNormal = FVector::ZeroVector;
-		if (IntersectOriginAabbSphere(OUT CollisionNormal, OUT PenetrationDepth, CurVerletBone, ClosestOnBoneLocal))
-		{
-			CollisionNormal = Rotation.RotateVector(CollisionNormal);
-			const FVector ClosestOnBone = Rotation.RotateVector(ClosestOnBoneLocal) + Location;
-
-			FVector DirFromParent = FVector::ZeroVector;
-			float DistFromParent = 0.0f;
-			(CurVerletBone.Location - ParentVerletBone.Location).ToDirectionAndLength(OUT DirFromParent, OUT DistFromParent);
-
-			if (bUseXPBDSolver && bFinalize == false)
-			{
-				double& CurLambda = Lambdas[i];
-				const float C = -PenetrationDepth;
-				const double Alpha = Compliance / (DeltaTime * DeltaTime);
-				const double DeltaLambda = -(C + Alpha * CurLambda) / (CurVerletBone.InvMass + ParentVerletBone.InvMass + Alpha);
-				CurLambda += DeltaLambda;
-
-				float ChildMoveAlpha = (ClosestOnBone - ParentVerletBone.Location).Size() / DistFromParent;
-				ChildMoveAlpha = ChildMoveAlpha * (2.0f - ChildMoveAlpha);	///EaseOutQuad for better movement(heuristic center of mass)
-
-				if (ParentVerletBone.IsPinned())
-					ChildMoveAlpha = 1.0f;
-				if (CurVerletBone.IsPinned())
-					ChildMoveAlpha = 0.0f;
-
-				if (ParentVerletBone.IsPinned() == false)
-					ParentVerletBone.Location = ParentVerletBone.Location + (CollisionNormal * DeltaLambda * (1.0f - ChildMoveAlpha));
-				if (CurVerletBone.IsPinned() == false)
-					CurVerletBone.Location = CurVerletBone.Location + (CollisionNormal * DeltaLambda * ChildMoveAlpha);
-			}
-			else
-			{
-				float ChildMoveAlpha = (ClosestOnBone - ParentVerletBone.Location).Size() / DistFromParent;
-				ChildMoveAlpha = ChildMoveAlpha * (2.0f - ChildMoveAlpha);	///EaseOutQuad for better movement(heuristic center of mass)
-
-				if (ParentVerletBone.IsPinned())
-					ChildMoveAlpha = 1.0f;
-				if (CurVerletBone.IsPinned())
-					ChildMoveAlpha = 0.0f;
-
-				if (ParentVerletBone.IsPinned() == false)
-					ParentVerletBone.Location = ParentVerletBone.Location + (CollisionNormal * PenetrationDepth * (1.0f - ChildMoveAlpha));
-				if (CurVerletBone.IsPinned() == false)
-					CurVerletBone.Location = CurVerletBone.Location + (CollisionNormal * PenetrationDepth * ChildMoveAlpha);
-			}
-		}
-	}
-
-	/// OBB - OBB version
-	/*const FQuat InvRotation = Rotation.Inverse();
-	for (int32 i = 0; i < BonePairs->Num(); ++i)
-	{
-		const FLKAnimVerletBoneIndicatorPair& CurPair = (*BonePairs)[i];
-		if (ExcludeBones.IsValidIndex(CurPair.BoneB.AnimVerletBoneIndex) && ExcludeBones[CurPair.BoneB.AnimVerletBoneIndex])
-			continue;
-
-		verify(CurPair.BoneB.IsValidBoneIndicator());
-		verify(Bones->IsValidIndex(CurPair.BoneB.AnimVerletBoneIndex));
-		FLKAnimVerletBone& CurVerletBone = (*Bones)[CurPair.BoneB.AnimVerletBoneIndex];
-		if (CurPair.BoneA.IsValidBoneIndicator() == false || CurVerletBone.bOverrideToUseSphereCollisionForChain)
-		{
-			CheckBoxSphere(IN OUT CurVerletBone, DeltaTime, bFinalize, CurVerletBone.Location, InvRotation, i);
-			continue;
-		}
-
-		verify(Bones->IsValidIndex(CurPair.BoneA.AnimVerletBoneIndex));
-		FLKAnimVerletBone& ParentVerletBone = (*Bones)[CurPair.BoneA.AnimVerletBoneIndex];
-
+		/// OBB - OBB version
 		/// Consider BoneLine to OBB
-		FVector DirFromParent = FVector::ZeroVector;
-		float DistFromParent = 0.0f;
-		(CurVerletBone.Location - ParentVerletBone.Location).ToDirectionAndLength(OUT DirFromParent, OUT DistFromParent);
-		const FVector BoneBoxLocation = (CurVerletBone.Location + ParentVerletBone.Location) * 0.5f;
-
-		const FVector BoxAxisX = Rotation.GetAxisX();
-		const FVector BoxAxisY = Rotation.GetAxisY();
-		const FVector BoxAxisZ = Rotation.GetAxisZ();
-		const FVector BoxAxes[3]{ BoxAxisX, BoxAxisY, BoxAxisZ };
-
-		const FQuat BoneBoxQuat = FRotationMatrix::MakeFromZ(DirFromParent).ToQuat();
-		const FVector BoneBoxAxisX = BoneBoxQuat.GetAxisX();
-		const FVector BoneBoxAxisY = BoneBoxQuat.GetAxisY();
-		const FVector BoneBoxAxisZ = BoneBoxQuat.GetAxisZ();
-		const FVector BoneBoxAxes[3]{ BoneBoxAxisX, BoneBoxAxisY, BoneBoxAxisZ };
-		const FVector BoneBoxHalfExtents(CurVerletBone.Thickness, CurVerletBone.Thickness, (DistFromParent + 2.0f * CurVerletBone.Thickness));
-
-		const FVector SATAxes[15] = { BoxAxisX, BoxAxisY, BoxAxisZ, BoneBoxAxisX, BoneBoxAxisY, BoneBoxAxisZ, 
-			BoxAxisX.Cross(BoneBoxAxisX), BoxAxisX.Cross(BoneBoxAxisY), BoxAxisX.Cross(BoneBoxAxisZ),
-			BoxAxisY.Cross(BoneBoxAxisX), BoxAxisY.Cross(BoneBoxAxisY), BoxAxisY.Cross(BoneBoxAxisZ),
-			BoxAxisZ.Cross(BoneBoxAxisX), BoxAxisZ.Cross(BoneBoxAxisY), BoxAxisZ.Cross(BoneBoxAxisZ) };
-
-		bool bNoCollision = false;
-		float PenetrationDepth = TNumericLimits<float>::Max();
-		FVector CollisionNormal = FVector::ZeroVector;
-		for (const FVector& CurAxis : SATAxes)
-		{
-			if (FMath::IsNearlyZero(CurAxis.SizeSquared(), KINDA_SMALL_NUMBER))
-				continue;
-
-			const FVector NormalizedAxis = CurAxis.GetSafeNormal();
-
-			float ProjA = 0.0f;
-			for (int32 CurAxisI = 0; CurAxisI < 3; ++CurAxisI)
-			{
-				ProjA += FMath::Abs((BoxAxes[CurAxisI] * HalfExtents[CurAxisI]).Dot(NormalizedAxis));
-			}
-
-			float ProjB = 0.0f;
-			for (int32 CurAxisI = 0; CurAxisI < 3; ++CurAxisI)
-			{
-				ProjB += FMath::Abs((BoneBoxAxes[CurAxisI] * BoneBoxHalfExtents[CurAxisI]).Dot(NormalizedAxis));
-			}
-
-			const float Distance = (BoneBoxLocation - Location).Dot(NormalizedAxis);
-			const float Overlap = ProjA + ProjB - FMath::Abs(Distance);
-
-			if (Overlap <= 0.0f)
-			{
-				bNoCollision = true;
-				break;
-			}
-
-			if (Overlap < PenetrationDepth) 
-			{
-				PenetrationDepth = Overlap;
-				CollisionNormal = Distance < 0.0f ? -NormalizedAxis : NormalizedAxis;
-			}
-		}
-
-		if (bNoCollision)
-			continue;
-
-		///const FVector ContactPointBox = Location + CollisionNormal * (HalfExtents.X + HalfExtents.Y + HalfExtents.Z);
-		const FVector ContactPointBone = BoneBoxLocation - CollisionNormal * (BoneBoxHalfExtents.X + BoneBoxHalfExtents.Y + BoneBoxHalfExtents.Z);
-		const FVector ClosestOnBone = FMath::ClosestPointOnSegment(ContactPointBone, CurVerletBone.Location, ParentVerletBone.Location);
-		{
-			if (bUseXPBDSolver && bFinalize == false)
-			{
-				double& CurLambda = Lambdas[i];
-				const float C = -PenetrationDepth;
-				const double Alpha = Compliance / (DeltaTime * DeltaTime);
-				const double DeltaLambda = -(C + Alpha * CurLambda) / (CurVerletBone.InvMass + ParentVerletBone.InvMass + Alpha);
-				CurLambda += DeltaLambda;
-
-				float ChildMoveAlpha = (ClosestOnBone - ParentVerletBone.Location).Size() / DistFromParent;
-				ChildMoveAlpha = ChildMoveAlpha * (2.0f - ChildMoveAlpha);	///EaseOutQuad for better movement(heuristic center of mass)
-
-				if (ParentVerletBone.IsPinned())
-					ChildMoveAlpha = 1.0f;
-				if (CurVerletBone.IsPinned())
-					ChildMoveAlpha = 0.0f;
-
-				if (ParentVerletBone.IsPinned() == false)
-					ParentVerletBone.Location = ParentVerletBone.Location + (CollisionNormal * DeltaLambda * (1.0f - ChildMoveAlpha));
-				if (CurVerletBone.IsPinned() == false)
-					CurVerletBone.Location = CurVerletBone.Location + (CollisionNormal * DeltaLambda * ChildMoveAlpha);
-			}
-			else
-			{
-				float ChildMoveAlpha = (ClosestOnBone - ParentVerletBone.Location).Size() / DistFromParent;
-				ChildMoveAlpha = ChildMoveAlpha * (2.0f - ChildMoveAlpha);	///EaseOutQuad for better movement(heuristic center of mass)
-
-				if (ParentVerletBone.IsPinned())
-					ChildMoveAlpha = 1.0f;
-				if (CurVerletBone.IsPinned())
-					ChildMoveAlpha = 0.0f;
-
-				if (ParentVerletBone.IsPinned() == false)
-					ParentVerletBone.Location = ParentVerletBone.Location + (CollisionNormal * PenetrationDepth * (1.0f - ChildMoveAlpha));
-				if (CurVerletBone.IsPinned() == false)
-					CurVerletBone.Location = CurVerletBone.Location + (CollisionNormal * PenetrationDepth * ChildMoveAlpha);
-			}
-		}
-	}*/
+		///CheckBoxBox(IN OUT CurVerletBone, IN OUT ParentVerletBone, DeltaTime, bFinalize, InvRotation, i);
+	}
 }
 ///=========================================================================================================================================
 
@@ -1396,6 +1406,76 @@ void FLKAnimVerletConstraint_Plane::CheckPlaneSphere(float DeltaTime, bool bFina
 	}
 }
 
+bool FLKAnimVerletConstraint_Plane::CheckPlaneCapsule(IN OUT FLKAnimVerletBone& CurVerletBone, IN OUT FLKAnimVerletBone& ParentVerletBone, float DeltaTime, bool bFinalize, bool bFinitePlane, const FQuat& InvRotation, int32 LambdaIndex)
+{
+	FVector DirFromParent = FVector::ZeroVector;
+	float DistFromParent = 0.0f;
+	(CurVerletBone.Location - ParentVerletBone.Location).ToDirectionAndLength(OUT DirFromParent, OUT DistFromParent);
+	const FVector VerletBoneCenter = (CurVerletBone.Location + ParentVerletBone.Location) * 0.5f;
+
+	FVector ClosestOnBone = FVector::ZeroVector;
+	const float CapsuleDotPlane = DirFromParent.Dot(PlaneNormal);
+	if (FMath::IsNearlyZero(CapsuleDotPlane, KINDA_SMALL_NUMBER))
+		ClosestOnBone = VerletBoneCenter;
+	else if (CapsuleDotPlane < 0.0f)
+		ClosestOnBone = CurVerletBone.Location;
+	else
+		ClosestOnBone = ParentVerletBone.Location;
+
+	const float DistToPlane = FVector::PointPlaneDist(ClosestOnBone, PlaneBase, PlaneNormal);
+	if (DistToPlane < CurVerletBone.Thickness)
+	{
+		if (bFinitePlane)
+		{
+			const FVector ProjectedLocationOnPlane = ClosestOnBone - (DistToPlane * PlaneNormal);
+			const FVector BoneLocationInPlaneLocal = InvRotation.RotateVector(ProjectedLocationOnPlane - PlaneBase);
+			if (BoneLocationInPlaneLocal.X > PlaneHalfExtents.X + CurVerletBone.Thickness || BoneLocationInPlaneLocal.X < -PlaneHalfExtents.X + CurVerletBone.Thickness ||
+				BoneLocationInPlaneLocal.Y > PlaneHalfExtents.Y + CurVerletBone.Thickness || BoneLocationInPlaneLocal.Y < -PlaneHalfExtents.Y + CurVerletBone.Thickness)
+				return false;
+		}
+
+		const float PenetrationDepth = (CurVerletBone.Thickness - DistToPlane);
+		if (bUseXPBDSolver && bFinalize == false)
+		{
+			double& CurLambda = Lambdas[LambdaIndex];
+			const float C = -PenetrationDepth;
+			const double Alpha = Compliance / (DeltaTime * DeltaTime);
+			const double DeltaLambda = -(C + Alpha * CurLambda) / (CurVerletBone.InvMass + ParentVerletBone.InvMass + Alpha);
+			CurLambda += DeltaLambda;
+
+			float ChildMoveAlpha = (ClosestOnBone - ParentVerletBone.Location).Size() / DistFromParent;
+			ChildMoveAlpha = ChildMoveAlpha * (2.0f - ChildMoveAlpha);	///EaseOutQuad for better movement(heuristic center of mass)
+
+			if (ParentVerletBone.IsPinned())
+				ChildMoveAlpha = 1.0f;
+			if (CurVerletBone.IsPinned())
+				ChildMoveAlpha = 0.0f;
+
+			if (ParentVerletBone.IsPinned() == false)
+				ParentVerletBone.Location = ParentVerletBone.Location + (PlaneNormal * DeltaLambda * (1.0f - ChildMoveAlpha));
+			if (CurVerletBone.IsPinned() == false)
+				CurVerletBone.Location = CurVerletBone.Location + (PlaneNormal * DeltaLambda * ChildMoveAlpha);
+		}
+		else
+		{
+			float ChildMoveAlpha = (ClosestOnBone - ParentVerletBone.Location).Size() / DistFromParent;
+			ChildMoveAlpha = ChildMoveAlpha * (2.0f - ChildMoveAlpha);	///EaseOutQuad for better movement(heuristic center of mass)
+
+			if (ParentVerletBone.IsPinned())
+				ChildMoveAlpha = 1.0f;
+			if (CurVerletBone.IsPinned())
+				ChildMoveAlpha = 0.0f;
+
+			if (ParentVerletBone.IsPinned() == false)
+				ParentVerletBone.Location = ParentVerletBone.Location + (PlaneNormal * PenetrationDepth * (1.0f - ChildMoveAlpha));
+			if (CurVerletBone.IsPinned() == false)
+				CurVerletBone.Location = CurVerletBone.Location + (PlaneNormal * PenetrationDepth * ChildMoveAlpha);
+		}
+		return true;
+	}
+	return false;
+}
+
 void FLKAnimVerletConstraint_Plane::CheckPlaneCapsule(float DeltaTime, bool bFinalize)
 {
 	const bool bFinitePlane = (PlaneHalfExtents.IsNearlyZero() == false);
@@ -1418,70 +1498,7 @@ void FLKAnimVerletConstraint_Plane::CheckPlaneCapsule(float DeltaTime, bool bFin
 		verify(Bones->IsValidIndex(CurPair.BoneA.AnimVerletBoneIndex));
 		FLKAnimVerletBone& ParentVerletBone = (*Bones)[CurPair.BoneA.AnimVerletBoneIndex];
 
-		FVector DirFromParent = FVector::ZeroVector;
-		float DistFromParent = 0.0f;
-		(CurVerletBone.Location - ParentVerletBone.Location).ToDirectionAndLength(OUT DirFromParent, OUT DistFromParent);
-		const FVector VerletBoneCenter = (CurVerletBone.Location + ParentVerletBone.Location) * 0.5f;
-
-		FVector ClosestOnBone = FVector::ZeroVector;
-		const float CapsuleDotPlane = DirFromParent.Dot(PlaneNormal);
-		if (FMath::IsNearlyZero(CapsuleDotPlane, KINDA_SMALL_NUMBER))
-			ClosestOnBone = VerletBoneCenter;
-		else if (CapsuleDotPlane < 0.0f)
-			ClosestOnBone = CurVerletBone.Location;
-		else
-			ClosestOnBone = ParentVerletBone.Location;
-
-		const float DistToPlane = FVector::PointPlaneDist(ClosestOnBone, PlaneBase, PlaneNormal);
-		if (DistToPlane < CurVerletBone.Thickness)
-		{
-			if (bFinitePlane)
-			{
-				const FVector ProjectedLocationOnPlane = ClosestOnBone - (DistToPlane * PlaneNormal);
-				const FVector BoneLocationInPlaneLocal = InvRotation.RotateVector(ProjectedLocationOnPlane - PlaneBase);
-				if (BoneLocationInPlaneLocal.X > PlaneHalfExtents.X + CurVerletBone.Thickness || BoneLocationInPlaneLocal.X < -PlaneHalfExtents.X + CurVerletBone.Thickness ||
-					BoneLocationInPlaneLocal.Y > PlaneHalfExtents.Y + CurVerletBone.Thickness || BoneLocationInPlaneLocal.Y < -PlaneHalfExtents.Y + CurVerletBone.Thickness)
-					continue;
-			}
-
-			const float PenetrationDepth = (CurVerletBone.Thickness - DistToPlane);
-			if (bUseXPBDSolver && bFinalize == false)
-			{
-				double& CurLambda = Lambdas[i];
-				const float C = -PenetrationDepth;
-				const double Alpha = Compliance / (DeltaTime * DeltaTime);
-				const double DeltaLambda = -(C + Alpha * CurLambda) / (CurVerletBone.InvMass + ParentVerletBone.InvMass + Alpha);
-				CurLambda += DeltaLambda;
-			
-				float ChildMoveAlpha = (ClosestOnBone - ParentVerletBone.Location).Size() / DistFromParent;
-				ChildMoveAlpha = ChildMoveAlpha * (2.0f - ChildMoveAlpha);	///EaseOutQuad for better movement(heuristic center of mass)
-			
-				if (ParentVerletBone.IsPinned())
-					ChildMoveAlpha = 1.0f;
-				if (CurVerletBone.IsPinned())
-					ChildMoveAlpha = 0.0f;
-
-				if (ParentVerletBone.IsPinned() == false)
-					ParentVerletBone.Location = ParentVerletBone.Location + (PlaneNormal * DeltaLambda * (1.0f - ChildMoveAlpha));
-				if (CurVerletBone.IsPinned() == false)
-					CurVerletBone.Location = CurVerletBone.Location + (PlaneNormal * DeltaLambda * ChildMoveAlpha);
-			}
-			else
-			{
-				float ChildMoveAlpha = (ClosestOnBone - ParentVerletBone.Location).Size() / DistFromParent;
-				ChildMoveAlpha = ChildMoveAlpha * (2.0f - ChildMoveAlpha);	///EaseOutQuad for better movement(heuristic center of mass)
-
-				if (ParentVerletBone.IsPinned())
-					ChildMoveAlpha = 1.0f;
-				if (CurVerletBone.IsPinned())
-					ChildMoveAlpha = 0.0f;
-
-				if (ParentVerletBone.IsPinned() == false)
-					ParentVerletBone.Location = ParentVerletBone.Location + (PlaneNormal * PenetrationDepth * (1.0f - ChildMoveAlpha));
-				if (CurVerletBone.IsPinned() == false)
-					CurVerletBone.Location = CurVerletBone.Location + (PlaneNormal * PenetrationDepth * ChildMoveAlpha);
-			}
-		}
+		CheckPlaneCapsule(IN OUT CurVerletBone, IN OUT ParentVerletBone, DeltaTime, bFinalize, bFinitePlane, InvRotation, i);
 	}
 }
 ///=========================================================================================================================================
@@ -1566,6 +1583,52 @@ void FLKAnimVerletConstraint_World::CheckWorldSphere(float DeltaTime, bool bFina
 	}
 }
 
+bool FLKAnimVerletConstraint_World::CheckWorldCapsule(IN OUT FLKAnimVerletBone& CurVerletBone, IN OUT FLKAnimVerletBone& ParentVerletBone, float DeltaTime, bool bFinalize, 
+													  const UWorld* World, const FCollisionQueryParams& CollisionQueryParams, const FTransform& ComponentTransform, int32 LambdaIndex)
+{
+	FVector DirFromParent = FVector::ZeroVector;
+	float DistFromParent = 0.0f;
+	(CurVerletBone.Location - ParentVerletBone.Location).ToDirectionAndLength(OUT DirFromParent, OUT DistFromParent);
+	const float CapsuleHalfHeight = DistFromParent * 0.5f + CurVerletBone.Thickness;
+
+	const FVector VerletBoneCenter = (CurVerletBone.Location + ParentVerletBone.Location) * 0.5f;
+	const FVector PrevVerletBoneCenter = (CurVerletBone.PrevLocation + ParentVerletBone.PrevLocation) * 0.5f;
+
+	const FVector PrevWorldLoc = ComponentTransform.TransformPosition(PrevVerletBoneCenter);
+	const FVector CurWorldLoc = ComponentTransform.TransformPosition(VerletBoneCenter);
+
+	FHitResult HitResult;
+	const bool bHit = World->SweepSingleByProfile(OUT HitResult, PrevWorldLoc, CurWorldLoc, FRotationMatrix::MakeFromZ(-DirFromParent).ToQuat(), WorldCollisionProfileName, FCollisionShape::MakeCapsule(CurVerletBone.Thickness, CapsuleHalfHeight), CollisionQueryParams);
+	if (bHit)
+	{
+		float ChildMoveAlpha = FMath::Clamp((HitResult.Location - ParentVerletBone.Location).Size() / DistFromParent, 0.0f, 1.0f);
+		ChildMoveAlpha = ChildMoveAlpha * (2.0f - ChildMoveAlpha);	///EaseOutQuad for better movement(heuristic center of mass)
+
+		if (ParentVerletBone.IsPinned() || CurVerletBone.IsPinned())
+			ChildMoveAlpha = 1.0f;
+
+		if (HitResult.bStartPenetrating && HitResult.PenetrationDepth > 0.0f)
+		{
+			if (ParentVerletBone.IsPinned() == false)
+				ParentVerletBone.Location = ParentVerletBone.Location + (HitResult.Normal * HitResult.PenetrationDepth * (1.0f - ChildMoveAlpha));
+			if (CurVerletBone.IsPinned() == false)
+				CurVerletBone.Location = CurVerletBone.Location + (HitResult.Normal * HitResult.PenetrationDepth * ChildMoveAlpha);
+		}
+		else
+		{
+			const FVector ResolvedLocationInWorld = HitResult.Location;
+			const FVector NewLocation = ComponentTransform.InverseTransformPosition(ResolvedLocationInWorld);
+
+			if (ParentVerletBone.IsPinned() == false)
+				ParentVerletBone.Location = ParentVerletBone.Location + (NewLocation - VerletBoneCenter) * (1.0f - ChildMoveAlpha);
+			if (CurVerletBone.IsPinned() == false)
+				CurVerletBone.Location = CurVerletBone.Location + (NewLocation - VerletBoneCenter) * ChildMoveAlpha;
+		}
+		return true;
+	}
+	return false;
+}
+
 void FLKAnimVerletConstraint_World::CheckWorldCapsule(float DeltaTime, bool bFinalize)
 {
 	const UWorld* World = WorldPtr.Get();
@@ -1595,45 +1658,7 @@ void FLKAnimVerletConstraint_World::CheckWorldCapsule(float DeltaTime, bool bFin
 		verify(Bones->IsValidIndex(CurPair.BoneA.AnimVerletBoneIndex));
 		FLKAnimVerletBone& ParentVerletBone = (*Bones)[CurPair.BoneA.AnimVerletBoneIndex];
 
-		FVector DirFromParent = FVector::ZeroVector;
-		float DistFromParent = 0.0f;
-		(CurVerletBone.Location - ParentVerletBone.Location).ToDirectionAndLength(OUT DirFromParent, OUT DistFromParent);
-		const float CapsuleHalfHeight = DistFromParent * 0.5f + CurVerletBone.Thickness;
-
-		const FVector VerletBoneCenter = (CurVerletBone.Location + ParentVerletBone.Location) * 0.5f;
-		const FVector PrevVerletBoneCenter = (CurVerletBone.PrevLocation + ParentVerletBone.PrevLocation) * 0.5f;
-
-		const FVector PrevWorldLoc = ComponentTransform.TransformPosition(PrevVerletBoneCenter);
-		const FVector CurWorldLoc = ComponentTransform.TransformPosition(VerletBoneCenter);
-
-		FHitResult HitResult;
-		const bool bHit = World->SweepSingleByProfile(OUT HitResult, PrevWorldLoc, CurWorldLoc, FRotationMatrix::MakeFromZ(-DirFromParent).ToQuat(), WorldCollisionProfileName, FCollisionShape::MakeCapsule(CurVerletBone.Thickness, CapsuleHalfHeight), CollisionQueryParams);
-		if (bHit)
-		{
-			float ChildMoveAlpha = FMath::Clamp((HitResult.Location - ParentVerletBone.Location).Size() / DistFromParent, 0.0f, 1.0f);
-			ChildMoveAlpha = ChildMoveAlpha * (2.0f - ChildMoveAlpha);	///EaseOutQuad for better movement(heuristic center of mass)
-
-			if (ParentVerletBone.IsPinned() || CurVerletBone.IsPinned())
-				ChildMoveAlpha = 1.0f;
-
-			if (HitResult.bStartPenetrating && HitResult.PenetrationDepth > 0.0f)
-			{
-				if (ParentVerletBone.IsPinned() == false)
-					ParentVerletBone.Location = ParentVerletBone.Location + (HitResult.Normal * HitResult.PenetrationDepth * (1.0f - ChildMoveAlpha));
-				if (CurVerletBone.IsPinned() == false)
-					CurVerletBone.Location = CurVerletBone.Location + (HitResult.Normal * HitResult.PenetrationDepth * ChildMoveAlpha);
-			}
-			else
-			{
-				const FVector ResolvedLocationInWorld = HitResult.Location;
-				const FVector NewLocation = ComponentTransform.InverseTransformPosition(ResolvedLocationInWorld);
-				
-				if (ParentVerletBone.IsPinned() == false)
-					ParentVerletBone.Location = ParentVerletBone.Location + (NewLocation - VerletBoneCenter) * (1.0f - ChildMoveAlpha);
-				if (CurVerletBone.IsPinned() == false)
-					CurVerletBone.Location = CurVerletBone.Location + (NewLocation - VerletBoneCenter) * ChildMoveAlpha;
-			}
-		}
+		CheckWorldCapsule(IN OUT CurVerletBone, IN OUT ParentVerletBone, DeltaTime, bFinalize, World, CollisionQueryParams, ComponentTransform, i);
 	}
 }
 ///=========================================================================================================================================
