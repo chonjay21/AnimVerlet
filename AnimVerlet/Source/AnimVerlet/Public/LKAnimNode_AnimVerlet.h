@@ -233,7 +233,7 @@ public:
 	/** Enable collision against to world.(May cause performance impact by physics sweep test for each bone and fake bone) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Collision", meta = (PinHiddenByDefault))
 	FName WorldCollisionProfile = NAME_None;
-	UPROPERTY(EditAnywhere, Category = "Collision", meta = (PinHiddenByDefault, EditCondition = "WorldCollisionProfile != NAME_None"))
+	UPROPERTY(EditAnywhere, Category = "Collision", meta = (PinHiddenByDefault))
 	TArray<FBoneReference> WorldCollisionExcludeBones;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Collision", meta = (PinHiddenByDefault))

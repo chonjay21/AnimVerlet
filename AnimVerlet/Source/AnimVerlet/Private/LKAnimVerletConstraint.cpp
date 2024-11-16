@@ -1170,7 +1170,19 @@ bool FLKAnimVerletConstraint_Box::CheckBoxBox(IN OUT FLKAnimVerletBone& CurVerle
 	const FVector BoxAxisZ = Rotation.GetAxisZ();
 	const FVector BoxAxes[3]{ BoxAxisX, BoxAxisY, BoxAxisZ };
 
-	const FQuat BoneBoxQuat = FRotationMatrix::MakeFromZ(DirFromParent).ToQuat();
+	float MinCos = TNumericLimits<float>::Max();
+	FVector MaxAngleAxis = FVector::ZeroVector;
+	for (int32 i = 0; i < 3; ++i)
+	{
+		const float CurCos = FMath::Abs(DirFromParent.Dot(BoxAxes[i]));
+		if (CurCos < MinCos)
+		{
+			MinCos = CurCos;
+			MaxAngleAxis = BoxAxes[i];
+		}
+	}
+
+	const FQuat BoneBoxQuat = FRotationMatrix::MakeFromZX(DirFromParent, MaxAngleAxis).ToQuat();	///Maintain z axis
 	const FVector BoneBoxAxisX = BoneBoxQuat.GetAxisX();
 	const FVector BoneBoxAxisY = BoneBoxQuat.GetAxisY();
 	const FVector BoneBoxAxisZ = BoneBoxQuat.GetAxisZ();
@@ -1289,11 +1301,11 @@ void FLKAnimVerletConstraint_Box::CheckBoxCapsule(float DeltaTime, bool bFinaliz
 		verify(Bones->IsValidIndex(CurPair.BoneA.AnimVerletBoneIndex));
 		FLKAnimVerletBone& ParentVerletBone = (*Bones)[CurPair.BoneA.AnimVerletBoneIndex];
 
-		CheckBoxCapsule(IN OUT CurVerletBone, IN OUT ParentVerletBone, DeltaTime, bFinalize, InvRotation, i);
+		///CheckBoxCapsule(IN OUT CurVerletBone, IN OUT ParentVerletBone, DeltaTime, bFinalize, InvRotation, i);
 
 		/// OBB - OBB version
 		/// Consider BoneLine to OBB
-		///CheckBoxBox(IN OUT CurVerletBone, IN OUT ParentVerletBone, DeltaTime, bFinalize, InvRotation, i);
+		CheckBoxBox(IN OUT CurVerletBone, IN OUT ParentVerletBone, DeltaTime, bFinalize, InvRotation, i);
 	}
 }
 ///=========================================================================================================================================
