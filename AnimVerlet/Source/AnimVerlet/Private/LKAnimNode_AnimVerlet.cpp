@@ -820,8 +820,7 @@ void FLKAnimNode_AnimVerlet::PrepareLocalCollisionConstraints(FComponentSpacePos
 		if (CurShapeSphere.bUseAbsoluteWorldTransform)
 		{
 			const FVector BoneLocation = ComponentTransform.InverseTransformPosition(CurShapeSphere.LocationOffset);
-			const FLKAnimVerletConstraint_Sphere SphereConstraint(BoneLocation, CurShapeSphere.Radius, CollisionConstraintInput);
-			SphereCollisionConstraints.Emplace(SphereConstraint);
+			SphereCollisionConstraints.Emplace(BoneLocation, CurShapeSphere.Radius, CollisionConstraintInput);
 		}
 		else
 		{
@@ -834,8 +833,7 @@ void FLKAnimNode_AnimVerlet::PrepareLocalCollisionConstraints(FComponentSpacePos
 
 				BoneTInCS = OffsetT * BoneTInCS;
 				const FVector BoneLocation = BoneTInCS.GetLocation();
-				const FLKAnimVerletConstraint_Sphere SphereConstraint(BoneLocation, CurShapeSphere.Radius, CollisionConstraintInput);
-				SphereCollisionConstraints.Emplace(SphereConstraint);
+				SphereCollisionConstraints.Emplace(BoneLocation, CurShapeSphere.Radius, CollisionConstraintInput);
 			}
 		}
 	}
@@ -847,8 +845,7 @@ void FLKAnimNode_AnimVerlet::PrepareLocalCollisionConstraints(FComponentSpacePos
 		if (CurShapeSphere.bUseAbsoluteWorldTransform)
 		{
 			const FVector BoneLocation = ComponentTransform.InverseTransformPosition(CurShapeSphere.LocationOffset);
-			const FLKAnimVerletConstraint_Sphere SphereConstraint(BoneLocation, CurShapeSphere.Radius, CollisionConstraintInput);
-			SphereCollisionConstraints.Emplace(SphereConstraint);
+			SphereCollisionConstraints.Emplace(BoneLocation, CurShapeSphere.Radius, CollisionConstraintInput);
 		}
 		else
 		{
@@ -866,8 +863,7 @@ void FLKAnimNode_AnimVerlet::PrepareLocalCollisionConstraints(FComponentSpacePos
 
 				BoneTInCS = OffsetT * BoneTInCS;
 				const FVector BoneLocation = BoneTInCS.GetLocation();
-				const FLKAnimVerletConstraint_Sphere SphereConstraint(BoneLocation, CurShapeSphere.Radius, CollisionConstraintInput);
-				SphereCollisionConstraints.Emplace(SphereConstraint);
+				SphereCollisionConstraints.Emplace(BoneLocation, CurShapeSphere.Radius, CollisionConstraintInput);
 			}
 		}
 	}
@@ -885,9 +881,8 @@ void FLKAnimNode_AnimVerlet::PrepareLocalCollisionConstraints(FComponentSpacePos
 		{
 			const FVector BoneLocation = ComponentTransform.InverseTransformPosition(CurShapeCapsule.LocationOffset);
 			const FQuat BoneRotation = ComponentTransform.InverseTransformRotation(CurShapeCapsule.RotationOffset.Quaternion());
-			const FLKAnimVerletConstraint_Capsule CapsuleConstraint(BoneLocation, BoneRotation, CurShapeCapsule.Radius, 
-																	CurShapeCapsule.HalfHeight, CollisionConstraintInput);
-			CapsuleCollisionConstraints.Emplace(CapsuleConstraint);
+			CapsuleCollisionConstraints.Emplace(BoneLocation, BoneRotation, CurShapeCapsule.Radius,
+												CurShapeCapsule.HalfHeight, CollisionConstraintInput);
 		}
 		else
 		{
@@ -901,9 +896,8 @@ void FLKAnimNode_AnimVerlet::PrepareLocalCollisionConstraints(FComponentSpacePos
 				BoneTInCS = OffsetT * BoneTInCS;
 				const FVector BoneLocation = BoneTInCS.GetLocation();
 				const FQuat BoneRotation = BoneTInCS.GetRotation();
-				const FLKAnimVerletConstraint_Capsule CapsuleConstraint(BoneLocation, BoneRotation, CurShapeCapsule.Radius, 
-																		CurShapeCapsule.HalfHeight, CollisionConstraintInput);
-				CapsuleCollisionConstraints.Emplace(CapsuleConstraint);
+				CapsuleCollisionConstraints.Emplace(BoneLocation, BoneRotation, CurShapeCapsule.Radius,
+													CurShapeCapsule.HalfHeight, CollisionConstraintInput);
 			}
 		}
 	}
@@ -916,9 +910,8 @@ void FLKAnimNode_AnimVerlet::PrepareLocalCollisionConstraints(FComponentSpacePos
 		{
 			const FVector BoneLocation = ComponentTransform.InverseTransformPosition(CurShapeCapsule.LocationOffset);
 			const FQuat BoneRotation = ComponentTransform.InverseTransformRotation(CurShapeCapsule.RotationOffset.Quaternion());
-			const FLKAnimVerletConstraint_Capsule CapsuleConstraint(BoneLocation, BoneRotation, CurShapeCapsule.Radius, 
-																	CurShapeCapsule.HalfHeight, CollisionConstraintInput);
-			CapsuleCollisionConstraints.Emplace(CapsuleConstraint);
+			CapsuleCollisionConstraints.Emplace(BoneLocation, BoneRotation, CurShapeCapsule.Radius,
+												CurShapeCapsule.HalfHeight, CollisionConstraintInput);
 		}
 		else
 		{
@@ -937,9 +930,8 @@ void FLKAnimNode_AnimVerlet::PrepareLocalCollisionConstraints(FComponentSpacePos
 				BoneTInCS = OffsetT * BoneTInCS;
 				const FVector BoneLocation = BoneTInCS.GetLocation();
 				const FQuat BoneRotation = BoneTInCS.GetRotation();
-				const FLKAnimVerletConstraint_Capsule CapsuleConstraint(BoneLocation, BoneRotation, CurShapeCapsule.Radius, 
-																		CurShapeCapsule.HalfHeight, CollisionConstraintInput);
-				CapsuleCollisionConstraints.Emplace(CapsuleConstraint);
+				CapsuleCollisionConstraints.Emplace(BoneLocation, BoneRotation, CurShapeCapsule.Radius,
+													CurShapeCapsule.HalfHeight, CollisionConstraintInput);
 			}
 		}
 	}
@@ -958,8 +950,7 @@ void FLKAnimNode_AnimVerlet::PrepareLocalCollisionConstraints(FComponentSpacePos
 			const FVector BoneLocation = ComponentTransform.InverseTransformPosition(CurShapeBox.LocationOffset);
 			const FQuat BoneRotation = ComponentTransform.InverseTransformRotation(CurShapeBox.RotationOffset.Quaternion());
 
-			const FLKAnimVerletConstraint_Box BoxConstraint(BoneLocation, BoneRotation, CurShapeBox.HalfExtents, CollisionConstraintInput);
-			BoxCollisionConstraints.Emplace(BoxConstraint);
+			BoxCollisionConstraints.Emplace(BoneLocation, BoneRotation, CurShapeBox.HalfExtents, CollisionConstraintInput);
 		}
 		else
 		{
@@ -974,8 +965,7 @@ void FLKAnimNode_AnimVerlet::PrepareLocalCollisionConstraints(FComponentSpacePos
 				const FVector BoneLocation = BoneTInCS.GetLocation();
 				const FQuat BoneRotation = BoneTInCS.GetRotation();
 
-				const FLKAnimVerletConstraint_Box BoxConstraint(BoneLocation, BoneRotation, CurShapeBox.HalfExtents, CollisionConstraintInput);
-				BoxCollisionConstraints.Emplace(BoxConstraint);
+				BoxCollisionConstraints.Emplace(BoneLocation, BoneRotation, CurShapeBox.HalfExtents, CollisionConstraintInput);
 			}
 		}
 	}
@@ -989,8 +979,7 @@ void FLKAnimNode_AnimVerlet::PrepareLocalCollisionConstraints(FComponentSpacePos
 			const FVector BoneLocation = ComponentTransform.InverseTransformPosition(CurShapeBox.LocationOffset);
 			const FQuat BoneRotation = ComponentTransform.InverseTransformRotation(CurShapeBox.RotationOffset.Quaternion());
 
-			const FLKAnimVerletConstraint_Box BoxConstraint(BoneLocation, BoneRotation, CurShapeBox.HalfExtents, CollisionConstraintInput);
-			BoxCollisionConstraints.Emplace(BoxConstraint);
+			BoxCollisionConstraints.Emplace(BoneLocation, BoneRotation, CurShapeBox.HalfExtents, CollisionConstraintInput);
 		}
 		else
 		{
@@ -1010,8 +999,7 @@ void FLKAnimNode_AnimVerlet::PrepareLocalCollisionConstraints(FComponentSpacePos
 				const FVector BoneLocation = BoneTInCS.GetLocation();
 				const FQuat BoneRotation = BoneTInCS.GetRotation();
 
-				const FLKAnimVerletConstraint_Box BoxConstraint(BoneLocation, BoneRotation, CurShapeBox.HalfExtents, CollisionConstraintInput);
-				BoxCollisionConstraints.Emplace(BoxConstraint);
+				BoxCollisionConstraints.Emplace(BoneLocation, BoneRotation, CurShapeBox.HalfExtents, CollisionConstraintInput);
 			}
 		}
 	}
@@ -1029,10 +1017,9 @@ void FLKAnimNode_AnimVerlet::PrepareLocalCollisionConstraints(FComponentSpacePos
 		{
 			const FVector BoneLocation = ComponentTransform.InverseTransformPosition(CurShapePlane.LocationOffset);
 			const FQuat BoneRotation = ComponentTransform.InverseTransformRotation(CurShapePlane.RotationOffset.Quaternion());
-			const FLKAnimVerletConstraint_Plane PlaneConstraint(BoneLocation, BoneRotation.GetUpVector(), BoneRotation,
-																CurShapePlane.bFinitePlane ? CurShapePlane.FinitePlaneHalfExtents : FVector2D::ZeroVector,
-																CollisionConstraintInput);
-			PlaneCollisionConstraints.Emplace(PlaneConstraint);
+			PlaneCollisionConstraints.Emplace(BoneLocation, BoneRotation.GetUpVector(), BoneRotation,
+											  CurShapePlane.bFinitePlane ? CurShapePlane.FinitePlaneHalfExtents : FVector2D::ZeroVector,
+											  CollisionConstraintInput);
 		}
 		else
 		{
@@ -1047,10 +1034,9 @@ void FLKAnimNode_AnimVerlet::PrepareLocalCollisionConstraints(FComponentSpacePos
 				const FVector BoneLocation = BoneTInCS.GetLocation();
 				const FQuat BoneRotation = BoneTInCS.GetRotation();
 
-				const FLKAnimVerletConstraint_Plane PlaneConstraint(BoneLocation, BoneRotation.GetUpVector(), BoneRotation,
-																	CurShapePlane.bFinitePlane ? CurShapePlane.FinitePlaneHalfExtents : FVector2D::ZeroVector,
-																	CollisionConstraintInput);
-				PlaneCollisionConstraints.Emplace(PlaneConstraint);
+				PlaneCollisionConstraints.Emplace(BoneLocation, BoneRotation.GetUpVector(), BoneRotation,
+												  CurShapePlane.bFinitePlane ? CurShapePlane.FinitePlaneHalfExtents : FVector2D::ZeroVector,
+												  CollisionConstraintInput);
 			}
 		}
 	}
@@ -1063,10 +1049,9 @@ void FLKAnimNode_AnimVerlet::PrepareLocalCollisionConstraints(FComponentSpacePos
 		{
 			const FVector BoneLocation = ComponentTransform.InverseTransformPosition(CurShapePlane.LocationOffset);
 			const FQuat BoneRotation = ComponentTransform.InverseTransformRotation(CurShapePlane.RotationOffset.Quaternion());
-			const FLKAnimVerletConstraint_Plane PlaneConstraint(BoneLocation, BoneRotation.GetUpVector(), BoneRotation,
-																CurShapePlane.bFinitePlane ? CurShapePlane.FinitePlaneHalfExtents : FVector2D::ZeroVector,
-																CollisionConstraintInput);
-			PlaneCollisionConstraints.Emplace(PlaneConstraint);
+			PlaneCollisionConstraints.Emplace(BoneLocation, BoneRotation.GetUpVector(), BoneRotation,
+											  CurShapePlane.bFinitePlane ? CurShapePlane.FinitePlaneHalfExtents : FVector2D::ZeroVector,
+											  CollisionConstraintInput);
 		}
 		else
 		{
@@ -1085,10 +1070,9 @@ void FLKAnimNode_AnimVerlet::PrepareLocalCollisionConstraints(FComponentSpacePos
 				BoneTInCS = OffsetT * BoneTInCS;
 				const FVector BoneLocation = BoneTInCS.GetLocation();
 				const FQuat BoneRotation = BoneTInCS.GetRotation();
-				const FLKAnimVerletConstraint_Plane PlaneConstraint(BoneLocation, BoneRotation.GetUpVector(), BoneRotation,
-																	CurShapePlane.bFinitePlane ? CurShapePlane.FinitePlaneHalfExtents : FVector2D::ZeroVector,
-																	CollisionConstraintInput);
-				PlaneCollisionConstraints.Emplace(PlaneConstraint);
+				PlaneCollisionConstraints.Emplace(BoneLocation, BoneRotation.GetUpVector(), BoneRotation,
+												  CurShapePlane.bFinitePlane ? CurShapePlane.FinitePlaneHalfExtents : FVector2D::ZeroVector,
+												  CollisionConstraintInput);
 			}
 		}
 	}

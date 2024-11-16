@@ -187,8 +187,8 @@ public:
 	TArray<FLKAnimVerletBoneIndicatorPair>* BonePairs = nullptr;
 
 	bool bUseXPBDSolver = false;
-	double Compliance = 0.0;		///for XPBD
-	TArray<double> Lambdas;			///for XPBD
+	double Compliance = 0.0;								///for XPBD
+	TArray<double, TInlineAllocator<64>> Lambdas;			///for XPBD
 
 public:
 	FLKAnimVerletConstraint_Sphere(const FVector& InLocation, float InRadius, const FLKAnimVerletCollisionConstraintInput& InCollisionInput);
@@ -224,8 +224,8 @@ public:
 	TArray<FLKAnimVerletBoneIndicatorPair>* BonePairs = nullptr;
 
 	bool bUseXPBDSolver = false;
-	double Compliance = 0.0;		///for XPBD
-	TArray<double> Lambdas;			///for XPBD
+	double Compliance = 0.0;								///for XPBD
+	TArray<double, TInlineAllocator<64>> Lambdas;			///for XPBD
 
 public:
 	FLKAnimVerletConstraint_Capsule(const FVector& InLocation, const FQuat& InRot, float InRadius, 
@@ -261,8 +261,8 @@ public:
 	TArray<FLKAnimVerletBoneIndicatorPair>* BonePairs = nullptr;
 
 	bool bUseXPBDSolver = false;
-	double Compliance = 0.0;		///for XPBD
-	TArray<double> Lambdas;			///for XPBD
+	double Compliance = 0.0;								///for XPBD
+	TArray<double, TInlineAllocator<64>> Lambdas;			///for XPBD
 
 public:
 	FLKAnimVerletConstraint_Box(const FVector& InLocation, const FQuat& InRot, const FVector& InHalfExtents, const FLKAnimVerletCollisionConstraintInput& InCollisionInput);
@@ -302,8 +302,8 @@ public:
 	TArray<FLKAnimVerletBoneIndicatorPair>* BonePairs = nullptr;
 
 	bool bUseXPBDSolver = false;
-	double Compliance = 0.0;		///for XPBD
-	TArray<double> Lambdas;			///for XPBD
+	double Compliance = 0.0;								///for XPBD
+	TArray<double, TInlineAllocator<64>> Lambdas;			///for XPBD
 
 public:
 	FLKAnimVerletConstraint_Plane(const FVector& InPlaneBase, const FVector& InPlaneNormal, const FQuat& InRotation, 
