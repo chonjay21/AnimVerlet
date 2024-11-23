@@ -92,7 +92,7 @@ void FLKAnimNode_AnimVerlet::EvaluateSkeletalControl_AnyThread(FComponentSpacePo
 	PrepareSimulation(Output, BoneContainer, CurComponentT);
 
 	/// Simulate verlet integration
-	if (DeltaTime > 0.0f)
+	if (DeltaTime > 0.0f && bPause == false)
 	{
 		const USkeletalMeshComponent* SkeletalMeshComponent = Output.AnimInstanceProxy->GetSkelMeshComponent();
 		const UWorld* World = SkeletalMeshComponent->GetWorld();
@@ -149,6 +149,9 @@ bool FLKAnimNode_AnimVerlet::IsValidToEvaluate(const USkeleton* Skeleton, const 
 	}
 #endif
 
+	if (bActivate == false)
+		return false;
+
 	for (const FLKAnimVerletBoneSetting& CurBoneSetting : VerletBones)
 	{
 		if (CurBoneSetting.RootBone.IsValidToEvaluate(RequiredBones) == false)
@@ -163,7 +166,7 @@ void FLKAnimNode_AnimVerlet::UpdateInternal(const FAnimationUpdateContext& Conte
 {
 	FAnimNode_SkeletalControlBase::UpdateInternal(Context);
 
-	UpdateDeltaTime(Context.GetDeltaTime(), Context.AnimInstanceProxy != nullptr ? Context.AnimInstanceProxy->GetTimeDilation() : 1.0f);
+	UpdateDeltaTime(Context.GetDeltaTime() * PlaySpeedRate, Context.AnimInstanceProxy != nullptr ? Context.AnimInstanceProxy->GetTimeDilation() * PlaySpeedRate : PlaySpeedRate);
 }
 
 void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer)
@@ -1727,7 +1730,10 @@ void FLKAnimNode_AnimVerlet::SyncFromOtherAnimVerletNode(const FLKAnimNode_AnimV
 
 	bSubDivideBones = Other.bSubDivideBones;
 	NumSubDividedBone = Other.NumSubDividedBone;
+	bActivate = Other.bActivate;
 	bSkipUpdateOnDedicatedServer = Other.bSkipUpdateOnDedicatedServer;
+	bPause = Other.bPause;
+	PlaySpeedRate = Other.PlaySpeedRate;
 
 	bMakeFakeTipBone = Other.bMakeFakeTipBone;
 	FakeTipBoneLength = Other.FakeTipBoneLength;

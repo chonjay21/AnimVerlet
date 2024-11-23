@@ -95,8 +95,14 @@ public:
 	bool bSubDivideBones = false;
 	UPROPERTY(EditAnywhere, Category = "Setup", meta = (EditCondition = "bSubDivideBones", EditConditionHides, ClampMin = "0"))
 	uint8 NumSubDividedBone = 1;
-	UPROPERTY(EditAnywhere, Category = "Setup")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Setup", meta = (PinShownByDefault))
+	bool bActivate = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Setup")
 	bool bSkipUpdateOnDedicatedServer = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Setup", meta = (PinShownByDefault))
+	bool bPause = false;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Setup", meta = (PinShownByDefault, ClampMin = "0.0"))
+	float PlaySpeedRate = 1.0f;
 
 	/** Adds an fake(virtual) bone to the end of the body.(may affect the rotation or collision of the end bone) */
 	UPROPERTY(EditAnywhere, Category = "Setup", meta = (EditCondition = "bLockTipBone == false"))
