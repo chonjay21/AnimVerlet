@@ -1106,7 +1106,6 @@ void FLKAnimNode_AnimVerlet::PreUpdateBones(const UWorld* World, float InDeltaTi
 	SCOPE_CYCLE_COUNTER(STAT_AnimVerlet_PreUpdateBones);
 #endif
 
-	const bool bUseRandomWind = (RandomWindDirection.IsNearlyZero(KINDA_SMALL_NUMBER) == false);
 	const bool bUseWindComponentInWorld = (bAdjustWindComponent && World->Scene != nullptr);
 	FLKAnimVerletUpdateParam VerletUpdateParam;
 	{
@@ -1142,9 +1141,20 @@ void FLKAnimNode_AnimVerlet::PreUpdateBones(const UWorld* World, float InDeltaTi
 		VerletUpdateParam.ShapeMemoryForce = ShapeMemoryForce;
 		VerletUpdateParam.Gravity = (bGravityInWorldSpace == false || Gravity.IsNearlyZero(KINDA_SMALL_NUMBER)) ? Gravity : ComponentTransform.InverseTransformVector(Gravity);
 		VerletUpdateParam.ExternalForce = (bExternalForceInWorldSpace == false || ExternalForce.IsNearlyZero(KINDA_SMALL_NUMBER)) ? ExternalForce : ComponentTransform.InverseTransformVector(ExternalForce);
-		VerletUpdateParam.RandomWindDir = (bRandomWindDirectionInWorldSpace == false && bUseRandomWind) ? RandomWindDirection : ComponentTransform.InverseTransformVector(RandomWindDirection);
-		VerletUpdateParam.RandomWindSizeMin = RandomWindSizeMin;
-		VerletUpdateParam.RandomWindSizeMax = RandomWindSizeMax;
+
+		const bool bUseRandomWind = (RandomWindDirection.IsNearlyZero(KINDA_SMALL_NUMBER) == false);
+		VerletUpdateParam.RandomWind.RandomForceDirection = (bRandomWindDirectionInWorldSpace == false && bUseRandomWind) ? RandomWindDirection : ComponentTransform.InverseTransformVector(RandomWindDirection);
+		VerletUpdateParam.RandomWind.RandomForceSizeMin = RandomWindSizeMin;
+		VerletUpdateParam.RandomWind.RandomForceSizeMax = RandomWindSizeMax;
+		VerletUpdateParam.RandomWind.bRandomForceDirectionInWorldSpace = bRandomWindDirectionInWorldSpace;
+		for (const FLKAnimVerletRandomForceSetting& CurWind : AdditionalRandomWinds)
+		{
+			FLKAnimVerletRandomForceSetting& NewWind = VerletUpdateParam.AdditionalRandomWinds.Emplace_GetRef();
+			NewWind.RandomForceDirection = (CurWind.bRandomForceDirectionInWorldSpace == false) ? CurWind.RandomForceDirection : ComponentTransform.InverseTransformVector(CurWind.RandomForceDirection);
+			NewWind.RandomForceSizeMin = CurWind.RandomForceSizeMin;
+			NewWind.RandomForceSizeMax = CurWind.RandomForceSizeMax;
+			NewWind.bRandomForceDirectionInWorldSpace = CurWind.bRandomForceDirectionInWorldSpace;
+		}
 		VerletUpdateParam.Damping = Damping;
 	}
 
@@ -1811,6 +1821,7 @@ void FLKAnimNode_AnimVerlet::SyncFromOtherAnimVerletNode(const FLKAnimNode_AnimV
 	RandomWindSizeMin = Other.RandomWindSizeMin;
 	RandomWindSizeMax = Other.RandomWindSizeMax;
 	bRandomWindDirectionInWorldSpace = Other.bRandomWindDirectionInWorldSpace;
+	AdditionalRandomWinds = Other.AdditionalRandomWinds;
 
 	bAdjustWindComponent = Other.bAdjustWindComponent;
 	WindComponentScale = Other.WindComponentScale;

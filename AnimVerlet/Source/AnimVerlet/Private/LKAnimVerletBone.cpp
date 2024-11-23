@@ -81,8 +81,16 @@ void FLKAnimVerletBone::Update(float DeltaTime, const FLKAnimVerletUpdateParam& 
 		Velocity += InParam.ExternalForce * CurDeltaTime;
 
 		/// RandomWind
-		if (InParam.RandomWindDir.IsNearlyZero(KINDA_SMALL_NUMBER) == false)
-			Velocity += InParam.RandomWindDir * FMath::RandRange(InParam.RandomWindSizeMin, InParam.RandomWindSizeMax) * CurDeltaTime;
+		{
+			if (InParam.RandomWind.RandomForceDirection.IsNearlyZero(KINDA_SMALL_NUMBER) == false)
+				Velocity += InParam.RandomWind.RandomForceDirection * FMath::RandRange(InParam.RandomWind.RandomForceSizeMin, InParam.RandomWind.RandomForceSizeMax) * CurDeltaTime;
+
+			for (const FLKAnimVerletRandomForceSetting& CurWind : InParam.AdditionalRandomWinds)
+			{
+				if (CurWind.RandomForceDirection.IsNearlyZero(KINDA_SMALL_NUMBER) == false)
+					Velocity += CurWind.RandomForceDirection * FMath::RandRange(CurWind.RandomForceSizeMin, CurWind.RandomForceSizeMax) * CurDeltaTime;
+			}
+		}
 
 		/// ShapeMemoryForce
 		Velocity += ((PoseLocation - Location).GetSafeNormal() * InParam.ShapeMemoryForce) * CurDeltaTime;
@@ -114,8 +122,16 @@ void FLKAnimVerletBone::Update(float DeltaTime, const FLKAnimVerletUpdateParam& 
 		Location += InParam.ExternalForce * CurDeltaTime;
 
 		/// RandomWind
-		if (InParam.RandomWindDir.IsNearlyZero(KINDA_SMALL_NUMBER) == false)
-			Location += InParam.RandomWindDir * FMath::RandRange(InParam.RandomWindSizeMin, InParam.RandomWindSizeMax) * CurDeltaTime;
+		{
+			if (InParam.RandomWind.RandomForceDirection.IsNearlyZero(KINDA_SMALL_NUMBER) == false)
+				Location += InParam.RandomWind.RandomForceDirection * FMath::RandRange(InParam.RandomWind.RandomForceSizeMin, InParam.RandomWind.RandomForceSizeMax) * CurDeltaTime;
+
+			for (const FLKAnimVerletRandomForceSetting& CurWind : InParam.AdditionalRandomWinds)
+			{
+				if (CurWind.RandomForceDirection.IsNearlyZero(KINDA_SMALL_NUMBER) == false)
+					Location += CurWind.RandomForceDirection * FMath::RandRange(CurWind.RandomForceSizeMin, CurWind.RandomForceSizeMax) * CurDeltaTime;
+			}
+		}
 
 		/// ShapeMemoryForce
 		Location += ((PoseLocation - Location).GetSafeNormal() * InParam.ShapeMemoryForce) * CurDeltaTime;

@@ -80,6 +80,22 @@ public:
 	float Mass = 1.0f;
 };
 
+USTRUCT(BlueprintInternalUseOnly)
+struct FLKAnimVerletRandomForceSetting
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (PinHiddenByDefault))
+	FVector RandomForceDirection = FVector::ZeroVector;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (PinHiddenByDefault, ClampMin = "0.0", ForceUnits = "cm/s"))
+	float RandomForceSizeMin = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (PinHiddenByDefault, ClampMin = "0.0", ForceUnits = "cm/s"))
+	float RandomForceSizeMax = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (PinHiddenByDefault))
+	bool bRandomForceDirectionInWorldSpace = true;
+};
+
 struct FLKAnimVerletUpdateParam
 {
 	bool bUseSquaredDeltaTime = false;
@@ -91,7 +107,6 @@ struct FLKAnimVerletUpdateParam
 	float ShapeMemoryForce = 0.0f;
 	FVector Gravity = FVector::ZeroVector;
 	FVector ExternalForce = FVector::ZeroVector;
-	FVector RandomWindDir = FVector::ZeroVector;
-	float RandomWindSizeMin = 0.0f;
-	float RandomWindSizeMax = 0.0f;
+	FLKAnimVerletRandomForceSetting RandomWind;
+	TArray<FLKAnimVerletRandomForceSetting, TInlineAllocator<8>> AdditionalRandomWinds;
 };

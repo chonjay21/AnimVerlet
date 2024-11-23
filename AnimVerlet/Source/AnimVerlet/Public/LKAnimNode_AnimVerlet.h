@@ -286,6 +286,8 @@ public:
 	float RandomWindSizeMax = 0.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Wind", meta = (PinHiddenByDefault))
 	bool bRandomWindDirectionInWorldSpace = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Wind", meta = (PinHiddenByDefault))
+	TArray<FLKAnimVerletRandomForceSetting> AdditionalRandomWinds;
 
 	/** Adjust UWindDirectionalSourceComponent in world. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Wind", meta = (PinHiddenByDefault))
