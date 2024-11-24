@@ -17,9 +17,9 @@
 ![](https://github.com/chonjay21/Screenshots/blob/main/AnimVerlet_UE5.png)
 ![](https://github.com/chonjay21/Screenshots/blob/main/AnimVerlet_Short.gif)
 ![](https://github.com/chonjay21/Screenshots/blob/main/AnimVerlet_Graph.gif)
-* [XPBD verlet simulation]
+* [XPBD verlet simulation]<br />
 ![](https://github.com/chonjay21/Screenshots/blob/main/AnimVerlet_String.gif)
-* [Drag and drop collision setup in preview]
+* [Drag and drop collision setup in preview]<br />
 ![](https://github.com/chonjay21/Screenshots/blob/main/AnimVerlet_Collision.gif)
 
 <br />
