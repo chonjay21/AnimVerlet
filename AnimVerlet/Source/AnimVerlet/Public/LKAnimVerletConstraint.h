@@ -344,10 +344,10 @@ public:
 
 private:
 	bool CheckWorldSphere(IN OUT FLKAnimVerletBone& CurVerletBone, float DeltaTime, bool bFinalize, const UWorld* World,
-						  const FCollisionQueryParams& CollisionQueryParams, const FTransform& ComponentTransform, int32 LambdaIndex);
+						  const struct FCollisionQueryParams& CollisionQueryParams, const FTransform& ComponentTransform, int32 LambdaIndex);
 	void CheckWorldSphere(float DeltaTime, bool bFinalize);
 	bool CheckWorldCapsule(IN OUT FLKAnimVerletBone& CurVerletBone, IN OUT FLKAnimVerletBone& ParentVerletBone, float DeltaTime, bool bFinalize, 
-						   const UWorld* World, const FCollisionQueryParams& CollisionQueryParams, const FTransform& ComponentTransform, int32 LambdaIndex);
+						   const UWorld* World, const struct FCollisionQueryParams& CollisionQueryParams, const FTransform& ComponentTransform, int32 LambdaIndex);
 	void CheckWorldCapsule(float DeltaTime, bool bFinalize);
 };
 ///=========================================================================================================================================
