@@ -23,10 +23,7 @@
 		{
 			"Name": "AnimVerletEditor",
 			"Type": "UncookedOnly",
-			"LoadingPhase": "PreDefault",
-			"WhitelistPlatforms": [
-				"Win64"
-			]
+			"LoadingPhase": "PreDefault"
 		}
 	]
 }
