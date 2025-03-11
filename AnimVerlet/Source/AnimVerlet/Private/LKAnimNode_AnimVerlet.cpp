@@ -138,6 +138,40 @@ void FLKAnimNode_AnimVerlet::InitializeBoneReferences(const FBoneContainer& Requ
 	{
 		ExcludedBones[i].BoneReference.Initialize(RequiredBones);
 	}
+
+	for (FLKAnimVerletCollisionSphere& CurShape : SimulatingCollisionShapes.SphereCollisionShapes)
+	{
+		InitializeAttachedShape(CurShape, RequiredBones);
+	}
+	for (FLKAnimVerletCollisionCapsule& CurShape : SimulatingCollisionShapes.CapsuleCollisionShapes)
+	{
+		InitializeAttachedShape(CurShape, RequiredBones);
+	}
+	for (FLKAnimVerletCollisionBox& CurShape : SimulatingCollisionShapes.BoxCollisionShapes)
+	{
+		InitializeAttachedShape(CurShape, RequiredBones);
+	}
+	for (FLKAnimVerletCollisionPlane& CurShape : SimulatingCollisionShapes.PlaneCollisionShapes)
+	{
+		InitializeAttachedShape(CurShape, RequiredBones);
+	}
+
+	for (FLKAnimVerletCollisionSphere& CurShape : DynamicCollisionShapes.SphereCollisionShapes)
+	{
+		InitializeAttachedShape(CurShape, RequiredBones);
+	}
+	for (FLKAnimVerletCollisionCapsule& CurShape : DynamicCollisionShapes.CapsuleCollisionShapes)
+	{
+		InitializeAttachedShape(CurShape, RequiredBones);
+	}
+	for (FLKAnimVerletCollisionBox& CurShape : DynamicCollisionShapes.BoxCollisionShapes)
+	{
+		InitializeAttachedShape(CurShape, RequiredBones);
+	}
+	for (FLKAnimVerletCollisionPlane& CurShape : DynamicCollisionShapes.PlaneCollisionShapes)
+	{
+		InitializeAttachedShape(CurShape, RequiredBones);
+	}
 }
 
 bool FLKAnimNode_AnimVerlet::IsValidToEvaluate(const USkeleton* Skeleton, const FBoneContainer& RequiredBones)
