@@ -210,6 +210,11 @@ public:
 	/** Use a fixed DeltaTime instead of real delta time if > 0. (It can help to obtain a consistent result regardless of the frame rate.) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = "Solve", meta = (ClampMin = "0.0", ForceUnits = "s"))
 	float FixedDeltaTime = 0.0f;
+	/** When using FixedDeltaTime, DeltaTime is corrected based on FixedDeltaTime in the current FrameRate. (It can help to obtain a consistent result regardless of the frame rate.) */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = "Solve")
+	bool bApplyDeltaTimeCorrection = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = "Solve", meta = (EditCondition = "bApplyDeltaTimeCorrection", ClampMin = "0.0"))
+	float DeltaTimeCorrectionTargetFrameRate = 60.0f;
 
 	/** Limit delta time in situations where the frame rate fluctuates. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = "Solve", meta = (ClampMin = "0.0", ForceUnits = "s"))

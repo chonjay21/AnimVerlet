@@ -773,7 +773,20 @@ void FLKAnimNode_AnimVerlet::MakeFakeBoneTransform(OUT FTransform& OutTransform,
 
 void FLKAnimNode_AnimVerlet::UpdateDeltaTime(float InDeltaTime, float InTimeDilation)
 {
-	DeltaTime = FMath::IsNearlyZero(FixedDeltaTime, KINDA_SMALL_NUMBER) ? FMath::Clamp(InDeltaTime, MinDeltaTime, MaxDeltaTime) : FMath::Clamp(FixedDeltaTime * InTimeDilation, MinDeltaTime, MaxDeltaTime);
+	float TargetDeltaTime = InDeltaTime;
+	if (FMath::IsNearlyZero(FixedDeltaTime, KINDA_SMALL_NUMBER) == false)
+	{
+		if (bApplyDeltaTimeCorrection)
+		{
+			const float TargetFPS = (60.0f * InDeltaTime) / 0.0166f;
+			TargetDeltaTime = ((FixedDeltaTime * InTimeDilation) * TargetFPS / FMath::Max(KINDA_SMALL_NUMBER, DeltaTimeCorrectionTargetFrameRate));
+		}
+		else
+		{
+			TargetDeltaTime = FixedDeltaTime * InTimeDilation;
+		}
+	}
+	DeltaTime = FMath::Clamp(TargetDeltaTime, MinDeltaTime, MaxDeltaTime);
 }
 
 void FLKAnimNode_AnimVerlet::PrepareSimulation(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer, const FTransform& ComponentTransform)
@@ -1824,6 +1837,8 @@ void FLKAnimNode_AnimVerlet::SyncFromOtherAnimVerletNode(const FLKAnimNode_AnimV
 	SolveIteration = Other.SolveIteration;
 
 	FixedDeltaTime = Other.FixedDeltaTime;
+	bApplyDeltaTimeCorrection = Other.bApplyDeltaTimeCorrection;
+	DeltaTimeCorrectionTargetFrameRate = Other.DeltaTimeCorrectionTargetFrameRate;
 	MinDeltaTime = Other.MinDeltaTime;
 	MaxDeltaTime = Other.MaxDeltaTime;
 	bUseSquaredDeltaTime = Other.bUseSquaredDeltaTime;
