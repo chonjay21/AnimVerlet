@@ -1,7 +1,7 @@
 {
 	"FileVersion": 3,
 	"Version": 3,
-	"VersionName": "3.1",
+	"VersionName": "3.2",
 	"FriendlyName": "AnimVerlet",
 	"Description": "Simple cloth and string anim dynamics(by verlet integration)",
 	"Category": "Animation",
