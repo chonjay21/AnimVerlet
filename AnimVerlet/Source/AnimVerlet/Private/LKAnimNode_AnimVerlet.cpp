@@ -1256,7 +1256,7 @@ void FLKAnimNode_AnimVerlet::PreUpdateBones(const UWorld* World, float InDeltaTi
 			NewWind.RandomForceSizeMax = CurWind.RandomForceSizeMax;
 			NewWind.bRandomForceDirectionInWorldSpace = CurWind.bRandomForceDirectionInWorldSpace;
 		}
-		VerletUpdateParam.Damping = bApplyDampingCorrection ? FMath::Pow(Damping, (DampingCorrectionTargetFrameRate / FMath::Max(KINDA_SMALL_NUMBER, GAverageFPS))) : Damping;
+		VerletUpdateParam.Damping = bApplyDampingCorrection ? FMath::Clamp(FMath::Pow(Damping, (DampingCorrectionTargetFrameRate / FMath::Max(KINDA_SMALL_NUMBER, GAverageFPS))), 0.0f, 1.0f) : Damping;
 	}
 
 	/// Simulate each bones	
