@@ -5,6 +5,8 @@
 #include <Animation/AnimTypes.h>
 #include <DrawDebugHelpers.h>
 #include <Kismet/KismetSystemLibrary.h>
+#include <PhysicsEngine/PhysicsAsset.h>
+#include <PhysicsEngine/SkeletalBodySetup.h>
 #include "LKAnimVerletCollisionData.h"
 
 #if LK_ENABLE_ANIMVERLET_DEBUG
@@ -523,6 +525,8 @@ void FLKAnimNode_AnimVerlet::InitializeLocalCollisionConstraints(const FBoneCont
 	SimulatingCollisionShapes.PlaneCollisionShapes = PlaneCollisionShapes;
 	if (CollisionDataAsset != nullptr)
 		CollisionDataAsset->ConvertToShape(OUT SimulatingCollisionShapes);
+	if (CollisionPhysicsAsset != nullptr)
+		ConvertPhysicsAssetToShape(OUT SimulatingCollisionShapes, BoneContainer, *CollisionPhysicsAsset);
 
 	for (FLKAnimVerletCollisionSphere& CurShape : SimulatingCollisionShapes.SphereCollisionShapes)
 	{
@@ -1123,6 +1127,49 @@ void FLKAnimNode_AnimVerlet::PrepareLocalCollisionConstraints(FComponentSpacePos
 				PlaneCollisionConstraints.Emplace(BoneLocation, BoneRotation.GetUpVector(), BoneRotation,
 												  CurShapePlane.bFinitePlane ? CurShapePlane.FinitePlaneHalfExtents : FVector2D::ZeroVector,
 												  CollisionConstraintInput);
+			}
+		}
+	}
+}
+
+void FLKAnimNode_AnimVerlet::ConvertPhysicsAssetToShape(OUT FLKAnimVerletCollisionShapeList& OutShapeList, const FBoneContainer& BoneContainer, const UPhysicsAsset& InPhysicsAsset) const
+{
+	for (const TObjectPtr<USkeletalBodySetup>& BodySetup : InPhysicsAsset.SkeletalBodySetups)
+	{
+		FBoneReference AttachedBone = BodySetup->BoneName;
+		AttachedBone.Initialize(BoneContainer);
+		if (AttachedBone.IsValidToEvaluate(BoneContainer) == false)
+			continue;
+
+		const FKAggregateGeom& CurGeometry = BodySetup->AggGeom;
+		for (const FKSphereElem& SphereElem : CurGeometry.SphereElems)
+		{
+			FLKAnimVerletCollisionSphere& SphereShape = OutShapeList.SphereCollisionShapes.Emplace_GetRef();
+			{
+				SphereShape.AttachedBone = AttachedBone;
+				SphereShape.LocationOffset = SphereElem.Center;
+				SphereShape.Radius = SphereElem.Radius;
+			}
+		}
+		for (const FKSphylElem& CapsuleElem : CurGeometry.SphylElems)
+		{
+			FLKAnimVerletCollisionCapsule& CapsuleShape = OutShapeList.CapsuleCollisionShapes.Emplace_GetRef();
+			{
+				CapsuleShape.AttachedBone = AttachedBone;
+				CapsuleShape.LocationOffset = CapsuleElem.Center;
+				CapsuleShape.RotationOffset = CapsuleElem.Rotation;
+				CapsuleShape.Radius = CapsuleElem.Radius;
+				CapsuleShape.HalfHeight = CapsuleElem.Length * 0.5f;
+			}
+		}
+		for (const FKBoxElem& BoxElem : CurGeometry.BoxElems)
+		{
+			FLKAnimVerletCollisionBox& BoxShape = OutShapeList.BoxCollisionShapes.Emplace_GetRef();
+			{
+				BoxShape.AttachedBone = AttachedBone;
+				BoxShape.LocationOffset = BoxElem.Center;
+				BoxShape.RotationOffset = BoxElem.Rotation;
+				BoxShape.HalfExtents = FVector(BoxElem.X, BoxElem.Y, BoxElem.Z) * 0.5f;
 			}
 		}
 	}
@@ -1862,6 +1909,7 @@ void FLKAnimNode_AnimVerlet::SyncFromOtherAnimVerletNode(const FLKAnimNode_AnimV
 	BoxCollisionShapes = Other.BoxCollisionShapes;
 	PlaneCollisionShapes = Other.PlaneCollisionShapes;
 	CollisionDataAsset = Other.CollisionDataAsset;
+	CollisionPhysicsAsset = Other.CollisionPhysicsAsset;
 	DynamicCollisionShapes = Other.DynamicCollisionShapes;
 
 	Gravity = Other.Gravity;

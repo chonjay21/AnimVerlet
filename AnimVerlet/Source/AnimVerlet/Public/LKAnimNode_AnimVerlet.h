@@ -50,6 +50,7 @@ private:
 	void UpdateDeltaTime(float InDeltaTime, float InTimeDilation);
 	void PrepareSimulation(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer, const FTransform& ComponentTransform);
 	void PrepareLocalCollisionConstraints(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer, const FTransform& ComponentTransform);
+	void ConvertPhysicsAssetToShape(OUT FLKAnimVerletCollisionShapeList& OutShapeList, const FBoneContainer& BoneContainer, const class UPhysicsAsset& InPhysicsAsset) const;
 	void SimulateVerlet(const UWorld* World, float InDeltaTime, const FTransform& ComponentTransform, const FTransform& PrevComponentTransform);
 	void PreUpdateBones(const UWorld* World, float InDeltaTime, const FTransform& ComponentTransform, const FTransform& PrevComponentTransform);
 	void SolveConstraints(float InDeltaTime);
@@ -263,6 +264,9 @@ public:
 	/** For sharing collision data from pre made data */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Collision", meta = (PinHiddenByDefault))
 	class ULKAnimVerletCollisionDataAsset* CollisionDataAsset = nullptr;
+	/** For sharing collision data from pre made data (Can not modify in preview window like CollisionDataAsset) */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Collision", meta = (PinHiddenByDefault))
+	class UPhysicsAsset* CollisionPhysicsAsset = nullptr;
 	/** For sharing collision data from Animation Blueprint or external source code etc every frame */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Collision", meta = (PinShownByDefault))
 	FLKAnimVerletCollisionShapeList DynamicCollisionShapes;
