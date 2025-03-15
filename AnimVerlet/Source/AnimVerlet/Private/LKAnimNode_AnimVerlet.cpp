@@ -1156,6 +1156,7 @@ void FLKAnimNode_AnimVerlet::PreUpdateBones(const UWorld* World, float InDeltaTi
 	const bool bUseWindComponentInWorld = (bAdjustWindComponent && World->Scene != nullptr);
 	FLKAnimVerletUpdateParam VerletUpdateParam;
 	{
+		extern ENGINE_API float GAverageFPS;
 		/// Clamp Move Intertia
 		{
 			const FVector PrevComponentLocation = PrevComponentTransform.GetLocation();
@@ -1165,7 +1166,9 @@ void FLKAnimNode_AnimVerlet::PreUpdateBones(const UWorld* World, float InDeltaTi
 			VerletUpdateParam.ComponentMoveDiff.ToDirectionAndLength(OUT MoveDiffDir, OUT MoveDiffDist);
 
 			MoveDiffDist = bClampMoveInertia ? FMath::Clamp(MoveDiffDist, 0.0f, MoveInertiaClampMaxDistance) : MoveDiffDist;
-			VerletUpdateParam.ComponentMoveDiff = MoveDiffDir * MoveDiffDist * MoveInertiaScale;
+
+			const float TargetMoveInertiaScale = bApplyMoveInertiaScaleCorrection ? (MoveInertiaScale * GAverageFPS / FMath::Max(KINDA_SMALL_NUMBER, MoveInertiaScaleTargetFrameRate)) : MoveInertiaScale;
+			VerletUpdateParam.ComponentMoveDiff = MoveDiffDir * MoveDiffDist * TargetMoveInertiaScale;
 		}
 
 		/// Clamp Rotation Intertia
@@ -1179,7 +1182,9 @@ void FLKAnimNode_AnimVerlet::PreUpdateBones(const UWorld* World, float InDeltaTi
 			float DiffAngeDegrees = FMath::RadiansToDegrees(RotDiffAngle);
 			if (bClampRotationInertia && FMath::Abs(DiffAngeDegrees) > RotationInertiaClampDegrees)
 				DiffAngeDegrees = FMath::Sign(DiffAngeDegrees) * RotationInertiaClampDegrees;
-			VerletUpdateParam.ComponentRotDiff = FQuat(RotDiffAxis, FMath::DegreesToRadians(DiffAngeDegrees * RotationInertiaScale));
+
+			const float TargetRotationInertiaScale = bApplyRotationInertiaScaleCorrection ? (RotationInertiaScale * GAverageFPS / FMath::Max(KINDA_SMALL_NUMBER, RotationInertiaScaleTargetFrameRate)) : RotationInertiaScale;
+			VerletUpdateParam.ComponentRotDiff = FQuat(RotDiffAxis, FMath::DegreesToRadians(DiffAngeDegrees * TargetRotationInertiaScale));
 		}
 
 		VerletUpdateParam.bUseSquaredDeltaTime = bUseSquaredDeltaTime;
@@ -1202,7 +1207,7 @@ void FLKAnimNode_AnimVerlet::PreUpdateBones(const UWorld* World, float InDeltaTi
 			NewWind.RandomForceSizeMax = CurWind.RandomForceSizeMax;
 			NewWind.bRandomForceDirectionInWorldSpace = CurWind.bRandomForceDirectionInWorldSpace;
 		}
-		VerletUpdateParam.Damping = Damping;
+		VerletUpdateParam.Damping = bApplyDampingCorrection ? FMath::Pow(Damping, (DampingCorrectionTargetFrameRate / FMath::Max(KINDA_SMALL_NUMBER, GAverageFPS))) : Damping;
 	}
 
 	/// Simulate each bones	
@@ -1806,6 +1811,8 @@ void FLKAnimNode_AnimVerlet::SyncFromOtherAnimVerletNode(const FLKAnimNode_AnimV
 	AnimationPoseInertia = Other.AnimationPoseInertia;
 
 	Damping = Other.Damping;
+	bApplyDampingCorrection = Other.bApplyDampingCorrection;
+	DampingCorrectionTargetFrameRate = Other.DampingCorrectionTargetFrameRate;
 
 	bUseXPBDSolver = Other.bUseXPBDSolver;
 	InvCompliance = Other.InvCompliance;
@@ -1876,9 +1883,14 @@ void FLKAnimNode_AnimVerlet::SyncFromOtherAnimVerletNode(const FLKAnimNode_AnimV
 	WindComponentScale = Other.WindComponentScale;
 
 	MoveInertiaScale = Other.MoveInertiaScale;
+	bApplyMoveInertiaScaleCorrection = Other.bApplyMoveInertiaScaleCorrection;
+	MoveInertiaScaleTargetFrameRate = Other.MoveInertiaScaleTargetFrameRate;
 	bClampMoveInertia = Other.bClampMoveInertia;
 	MoveInertiaClampMaxDistance = Other.MoveInertiaClampMaxDistance;
+
 	RotationInertiaScale = Other.RotationInertiaScale;
+	bApplyRotationInertiaScaleCorrection = Other.bApplyRotationInertiaScaleCorrection;
+	RotationInertiaScaleTargetFrameRate = Other.RotationInertiaScaleTargetFrameRate;
 	bClampRotationInertia = Other.bClampRotationInertia;
 	RotationInertiaClampDegrees = Other.RotationInertiaClampDegrees;
 }

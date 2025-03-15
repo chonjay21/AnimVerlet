@@ -138,6 +138,11 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Solve", meta = (ClampMin = "0.0", ClampMax = "1.0"))
 	float Damping = 0.9f;
+	/** Based on DampingCorrectionTargetFrameRate, the Damping value at the current FrameRate is adjusted. (It can help to obtain a consistent result regardless of the frame rate.) */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Solve")
+	bool bApplyDampingCorrection = false;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Solve", meta = (EditCondition = "bApplyDampingCorrection", ClampMin = "0.0"))
+	float DampingCorrectionTargetFrameRate = 60.0f;
 
 	/** Use XPBD(Extended Position Based Dynamics) or PBD(Position Based Dynamics) solving constraints */
 	UPROPERTY(EditAnywhere, Category = "Solve")
@@ -303,14 +308,25 @@ public:
 	/** The scale to be applied to the inertia caused by the component's positional movement in the world. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inertia", meta = (PinHiddenByDefault, ClampMin = "0.0"))
 	float MoveInertiaScale = 1.0f;
+	/** Based on MoveInertiaScaleTargetFrameRate, the MoveInertiaScale value at the current FrameRate is adjusted. (It can help to obtain a consistent result regardless of the frame rate.) */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inertia", meta = (PinHiddenByDefault))
+	bool bApplyMoveInertiaScaleCorrection = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inertia", meta = (PinHiddenByDefault, EditCondition = "bApplyMoveInertiaScaleCorrection", ClampMin = "0.0"))
+	float MoveInertiaScaleTargetFrameRate = 60.0f;
 	/** Limits the amount of inertia caused by the component's positional movement in the world. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inertia", meta = (PinHiddenByDefault))
 	bool bClampMoveInertia = true;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inertia", meta = (PinHiddenByDefault, EditCondition = "bClampMoveInertia", EditConditionHides, ClampMin = "0.0", ForceUnits = "cm"))
 	float MoveInertiaClampMaxDistance = 300.0f;
+
 	/** The scale to be applied to the inertia caused by the component's rotational movement in the world. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inertia", meta = (PinHiddenByDefault, ClampMin = "0.0"))
 	float RotationInertiaScale = 1.0f;
+	/** Based on RotationInertiaScaleTargetFrameRate, the RotationInertiaScale value at the current FrameRate is adjusted. (It can help to obtain a consistent result regardless of the frame rate.) */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inertia", meta = (PinHiddenByDefault))
+	bool bApplyRotationInertiaScaleCorrection = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inertia", meta = (PinHiddenByDefault, EditCondition = "bApplyRotationInertiaScaleCorrection", ClampMin = "0.0"))
+	float RotationInertiaScaleTargetFrameRate = 60.0f;
 	/** Limits the amount of inertia caused by the component's rotational movement in the world. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inertia", meta = (PinHiddenByDefault))
 	bool bClampRotationInertia = true;
