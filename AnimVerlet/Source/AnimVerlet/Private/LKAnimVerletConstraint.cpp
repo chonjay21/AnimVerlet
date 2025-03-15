@@ -566,12 +566,24 @@ void FLKAnimVerletConstraint_Sphere::Update(float DeltaTime, bool bFinalize)
 		{
 			verify(BonePairs != nullptr);
 			if (Lambdas.Num() != BonePairs->Num())
+			{
+				#if	(ENGINE_MINOR_VERSION >= 5)
+				Lambdas.SetNum(BonePairs->Num(), EAllowShrinking::No);
+				#else
 				Lambdas.SetNum(BonePairs->Num(), false);
+				#endif
+			}
 		}
 		else
 		{
 			if (Lambdas.Num() != Bones->Num())
+			{
+				#if	(ENGINE_MINOR_VERSION >= 5)
+				Lambdas.SetNum(Bones->Num(), EAllowShrinking::No);
+				#else
 				Lambdas.SetNum(Bones->Num(), false);
+				#endif
+			}
 		}
 	}
 
@@ -752,12 +764,24 @@ void FLKAnimVerletConstraint_Capsule::Update(float DeltaTime, bool bFinalize)
 		{
 			verify(BonePairs != nullptr);
 			if (Lambdas.Num() != BonePairs->Num())
+			{
+				#if	(ENGINE_MINOR_VERSION >= 5)
+				Lambdas.SetNum(BonePairs->Num(), EAllowShrinking::No);
+				#else
 				Lambdas.SetNum(BonePairs->Num(), false);
+				#endif
+			}
 		}
 		else
 		{
 			if (Lambdas.Num() != Bones->Num())
+			{
+				#if	(ENGINE_MINOR_VERSION >= 5)
+				Lambdas.SetNum(Bones->Num(), EAllowShrinking::No);
+				#else
 				Lambdas.SetNum(Bones->Num(), false);
+				#endif
+			}
 		}
 	}
 
@@ -959,12 +983,24 @@ void FLKAnimVerletConstraint_Box::Update(float DeltaTime, bool bFinalize)
 		{
 			verify(BonePairs != nullptr);
 			if (Lambdas.Num() != BonePairs->Num())
+			{
+				#if	(ENGINE_MINOR_VERSION >= 5)
+				Lambdas.SetNum(BonePairs->Num(), EAllowShrinking::No);
+				#else
 				Lambdas.SetNum(BonePairs->Num(), false);
+				#endif
+			}
 		}
 		else
 		{
 			if (Lambdas.Num() != Bones->Num())
+			{
+				#if	(ENGINE_MINOR_VERSION >= 5)
+				Lambdas.SetNum(Bones->Num(), EAllowShrinking::No);
+				#else
 				Lambdas.SetNum(Bones->Num(), false);
+				#endif
+			}
 		}
 	}
 
@@ -1352,12 +1388,24 @@ void FLKAnimVerletConstraint_Plane::Update(float DeltaTime, bool bFinalize)
 		{
 			verify(BonePairs != nullptr);
 			if (Lambdas.Num() != BonePairs->Num())
+			{
+				#if	(ENGINE_MINOR_VERSION >= 5)
+				Lambdas.SetNum(BonePairs->Num(), EAllowShrinking::No);
+				#else
 				Lambdas.SetNum(BonePairs->Num(), false);
+				#endif
+			}
 		}
 		else
 		{
 			if (Lambdas.Num() != Bones->Num())
+			{
+				#if	(ENGINE_MINOR_VERSION >= 5)
+				Lambdas.SetNum(Bones->Num(), EAllowShrinking::No);
+				#else
 				Lambdas.SetNum(Bones->Num(), false);
+				#endif
+			}
 		}
 	}
 
