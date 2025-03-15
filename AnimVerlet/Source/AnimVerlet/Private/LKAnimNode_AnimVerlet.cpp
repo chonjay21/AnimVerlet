@@ -6,7 +6,9 @@
 #include <DrawDebugHelpers.h>
 #include <Kismet/KismetSystemLibrary.h>
 #include <PhysicsEngine/PhysicsAsset.h>
+#if (ENGINE_MINOR_VERSION >= 5)
 #include <PhysicsEngine/SkeletalBodySetup.h>
+#endif
 #include "LKAnimVerletCollisionData.h"
 
 #if LK_ENABLE_ANIMVERLET_DEBUG
