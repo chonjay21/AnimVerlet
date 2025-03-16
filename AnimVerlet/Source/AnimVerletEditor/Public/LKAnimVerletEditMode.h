@@ -3,7 +3,23 @@
 #include <CoreMinimal.h>
 #include "LKAnimGraphNode_AnimVerlet.h"
 #include "LKAnimNode_AnimVerlet.h"
+#include "LKAnimVerletCollisionPhysicsAsset.h"
 #include "LKAnimVerletType.h"
+
+///=========================================================================================================================================
+/// ELKAnimVerletColliderSource
+///=========================================================================================================================================
+UENUM()
+enum class ELKAnimVerletColliderSource : uint8
+{
+	None,
+
+	Node,
+	DataAsset,
+	PhysicsAsset,
+
+	Count
+};
 
 ///=========================================================================================================================================
 /// FLKAnimVerletEditModeSelection
@@ -12,23 +28,26 @@ struct FLKAnimVerletEditModeSelection
 {
 public:
 	ELKAnimVerletCollider ColliderType = ELKAnimVerletCollider::None;
-	bool bColliderFromDA = false;
+	ELKAnimVerletColliderSource ColliderSourceType = ELKAnimVerletColliderSource::None;
 	int32 ColliderListIndex = INDEX_NONE;
+	int32 OptionalBodySetupIndex = INDEX_NONE;
 
 public:
-	void Select(ELKAnimVerletCollider InColliderType, bool bInColliderFromDA, int32 InColliderListIndex)
+	void Select(ELKAnimVerletCollider InColliderType, ELKAnimVerletColliderSource InColliderSourceType, int32 InColliderListIndex, int32 InOptionalBodySetupIndex)
 	{
 		ColliderType = InColliderType;
-		bColliderFromDA = bInColliderFromDA;
+		ColliderSourceType = InColliderSourceType;
 		ColliderListIndex = InColliderListIndex;
+		OptionalBodySetupIndex = InOptionalBodySetupIndex;
 	}
 
 	bool IsSelected() const { return ColliderType != ELKAnimVerletCollider::None && ColliderListIndex != INDEX_NONE; }
 	void ResetSelection()
 	{
 		ColliderType = ELKAnimVerletCollider::None;
-		bColliderFromDA = false;
+		ColliderSourceType = ELKAnimVerletColliderSource::None;
 		ColliderListIndex = INDEX_NONE;
+		OptionalBodySetupIndex = INDEX_NONE;
 	}
 };
 
@@ -77,10 +96,11 @@ private:
 	void RenderCapsuleColliders(class FPrimitiveDrawInterface* PDI, const USkeletalMeshComponent* PreviewMeshComponent);
 	void RenderBoxColliders(class FPrimitiveDrawInterface* PDI, const USkeletalMeshComponent* PreviewMeshComponent);
 	void RenderPlaneColliders(class FPrimitiveDrawInterface* PDI, const USkeletalMeshComponent* PreviewMeshComponent);
+	void RenderText(const class FViewport* Viewport, const class FSceneView* View, class FCanvas* Canvas, const FVector& Location, const FText& Text);
 
 	bool ValidateSelection(bool bGraphNode) const;
-	struct FLKAnimVerletColliderInterface* GetSelectedColliderFromGraphNode() const;			///Editor Graph setting
-	struct FLKAnimVerletColliderInterface* GetSelectedColliderFromRuntime() const;				///Preview or real runtime setting
+	struct FLKAnimVerletColliderInterface* GetSelectedColliderFromGraphNode(bool bMarkDirty) const;				///Editor Graph setting
+	struct FLKAnimVerletColliderInterface* GetSelectedColliderFromRuntime(bool bMarkDirty) const;				///Preview or real runtime setting
 
 	bool ConvertBoneTToWorldT(OUT FTransform& OutWorldT, const USkeletalMeshComponent* SkeletalMeshComponent, const FName& BoneName) const;
 	FTransform GetColliderWorldT(const struct FLKAnimVerletColliderInterface& InCollider, const USkeletalMeshComponent* SkeletalMeshComponent) const;
@@ -97,4 +117,11 @@ private:
 
 	LK_UEWIDGET::EWidgetMode CurrentWidgetMode = LK_UEWIDGET::EWidgetMode::WM_Translate;
 	mutable FLKAnimVerletEditModeSelection SelectedElement;
+
+	mutable FLKAnimVerletCollisionPASphere PASphereRuntimeSpace;
+	mutable FLKAnimVerletCollisionPASphere PASphereGraphNodeSpace;
+	mutable FLKAnimVerletCollisionPACapsule PACapsuleRuntimeSpace;
+	mutable FLKAnimVerletCollisionPACapsule PACapsuleGraphNodeSpace;
+	mutable FLKAnimVerletCollisionPABox PABoxRuntimeSpace;
+	mutable FLKAnimVerletCollisionPABox PABoxGraphNodeSpace;
 };
