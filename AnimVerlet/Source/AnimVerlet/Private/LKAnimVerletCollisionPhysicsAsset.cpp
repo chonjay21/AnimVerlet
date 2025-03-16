@@ -1,7 +1,6 @@
 #include "LKAnimVerletCollisionPhysicsAsset.h"
 
 #include <DrawDebugHelpers.h>
-#include <PhysicsEngine/PhysicsAsset.h>
 #if (ENGINE_MINOR_VERSION >= 5)
 #include <PhysicsEngine/SkeletalBodySetup.h>
 #endif
