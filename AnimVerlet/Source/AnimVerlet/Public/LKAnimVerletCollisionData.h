@@ -75,6 +75,7 @@ public:
 public:
 	void ConvertToShape(OUT struct FLKAnimVerletCollisionSphere& OutSphere) const;
 	void ConvertFromShape(const struct FLKAnimVerletCollisionSphere& InSphere);
+	void ConvertFromPhysicsAsset(const struct FKSphereElem& InSphere, const FName& InAttachBoneName);
 };
 ///=========================================================================================================================================
 
@@ -111,6 +112,7 @@ public:
 public:
 	void ConvertToShape(OUT struct FLKAnimVerletCollisionCapsule& OutCapsule) const;
 	void ConvertFromShape(const struct FLKAnimVerletCollisionCapsule& InCapsule);
+	void ConvertFromPhysicsAsset(const struct FKSphylElem& InCapsule, const FName& InAttachBoneName);
 };
 ///=========================================================================================================================================
 
@@ -144,6 +146,7 @@ public:
 public:
 	void ConvertToShape(OUT struct FLKAnimVerletCollisionBox& OutBox) const;
 	void ConvertFromShape(const struct FLKAnimVerletCollisionBox& InBox);
+	void ConvertFromPhysicsAsset(const struct FKBoxElem& InBox, const FName& InAttachBoneName);
 };
 ///=========================================================================================================================================
 

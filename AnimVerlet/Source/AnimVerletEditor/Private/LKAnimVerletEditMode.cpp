@@ -101,9 +101,9 @@ void FLKAnimVerletEditMode::RenderSphereColliders(FPrimitiveDrawInterface* PDI, 
 				const FKSphereElem& SphereElem = CurGeometry.SphereElems[GeomI];		
 				FLKAnimVerletCollisionSphere SphereShape;
 				{
-					SphereShape.AttachedBone = BodySetup->BoneName;
-					SphereShape.LocationOffset = SphereElem.Center;
-					SphereShape.Radius = SphereElem.Radius;
+					FLKAnimVerletCollisionDataSphere SphereData;
+					SphereData.ConvertFromPhysicsAsset(SphereElem, BodySetup->BoneName);
+					SphereData.ConvertToShape(SphereShape);
 				}
 
 				const FTransform CollisionWorldT = GetColliderWorldT(SphereShape, PreviewMeshComponent);
@@ -186,11 +186,9 @@ void FLKAnimVerletEditMode::RenderCapsuleColliders(FPrimitiveDrawInterface* PDI,
 				const FKSphylElem& CapsuleElem = CurGeometry.SphylElems[GeomI];
 				FLKAnimVerletCollisionCapsule CapsuleShape;
 				{
-					CapsuleShape.AttachedBone = BodySetup->BoneName;
-					CapsuleShape.LocationOffset = CapsuleElem.Center;
-					CapsuleShape.RotationOffset = CapsuleElem.Rotation;
-					CapsuleShape.Radius = CapsuleElem.Radius;
-					CapsuleShape.HalfHeight = CapsuleElem.Length * 0.5f;
+					FLKAnimVerletCollisionDataCapsule CapsuleData;
+					CapsuleData.ConvertFromPhysicsAsset(CapsuleElem, BodySetup->BoneName);
+					CapsuleData.ConvertToShape(CapsuleShape);
 				}
 
 				const FTransform CollisionWorldT = GetColliderWorldT(CapsuleShape, PreviewMeshComponent);
@@ -275,10 +273,9 @@ void FLKAnimVerletEditMode::RenderBoxColliders(FPrimitiveDrawInterface* PDI, con
 				const FKBoxElem& BoxElem = CurGeometry.BoxElems[GeomI];
 				FLKAnimVerletCollisionBox BoxShape;
 				{
-					BoxShape.AttachedBone = BodySetup->BoneName;
-					BoxShape.LocationOffset = BoxElem.Center;
-					BoxShape.RotationOffset = BoxElem.Rotation;
-					BoxShape.HalfExtents = FVector(BoxElem.X, BoxElem.Y, BoxElem.Z) * 0.5f;
+					FLKAnimVerletCollisionDataBox BoxData;
+					BoxData.ConvertFromPhysicsAsset(BoxElem, BodySetup->BoneName);
+					BoxData.ConvertToShape(BoxShape);
 				}
 
 				const FTransform CollisionWorldT = GetColliderWorldT(BoxShape, PreviewMeshComponent);
@@ -382,89 +379,95 @@ void FLKAnimVerletEditMode::DrawHUD(FEditorViewportClient* ViewportClient, FView
 	///	AnimNode->DrawCanvas(*Viewport, *const_cast<FSceneView*>(View), *Canvas, GetAnimPreviewScene().GetPreviewMeshComponent());
 	///}
 	
-	const USkeletalMeshComponent* PreviewMeshComponent = GetAnimPreviewScene().GetPreviewMeshComponent();
-	if (PreviewMeshComponent != nullptr && PreviewMeshComponent->GetSkeletalMeshAsset() != nullptr)
-	{
-		if (CachedAnimVerletGraphNode->Node.CollisionDataAsset != nullptr)
-		{
-			for (int32 i = 0; i < CachedAnimVerletGraphNode->Node.CollisionDataAsset->CollisionDataList.SphereCollisionData.Num(); i++)
-			{
-				const FLKAnimVerletCollisionDataSphere& CurShapeData = CachedAnimVerletGraphNode->Node.CollisionDataAsset->CollisionDataList.SphereCollisionData[i];
-				const FTransform CollisionWorldT = GetColliderWorldT(CurShapeData, PreviewMeshComponent);
-				const FVector ShapeLocation = CollisionWorldT.GetLocation();
-				RenderText(Viewport, View, Canvas, ShapeLocation, FText::FromString(TEXT("DataAsset")));
-			}
-			for (int32 i = 0; i < CachedAnimVerletGraphNode->Node.CollisionDataAsset->CollisionDataList.CapsuleCollisionData.Num(); i++)
-			{
-				const FLKAnimVerletCollisionDataCapsule& CurShapeData = CachedAnimVerletGraphNode->Node.CollisionDataAsset->CollisionDataList.CapsuleCollisionData[i];
-				const FTransform CollisionWorldT = GetColliderWorldT(CurShapeData, PreviewMeshComponent);
-				const FVector ShapeLocation = CollisionWorldT.GetLocation();
-				RenderText(Viewport, View, Canvas, ShapeLocation, FText::FromString(TEXT("DataAsset")));
-			}
-			for (int32 i = 0; i < CachedAnimVerletGraphNode->Node.CollisionDataAsset->CollisionDataList.BoxCollisionData.Num(); i++)
-			{
-				const FLKAnimVerletCollisionDataBox& CurShapeData = CachedAnimVerletGraphNode->Node.CollisionDataAsset->CollisionDataList.BoxCollisionData[i];
-				const FTransform CollisionWorldT = GetColliderWorldT(CurShapeData, PreviewMeshComponent);
-				const FVector ShapeLocation = CollisionWorldT.GetLocation();
-				RenderText(Viewport, View, Canvas, ShapeLocation, FText::FromString(TEXT("DataAsset")));
-			}
-			for (int32 i = 0; i < CachedAnimVerletGraphNode->Node.CollisionDataAsset->CollisionDataList.PlaneCollisionData.Num(); i++)
-			{
-				const FLKAnimVerletCollisionDataPlane& CurShapeData = CachedAnimVerletGraphNode->Node.CollisionDataAsset->CollisionDataList.PlaneCollisionData[i];
-				const FTransform CollisionWorldT = GetColliderWorldT(CurShapeData, PreviewMeshComponent);
-				const FVector ShapeLocation = CollisionWorldT.GetLocation();
-				RenderText(Viewport, View, Canvas, ShapeLocation, FText::FromString(TEXT("DataAsset")));
-			}
-		}
+	if (CachedAnimVerletGraphNode == nullptr)
+		return;
+	
+	if (CachedAnimVerletGraphNode->bShowCollisionAssetSource == false)
+		return;
 
-		if (CachedAnimVerletGraphNode->Node.CollisionPhysicsAsset != nullptr)
+	const USkeletalMeshComponent* PreviewMeshComponent = GetAnimPreviewScene().GetPreviewMeshComponent();
+	if (PreviewMeshComponent == nullptr || PreviewMeshComponent->GetSkeletalMeshAsset() == nullptr)
+		return;
+
+	if (CachedAnimVerletGraphNode->Node.CollisionDataAsset != nullptr)
+	{
+		for (int32 i = 0; i < CachedAnimVerletGraphNode->Node.CollisionDataAsset->CollisionDataList.SphereCollisionData.Num(); i++)
 		{
-			for (int32 BodySetupI = 0; BodySetupI < CachedAnimVerletGraphNode->Node.CollisionPhysicsAsset->SkeletalBodySetups.Num(); ++BodySetupI)
+			const FLKAnimVerletCollisionDataSphere& CurShapeData = CachedAnimVerletGraphNode->Node.CollisionDataAsset->CollisionDataList.SphereCollisionData[i];
+			const FTransform CollisionWorldT = GetColliderWorldT(CurShapeData, PreviewMeshComponent);
+			const FVector ShapeLocation = CollisionWorldT.GetLocation();
+			RenderText(Viewport, View, Canvas, ShapeLocation, FText::FromString(TEXT("DataAsset")));
+		}
+		for (int32 i = 0; i < CachedAnimVerletGraphNode->Node.CollisionDataAsset->CollisionDataList.CapsuleCollisionData.Num(); i++)
+		{
+			const FLKAnimVerletCollisionDataCapsule& CurShapeData = CachedAnimVerletGraphNode->Node.CollisionDataAsset->CollisionDataList.CapsuleCollisionData[i];
+			const FTransform CollisionWorldT = GetColliderWorldT(CurShapeData, PreviewMeshComponent);
+			const FVector ShapeLocation = CollisionWorldT.GetLocation();
+			RenderText(Viewport, View, Canvas, ShapeLocation, FText::FromString(TEXT("DataAsset")));
+		}
+		for (int32 i = 0; i < CachedAnimVerletGraphNode->Node.CollisionDataAsset->CollisionDataList.BoxCollisionData.Num(); i++)
+		{
+			const FLKAnimVerletCollisionDataBox& CurShapeData = CachedAnimVerletGraphNode->Node.CollisionDataAsset->CollisionDataList.BoxCollisionData[i];
+			const FTransform CollisionWorldT = GetColliderWorldT(CurShapeData, PreviewMeshComponent);
+			const FVector ShapeLocation = CollisionWorldT.GetLocation();
+			RenderText(Viewport, View, Canvas, ShapeLocation, FText::FromString(TEXT("DataAsset")));
+		}
+		for (int32 i = 0; i < CachedAnimVerletGraphNode->Node.CollisionDataAsset->CollisionDataList.PlaneCollisionData.Num(); i++)
+		{
+			const FLKAnimVerletCollisionDataPlane& CurShapeData = CachedAnimVerletGraphNode->Node.CollisionDataAsset->CollisionDataList.PlaneCollisionData[i];
+			const FTransform CollisionWorldT = GetColliderWorldT(CurShapeData, PreviewMeshComponent);
+			const FVector ShapeLocation = CollisionWorldT.GetLocation();
+			RenderText(Viewport, View, Canvas, ShapeLocation, FText::FromString(TEXT("DataAsset")));
+		}
+	}
+
+	if (CachedAnimVerletGraphNode->Node.CollisionPhysicsAsset != nullptr)
+	{
+		for (int32 BodySetupI = 0; BodySetupI < CachedAnimVerletGraphNode->Node.CollisionPhysicsAsset->SkeletalBodySetups.Num(); ++BodySetupI)
+		{
+			const TObjectPtr<USkeletalBodySetup>& BodySetup = CachedAnimVerletGraphNode->Node.CollisionPhysicsAsset->SkeletalBodySetups[BodySetupI];
+			const FKAggregateGeom& CurGeometry = BodySetup->AggGeom;
+			for (int32 GeomI = 0; GeomI < CurGeometry.SphereElems.Num(); ++GeomI)
 			{
-				const TObjectPtr<USkeletalBodySetup>& BodySetup = CachedAnimVerletGraphNode->Node.CollisionPhysicsAsset->SkeletalBodySetups[BodySetupI];
-				const FKAggregateGeom& CurGeometry = BodySetup->AggGeom;
-				for (int32 GeomI = 0; GeomI < CurGeometry.SphereElems.Num(); ++GeomI)
+				const FKSphereElem& SphereElem = CurGeometry.SphereElems[GeomI];
+				FLKAnimVerletCollisionSphere SphereShape;
 				{
-					const FKSphereElem& SphereElem = CurGeometry.SphereElems[GeomI];
-					FLKAnimVerletCollisionSphere SphereShape;
-					{
-						SphereShape.AttachedBone = BodySetup->BoneName;
-						SphereShape.LocationOffset = SphereElem.Center;
-						SphereShape.Radius = SphereElem.Radius;
-					}
-					const FTransform CollisionWorldT = GetColliderWorldT(SphereShape, PreviewMeshComponent);
-					const FVector ShapeLocation = CollisionWorldT.GetLocation();
-					RenderText(Viewport, View, Canvas, ShapeLocation, FText::FromString(TEXT("PhysicsAsset")));
+					SphereShape.AttachedBone = BodySetup->BoneName;
+					SphereShape.LocationOffset = SphereElem.Center;
+					SphereShape.Radius = SphereElem.Radius;
 				}
-				for (int32 GeomI = 0; GeomI < CurGeometry.SphylElems.Num(); ++GeomI)
+				const FTransform CollisionWorldT = GetColliderWorldT(SphereShape, PreviewMeshComponent);
+				const FVector ShapeLocation = CollisionWorldT.GetLocation();
+				RenderText(Viewport, View, Canvas, ShapeLocation, FText::FromString(TEXT("PhysicsAsset")));
+			}
+			for (int32 GeomI = 0; GeomI < CurGeometry.SphylElems.Num(); ++GeomI)
+			{
+				const FKSphylElem& CapsuleElem = CurGeometry.SphylElems[GeomI];
+				FLKAnimVerletCollisionCapsule CapsuleShape;
 				{
-					const FKSphylElem& CapsuleElem = CurGeometry.SphylElems[GeomI];
-					FLKAnimVerletCollisionCapsule CapsuleShape;
-					{
-						CapsuleShape.AttachedBone = BodySetup->BoneName;
-						CapsuleShape.LocationOffset = CapsuleElem.Center;
-						CapsuleShape.RotationOffset = CapsuleElem.Rotation;
-						CapsuleShape.Radius = CapsuleElem.Radius;
-						CapsuleShape.HalfHeight = CapsuleElem.Length * 0.5f;
-					}
-					const FTransform CollisionWorldT = GetColliderWorldT(CapsuleShape, PreviewMeshComponent);
-					const FVector ShapeLocation = CollisionWorldT.GetLocation();
-					RenderText(Viewport, View, Canvas, ShapeLocation, FText::FromString(TEXT("PhysicsAsset")));
+					CapsuleShape.AttachedBone = BodySetup->BoneName;
+					CapsuleShape.LocationOffset = CapsuleElem.Center;
+					CapsuleShape.RotationOffset = CapsuleElem.Rotation;
+					CapsuleShape.Radius = CapsuleElem.Radius;
+					CapsuleShape.HalfHeight = CapsuleElem.Length * 0.5f;
 				}
-				for (int32 GeomI = 0; GeomI < CurGeometry.BoxElems.Num(); ++GeomI)
+				const FTransform CollisionWorldT = GetColliderWorldT(CapsuleShape, PreviewMeshComponent);
+				const FVector ShapeLocation = CollisionWorldT.GetLocation();
+				RenderText(Viewport, View, Canvas, ShapeLocation, FText::FromString(TEXT("PhysicsAsset")));
+			}
+			for (int32 GeomI = 0; GeomI < CurGeometry.BoxElems.Num(); ++GeomI)
+			{
+				const FKBoxElem& BoxElem = CurGeometry.BoxElems[GeomI];
+				FLKAnimVerletCollisionBox BoxShape;
 				{
-					const FKBoxElem& BoxElem = CurGeometry.BoxElems[GeomI];
-					FLKAnimVerletCollisionBox BoxShape;
-					{
-						BoxShape.AttachedBone = BodySetup->BoneName;
-						BoxShape.LocationOffset = BoxElem.Center;
-						BoxShape.RotationOffset = BoxElem.Rotation;
-						BoxShape.HalfExtents = FVector(BoxElem.X, BoxElem.Y, BoxElem.Z) * 0.5f;
-					}
-					const FTransform CollisionWorldT = GetColliderWorldT(BoxShape, PreviewMeshComponent);
-					const FVector ShapeLocation = CollisionWorldT.GetLocation();
-					RenderText(Viewport, View, Canvas, ShapeLocation, FText::FromString(TEXT("PhysicsAsset")));
+					BoxShape.AttachedBone = BodySetup->BoneName;
+					BoxShape.LocationOffset = BoxElem.Center;
+					BoxShape.RotationOffset = BoxElem.Rotation;
+					BoxShape.HalfExtents = FVector(BoxElem.X, BoxElem.Y, BoxElem.Z) * 0.5f;
 				}
+				const FTransform CollisionWorldT = GetColliderWorldT(BoxShape, PreviewMeshComponent);
+				const FVector ShapeLocation = CollisionWorldT.GetLocation();
+				RenderText(Viewport, View, Canvas, ShapeLocation, FText::FromString(TEXT("PhysicsAsset")));
 			}
 		}
 	}

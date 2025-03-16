@@ -528,7 +528,7 @@ void FLKAnimNode_AnimVerlet::InitializeLocalCollisionConstraints(const FBoneCont
 	if (CollisionDataAsset != nullptr)
 		CollisionDataAsset->ConvertToShape(OUT SimulatingCollisionShapes);
 	if (CollisionPhysicsAsset != nullptr)
-		ConvertPhysicsAssetToShape(OUT SimulatingCollisionShapes, BoneContainer, *CollisionPhysicsAsset);
+		ConvertPhysicsAssetToShape(OUT SimulatingCollisionShapes, *CollisionPhysicsAsset, &BoneContainer);
 
 	for (FLKAnimVerletCollisionSphere& CurShape : SimulatingCollisionShapes.SphereCollisionShapes)
 	{
@@ -1134,44 +1134,44 @@ void FLKAnimNode_AnimVerlet::PrepareLocalCollisionConstraints(FComponentSpacePos
 	}
 }
 
-void FLKAnimNode_AnimVerlet::ConvertPhysicsAssetToShape(OUT FLKAnimVerletCollisionShapeList& OutShapeList, const FBoneContainer& BoneContainer, const UPhysicsAsset& InPhysicsAsset) const
+void FLKAnimNode_AnimVerlet::ConvertPhysicsAssetToShape(OUT FLKAnimVerletCollisionShapeList& OutShapeList, const UPhysicsAsset& InPhysicsAsset, const FBoneContainer* BoneContainerNullable) const
 {
 	for (const TObjectPtr<USkeletalBodySetup>& BodySetup : InPhysicsAsset.SkeletalBodySetups)
 	{
 		FBoneReference AttachedBone = BodySetup->BoneName;
-		AttachedBone.Initialize(BoneContainer);
-		if (AttachedBone.IsValidToEvaluate(BoneContainer) == false)
-			continue;
+		if (BoneContainerNullable != nullptr)
+		{
+			AttachedBone.Initialize(*BoneContainerNullable);
+			if (AttachedBone.IsValidToEvaluate(*BoneContainerNullable) == false)
+				continue;
+		}
 
 		const FKAggregateGeom& CurGeometry = BodySetup->AggGeom;
 		for (const FKSphereElem& SphereElem : CurGeometry.SphereElems)
 		{
 			FLKAnimVerletCollisionSphere& SphereShape = OutShapeList.SphereCollisionShapes.Emplace_GetRef();
 			{
-				SphereShape.AttachedBone = AttachedBone;
-				SphereShape.LocationOffset = SphereElem.Center;
-				SphereShape.Radius = SphereElem.Radius;
+				FLKAnimVerletCollisionDataSphere SphereData;
+				SphereData.ConvertFromPhysicsAsset(SphereElem, AttachedBone.BoneName);
+				SphereData.ConvertToShape(SphereShape);
 			}
 		}
 		for (const FKSphylElem& CapsuleElem : CurGeometry.SphylElems)
 		{
 			FLKAnimVerletCollisionCapsule& CapsuleShape = OutShapeList.CapsuleCollisionShapes.Emplace_GetRef();
 			{
-				CapsuleShape.AttachedBone = AttachedBone;
-				CapsuleShape.LocationOffset = CapsuleElem.Center;
-				CapsuleShape.RotationOffset = CapsuleElem.Rotation;
-				CapsuleShape.Radius = CapsuleElem.Radius;
-				CapsuleShape.HalfHeight = CapsuleElem.Length * 0.5f;
+				FLKAnimVerletCollisionDataCapsule CapsuleData;
+				CapsuleData.ConvertFromPhysicsAsset(CapsuleElem, AttachedBone.BoneName);
+				CapsuleData.ConvertToShape(CapsuleShape);
 			}
 		}
 		for (const FKBoxElem& BoxElem : CurGeometry.BoxElems)
 		{
 			FLKAnimVerletCollisionBox& BoxShape = OutShapeList.BoxCollisionShapes.Emplace_GetRef();
 			{
-				BoxShape.AttachedBone = AttachedBone;
-				BoxShape.LocationOffset = BoxElem.Center;
-				BoxShape.RotationOffset = BoxElem.Rotation;
-				BoxShape.HalfExtents = FVector(BoxElem.X, BoxElem.Y, BoxElem.Z) * 0.5f;
+				FLKAnimVerletCollisionDataBox BoxData;
+				BoxData.ConvertFromPhysicsAsset(BoxElem, AttachedBone.BoneName);
+				BoxData.ConvertToShape(BoxShape);
 			}
 		}
 	}
@@ -1817,6 +1817,7 @@ bool FLKAnimNode_AnimVerlet::ConvertCollisionShapesToDataAsset()
 
 	CollisionDataAsset->Reset();
 	CollisionDataAsset->ConvertFromShape(ShapeList);
+	CollisionDataAsset->MarkPackageDirty();
 
 	return true;
 }
@@ -1830,6 +1831,38 @@ bool FLKAnimNode_AnimVerlet::ConvertCollisionShapesFromDataAsset()
 
 	FLKAnimVerletCollisionShapeList ShapeList;
 	CollisionDataAsset->ConvertToShape(OUT ShapeList);
+	CollisionShapesFromCollisionShapeList(ShapeList);
+
+	return true;
+}
+
+bool FLKAnimNode_AnimVerlet::ConvertPhysicsAssetToDataAsset()
+{
+	if (CollisionPhysicsAsset == nullptr)
+		return false;
+
+	if (CollisionDataAsset == nullptr)
+		return false;
+
+	FLKAnimVerletCollisionShapeList ShapeList;
+	ConvertPhysicsAssetToShape(OUT ShapeList, *CollisionPhysicsAsset, nullptr);
+
+	CollisionDataAsset->Reset();
+	CollisionDataAsset->ConvertFromShape(ShapeList);
+	CollisionDataAsset->MarkPackageDirty();
+
+	return true;
+}
+
+bool FLKAnimNode_AnimVerlet::ConvertCollisionShapesFromPhysicsAsset()
+{
+	if (CollisionPhysicsAsset == nullptr)
+		return false;
+
+	ResetCollisionShapes();
+
+	FLKAnimVerletCollisionShapeList ShapeList;
+	ConvertPhysicsAssetToShape(OUT ShapeList, *CollisionPhysicsAsset, nullptr);
 	CollisionShapesFromCollisionShapeList(ShapeList);
 
 	return true;

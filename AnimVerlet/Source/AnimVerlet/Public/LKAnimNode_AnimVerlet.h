@@ -50,7 +50,7 @@ private:
 	void UpdateDeltaTime(float InDeltaTime, float InTimeDilation);
 	void PrepareSimulation(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer, const FTransform& ComponentTransform);
 	void PrepareLocalCollisionConstraints(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer, const FTransform& ComponentTransform);
-	void ConvertPhysicsAssetToShape(OUT FLKAnimVerletCollisionShapeList& OutShapeList, const FBoneContainer& BoneContainer, const class UPhysicsAsset& InPhysicsAsset) const;
+	void ConvertPhysicsAssetToShape(OUT FLKAnimVerletCollisionShapeList& OutShapeList, const class UPhysicsAsset& InPhysicsAsset, const FBoneContainer* BoneContainerNullable) const;
 	void SimulateVerlet(const UWorld* World, float InDeltaTime, const FTransform& ComponentTransform, const FTransform& PrevComponentTransform);
 	void PreUpdateBones(const UWorld* World, float InDeltaTime, const FTransform& ComponentTransform, const FTransform& PrevComponentTransform);
 	void SolveConstraints(float InDeltaTime);
@@ -83,6 +83,8 @@ public:
 	void CollisionShapesFromCollisionShapeList(const FLKAnimVerletCollisionShapeList& InShapeList);
 	bool ConvertCollisionShapesToDataAsset();
 	bool ConvertCollisionShapesFromDataAsset();
+	bool ConvertPhysicsAssetToDataAsset();
+	bool ConvertCollisionShapesFromPhysicsAsset();
 	void SyncFromOtherAnimVerletNode(const FLKAnimNode_AnimVerlet& Other);
 
 	void DebugDrawAnimVerlet(const FComponentSpacePoseContext& Output);

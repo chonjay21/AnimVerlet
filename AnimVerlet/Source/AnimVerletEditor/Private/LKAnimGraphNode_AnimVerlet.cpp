@@ -108,6 +108,24 @@ void ULKAnimGraphNode_AnimVerlet::CustomizeDetails(IDetailLayoutBuilder& DetailB
 				.ToolTipText(LOCTEXT("ConvertFromDaButtonToolTip", "Convert CollisionDataAsset to collision shape data list(Need to save the AnimBlueprint manually after convert)"))
 				.OnClicked(FOnClicked::CreateStatic(&ULKAnimGraphNode_AnimVerlet::ConvertFromDaButtonClicked, &DetailBuilder))
 		];
+
+	FDetailWidgetRow& ConvertFromPaToDaWidgetRow = AnimVerletToolCategory.AddCustomRow(LOCTEXT("ConvertFromPhysicsAssetToDataAssetRow", "ConvertCollisionFromPhysicsAssetToDataAsset"));
+	ConvertFromPaToDaWidgetRow
+		[
+			SNew(SButton)
+				.Text(LOCTEXT("ConvertFromPaToDaButtonText", "Convert Collision From PhysicsAsset to DataAsset"))
+				.ToolTipText(LOCTEXT("ConvertFromPaToDaButtonToolTip", "Convert CollisionPhysicsAsset to CollisionDataAsset(Need to save the DataAsset manually after convert)"))
+				.OnClicked(FOnClicked::CreateStatic(&ULKAnimGraphNode_AnimVerlet::ConvertFromPaToDaButtonClicked, &DetailBuilder))
+		];
+
+	FDetailWidgetRow& ConvertFromPaWidgetRow = AnimVerletToolCategory.AddCustomRow(LOCTEXT("ConvertFromPhysicsAssetRow", "ConvertCollisionFromPhysicsAsset"));
+	ConvertFromPaWidgetRow
+		[
+			SNew(SButton)
+				.Text(LOCTEXT("ConvertFromPaButtonText", "Convert Collision From PhysicsAsset"))
+				.ToolTipText(LOCTEXT("ConvertFromPaButtonToolTip", "Convert CollisionPhysicsAsset to collision shape data list(Need to save the AnimBlueprint manually after convert)"))
+				.OnClicked(FOnClicked::CreateStatic(&ULKAnimGraphNode_AnimVerlet::ConvertFromPaButtonClicked, &DetailBuilder))
+		];
 }
 
 void ULKAnimGraphNode_AnimVerlet::Draw(FPrimitiveDrawInterface* PDI, USkeletalMeshComponent* PreviewSkelMeshComp) const
@@ -409,6 +427,65 @@ FReply ULKAnimGraphNode_AnimVerlet::ConvertFromDaButtonClicked(IDetailLayoutBuil
 		if (ULKAnimGraphNode_AnimVerlet* AnimVerletGraphNode = Cast<ULKAnimGraphNode_AnimVerlet>(Object.Get()))
 		{
 			AnimVerletGraphNode->ConvertCollisionShapesFromDataAsset();
+		}
+	}
+
+	return FReply::Handled();
+}
+
+void ULKAnimGraphNode_AnimVerlet::ConvertPhysicsAssetToDataAsset()
+{
+	const bool bResult = Node.ConvertPhysicsAssetToDataAsset();
+	if (bResult)
+	{
+		ShowNotification(FText::FromString(TEXT("Converted to CollisionDataAsset")), true);
+	}
+	else
+	{
+		ShowNotification(FText::FromString(TEXT("CollisionPhysicsAsset or CollisionDataAsset is required")), false);
+	}
+}
+FReply ULKAnimGraphNode_AnimVerlet::ConvertFromPaToDaButtonClicked(IDetailLayoutBuilder* DetailLayoutBuilder)
+{
+	const TArray<TWeakObjectPtr<UObject>>& SelectedObjectsList = DetailLayoutBuilder->GetSelectedObjects();
+	for (TWeakObjectPtr<UObject> Object : SelectedObjectsList)
+	{
+		if (ULKAnimGraphNode_AnimVerlet* AnimVerletGraphNode = Cast<ULKAnimGraphNode_AnimVerlet>(Object.Get()))
+		{
+			AnimVerletGraphNode->ConvertPhysicsAssetToDataAsset();
+		}
+	}
+
+	return FReply::Handled();
+}
+
+void ULKAnimGraphNode_AnimVerlet::ConvertCollisionShapesFromPhysicsAsset()
+{
+	const bool bResult = Node.ConvertCollisionShapesFromPhysicsAsset();
+	if (bResult)
+	{
+		ShowNotification(FText::FromString(TEXT("Converted from CollisionPhysicsAsset")), true);
+	}
+	else
+	{
+		ShowNotification(FText::FromString(TEXT("CollisionPhysicsAsset is required")), false);
+		return;
+	}
+
+	FLKAnimNode_AnimVerlet* PreviewNode = GetPreviewAnimVerletNode();
+	if (PreviewNode != nullptr)
+	{
+		PreviewNode->ConvertCollisionShapesFromPhysicsAsset();
+	}
+}
+FReply ULKAnimGraphNode_AnimVerlet::ConvertFromPaButtonClicked(IDetailLayoutBuilder* DetailLayoutBuilder)
+{
+	const TArray<TWeakObjectPtr<UObject>>& SelectedObjectsList = DetailLayoutBuilder->GetSelectedObjects();
+	for (TWeakObjectPtr<UObject> Object : SelectedObjectsList)
+	{
+		if (ULKAnimGraphNode_AnimVerlet* AnimVerletGraphNode = Cast<ULKAnimGraphNode_AnimVerlet>(Object.Get()))
+		{
+			AnimVerletGraphNode->ConvertCollisionShapesFromPhysicsAsset();
 		}
 	}
 

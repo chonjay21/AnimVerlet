@@ -13,6 +13,8 @@ public:
 	static FReply ResetSimulationButtonClicked(IDetailLayoutBuilder* DetailLayoutBuilder);
 	static FReply ConvertToDaButtonClicked(IDetailLayoutBuilder* DetailLayoutBuilder);
 	static FReply ConvertFromDaButtonClicked(IDetailLayoutBuilder* DetailLayoutBuilder);
+	static FReply ConvertFromPaToDaButtonClicked(IDetailLayoutBuilder* DetailLayoutBuilder);
+	static FReply ConvertFromPaButtonClicked(IDetailLayoutBuilder* DetailLayoutBuilder);
 
 public:
 	ULKAnimGraphNode_AnimVerlet(const FObjectInitializer& ObjectInitializer);
@@ -20,6 +22,9 @@ public:
 	void ResetSimulation();
 	void ConvertCollisionShapesToDataAsset();
 	void ConvertCollisionShapesFromDataAsset();
+	void ConvertPhysicsAssetToDataAsset();
+	void ConvertCollisionShapesFromPhysicsAsset();
+
 	FLKAnimNode_AnimVerlet* GetPreviewAnimVerletNode() const;
 
 public:
@@ -55,6 +60,8 @@ public:
 	bool bShowAndModifyBoxCollision = true;
 	UPROPERTY(EditAnywhere, Category = "CollisionInput", meta = (DisplayPriority = "1"))
 	bool bShowAndModifyPlaneCollision = true;
+	UPROPERTY(EditAnywhere, Category = "CollisionInput", meta = (DisplayPriority = "1"))
+	bool bShowCollisionAssetSource = true;
 
 	UPROPERTY(EditAnywhere, Category = "Preview")
 	bool bShowBones = true;

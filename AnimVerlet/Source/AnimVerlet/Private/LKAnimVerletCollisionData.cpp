@@ -1,6 +1,9 @@
 #include "LKAnimVerletCollisionData.h"
 
 #include <DrawDebugHelpers.h>
+#include <PhysicsEngine/BoxElem.h>
+#include <PhysicsEngine/SphereElem.h>
+#include <PhysicsEngine/SphylElem.h>
 #include "LKAnimVerletCollisionShape.h"
 
 ///=========================================================================================================================================
@@ -53,6 +56,16 @@ void FLKAnimVerletCollisionDataSphere::ConvertFromShape(const FLKAnimVerletColli
 	Radius = InSphere.Radius;
 }
 
+void FLKAnimVerletCollisionDataSphere::ConvertFromPhysicsAsset(const FKSphereElem& InSphere, const FName& InAttachBoneName)
+{
+	bUseAbsoluteWorldTransform = false;
+	ExcludeBones.Reset();
+	
+	AttachBoneName = InAttachBoneName;
+	LocationOffset = InSphere.Center;
+	Radius = InSphere.Radius;
+}
+
 void FLKAnimVerletCollisionDataSphere::DebugDrawCollider(const UWorld* InWorld, const USkeletalMeshComponent* InMeshNullable, float LifeTime) const
 {
 	if (IsUseAbsoluteWorldTransform())
@@ -87,6 +100,18 @@ void FLKAnimVerletCollisionDataCapsule::ConvertFromShape(const FLKAnimVerletColl
 	HalfHeight = InCapsule.HalfHeight;
 }
 
+void FLKAnimVerletCollisionDataCapsule::ConvertFromPhysicsAsset(const FKSphylElem& InCapsule, const FName& InAttachBoneName)
+{
+	bUseAbsoluteWorldTransform = false;
+	ExcludeBones.Reset();
+
+	AttachBoneName = InAttachBoneName;
+	LocationOffset = InCapsule.Center;
+	RotationOffset = InCapsule.Rotation;
+	Radius = InCapsule.Radius;
+	HalfHeight = InCapsule.Length * 0.5f;
+}
+
 void FLKAnimVerletCollisionDataCapsule::DebugDrawCollider(const UWorld* InWorld, const USkeletalMeshComponent* InMeshNullable, float LifeTime) const
 {
 	if (IsUseAbsoluteWorldTransform())
@@ -117,6 +142,17 @@ void FLKAnimVerletCollisionDataBox::ConvertFromShape(const FLKAnimVerletCollisio
 
 	RotationOffset = InBox.RotationOffset;
 	HalfExtents = InBox.HalfExtents;
+}
+
+void FLKAnimVerletCollisionDataBox::ConvertFromPhysicsAsset(const FKBoxElem& InBox, const FName& InAttachBoneName)
+{
+	bUseAbsoluteWorldTransform = false;
+	ExcludeBones.Reset();
+
+	AttachBoneName = InAttachBoneName;
+	LocationOffset = InBox.Center;
+	RotationOffset = InBox.Rotation;
+	HalfExtents = FVector(InBox.X, InBox.Y, InBox.Z) * 0.5f;
 }
 
 void FLKAnimVerletCollisionDataBox::DebugDrawCollider(const UWorld* InWorld, const USkeletalMeshComponent* InMeshNullable, float LifeTime) const
