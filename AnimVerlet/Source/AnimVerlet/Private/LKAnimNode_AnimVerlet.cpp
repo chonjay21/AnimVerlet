@@ -1233,7 +1233,8 @@ void FLKAnimNode_AnimVerlet::PreUpdateBones(const UWorld* World, float InDeltaTi
 				DiffAngeDegrees = FMath::Sign(DiffAngeDegrees) * RotationInertiaClampDegrees;
 
 			const float TargetRotationInertiaScale = bApplyRotationInertiaScaleCorrection ? (RotationInertiaScale * GAverageFPS / FMath::Max(KINDA_SMALL_NUMBER, RotationInertiaScaleTargetFrameRate)) : RotationInertiaScale;
-			VerletUpdateParam.ComponentRotDiff = FQuat(RotDiffAxis, FMath::DegreesToRadians(DiffAngeDegrees * TargetRotationInertiaScale));
+			VerletUpdateParam.ComponentRotDiff = FQuat(RotDiffAxis, FMath::DegreesToRadians(DiffAngeDegrees));
+			VerletUpdateParam.RotationInertiaScale = TargetRotationInertiaScale;
 		}
 
 		VerletUpdateParam.bUseSquaredDeltaTime = bUseSquaredDeltaTime;

@@ -107,7 +107,7 @@ void FLKAnimVerletBone::Update(float DeltaTime, const FLKAnimVerletUpdateParam& 
 
 		/// Component movement
 		Location += InParam.ComponentMoveDiff * CurDeltaTime;
-		Location += (InParam.ComponentRotDiff.RotateVector(PrevLocation) - PrevLocation) * CurDeltaTime;
+		Location += (InParam.ComponentRotDiff.RotateVector(PrevLocation) - PrevLocation) * InParam.RotationInertiaScale * CurDeltaTime;
 
 		/// Gravity
 		Location += InParam.Gravity * CurDeltaTime;
