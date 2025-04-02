@@ -1284,9 +1284,13 @@ void FLKAnimNode_AnimVerlet::PreUpdateBones(const UWorld* World, float InDeltaTi
 		/// Adjust animation pose transform
 		if (bIgnoreAnimationPose == false && CurVerletBone.HasParentBone())
 		{
+			extern ENGINE_API float GAverageFPS;
+
 			FLKAnimVerletBone& ParentVerletBone = SimulateBones[CurVerletBone.ParentVerletBoneIndex];
+			///const float AnimPoseDeltaInertiaScaled = bApplyAnimationPoseInertiaCorrection ? (AnimationPoseDeltaInertia * AnimationPoseDeltaInertiaScale * AnimationPoseInertiaTargetFrameRate / FMath::Max(KINDA_SMALL_NUMBER, GAverageFPS)) : AnimationPoseDeltaInertia * AnimationPoseDeltaInertiaScale;
 			const float AnimPoseDeltaInertiaScaled = AnimationPoseDeltaInertia * AnimationPoseDeltaInertiaScale;
-			CurVerletBone.AdjustPoseTransform(InDeltaTime, ParentVerletBone.Location, ParentVerletBone.PoseLocation, AnimationPoseInertia, AnimPoseDeltaInertiaScaled, bClampAnimationPoseDeltaInertia, AnimationPoseDeltaInertiaClampMax);
+			const float TargetAnimationPoseInertia = bApplyAnimationPoseInertiaCorrection ? (AnimationPoseInertia * AnimationPoseInertiaTargetFrameRate / FMath::Max(KINDA_SMALL_NUMBER, GAverageFPS)) : AnimationPoseInertia;
+			CurVerletBone.AdjustPoseTransform(InDeltaTime, ParentVerletBone.Location, ParentVerletBone.PoseLocation, TargetAnimationPoseInertia, AnimPoseDeltaInertiaScaled, bClampAnimationPoseDeltaInertia, AnimationPoseDeltaInertiaClampMax);
 		}
 	}
 }
@@ -1892,6 +1896,8 @@ void FLKAnimNode_AnimVerlet::SyncFromOtherAnimVerletNode(const FLKAnimNode_AnimV
 	AnimationPoseDeltaInertiaClampMax = Other.AnimationPoseDeltaInertiaClampMax;
 	bIgnoreAnimationPose = Other.bIgnoreAnimationPose;
 	AnimationPoseInertia = Other.AnimationPoseInertia;
+	bApplyAnimationPoseInertiaCorrection = Other.bApplyAnimationPoseInertiaCorrection;
+	AnimationPoseInertiaTargetFrameRate = Other.AnimationPoseInertiaTargetFrameRate;
 
 	Damping = Other.Damping;
 	bApplyDampingCorrection = Other.bApplyDampingCorrection;

@@ -137,6 +137,11 @@ public:
 	/** The magnitude of inertia to the animation pose position.(Pulls the cloth simulation result into the animation pose position) */
 	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Settings", meta = (EditCondition = "bIgnoreAnimationPose == false", EditConditionHides, ClampMin = "0.0", ClampMax = "1.0"))
 	float AnimationPoseInertia = 0.03f;
+	/** Based on AnimationPoseInertiaTargetFrameRate, the AnimationPoseInertia value at the current FrameRate is adjusted. (It can help to obtain a consistent result regardless of the frame rate.) */
+	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Settings", meta = (EditCondition = "bIgnoreAnimationPose == false", EditConditionHides))
+	bool bApplyAnimationPoseInertiaCorrection = true;
+	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Settings", meta = (EditCondition = "bIgnoreAnimationPose == false && bApplyAnimationPoseInertiaCorrection", EditConditionHides, ClampMin = "0.0"))
+	float AnimationPoseInertiaTargetFrameRate = 60.0f;
 
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Solve", meta = (ClampMin = "0.0", ClampMax = "1.0"))
