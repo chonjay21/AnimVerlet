@@ -135,6 +135,25 @@ FLKAnimVerletConstraint_IsometricBending::FLKAnimVerletConstraint_IsometricBendi
 	RestAngle = CalculateRestAngle(BoneA, BoneB, BoneC, BoneD);
 }
 
+/// cot(angle at P) in triangle (P, Q, R)
+inline float CotangentAtVertex(const FVector& P, const FVector& Q, const FVector& R)
+{
+	const FVector U = Q - P;
+	const FVector V = R - P;
+
+	const float CrossLen = U.Cross(V).Length();
+	if (CrossLen < UE_SMALL_NUMBER)
+		return 0.0f;
+
+	const float DotUV = U.Dot(V);
+	return DotUV / CrossLen;
+}
+
+inline float TriangleArea(const FVector& P, const FVector& Q, const FVector& R)
+{
+	return 0.5f * (Q - P).Cross(R - P).Length();
+}
+
 void FLKAnimVerletConstraint_IsometricBending::CalculateQMatrix(float InQ[4][4], FLKAnimVerletBone* InBoneA, FLKAnimVerletBone* InBoneB, FLKAnimVerletBone* InBoneC, FLKAnimVerletBone* InBoneD)
 {
 	verify(InBoneA != nullptr);
@@ -142,25 +161,46 @@ void FLKAnimVerletConstraint_IsometricBending::CalculateQMatrix(float InQ[4][4],
 	verify(InBoneC != nullptr);
 	verify(InBoneD != nullptr);
 
-	const FVector A = InBoneB->Location - InBoneA->Location;
-	const FVector B = InBoneC->Location - InBoneA->Location;
-	const FVector C = InBoneD->Location - InBoneA->Location;
+	const FVector& A = InBoneA->Location;
+	const FVector& B = InBoneB->Location;
+	const FVector& C = InBoneC->Location;
+	const FVector& D = InBoneD->Location;
 
-	const float Area = A.Cross(B).Length() / 2.0f;
+	const float A0 = TriangleArea(A, B, C);
+	const float A1 = TriangleArea(D, C, B);
+
+	const float TotalArea = A0 + A1;
+	if (TotalArea < UE_SMALL_NUMBER)
+	{
+		for (int32 i = 0; i < 4; ++i)
+			for (int32 j = 0; j < 4; ++j)
+				InQ[i][j] = 0.0f;
+		return;
+	}
+
+	const float CotB0 = CotangentAtVertex(B, A, C); /// angle at B in triangle ABC
+	const float CotC0 = CotangentAtVertex(C, A, B); /// angle at C in triangle ABC
+
+	const float CotB1 = CotangentAtVertex(B, D, C); /// angle at B in triangle DBC
+	const float CotC1 = CotangentAtVertex(C, D, B); /// angle at C in triangle DBC
+
+	/// K vector in vertex order [A, B, C, D]
+	/// Shared-edge vertices (B,C): positive sums across both triangles
+	/// Opposite vertices (A,D): negative sums per triangle
+	float K[4];
+	K[0] = -(CotB0 + CotC0);		/// A
+	K[1] = (CotB0 + CotB1);			/// B
+	K[2] = (CotC0 + CotC1);			/// C
+	K[3] = -(CotB1 + CotC1);		/// D
+
+	const float Scale = 1.0f / (2.0f * TotalArea);
+
+	/// Q = scale * K * K^T
 	for (int32 i = 0; i < 4; ++i)
 	{
 		for (int32 j = 0; j < 4; ++j)
 		{
-			if (i == j)
-			{
-				InQ[i][j] = 2.0f / Area;
-			}
-			else
-			{
-				const FVector V1 = (i == 0) ? A : (i == 1) ? B : C;
-				const FVector V2 = (j == 0) ? A : (j == 1) ? B : C;
-				InQ[i][j] = -2.0f * V1.Dot(V2) / (4.0f * Area);
-			}
+			InQ[i][j] = Scale * K[i] * K[j];
 		}
 	}
 }
@@ -172,13 +212,49 @@ float FLKAnimVerletConstraint_IsometricBending::CalculateRestAngle(FLKAnimVerlet
 	verify(InBoneC != nullptr);
 	verify(InBoneD != nullptr);
 
-	const FVector Vec1 = InBoneB->Location - InBoneA->Location;
-	const FVector Vec2 = InBoneC->Location - InBoneA->Location;
-	const FVector Vec3 = InBoneD->Location - InBoneA->Location;
+	FLKAnimVerletBone* X[4] = { InBoneA, InBoneB, InBoneC, InBoneD };
+	float ResultAngle = 0.0f;
+	for (int32 i = 0; i < 4; ++i)
+	{
+		for (int32 j = 0; j < 4; ++j)
+		{
+			ResultAngle += X[i]->Location.Dot(X[j]->Location) * Q[i][j];
+		}
+	}
+	return ResultAngle;
 
-	const float Angle1 = FMath::Atan2(Vec2.Y, Vec2.X) - FMath::Atan2(Vec1.Y, Vec1.X);
-	const float Angle2 = FMath::Atan2(Vec3.Y, Vec3.X) - FMath::Atan2(Vec1.Y, Vec1.X);
-	return Angle2 - Angle1;
+
+	/*const FVector& A = InBoneA->Location;
+	const FVector& B = InBoneB->Location;
+	const FVector& C = InBoneC->Location;
+	const FVector& D = InBoneD->Location;
+
+	/// Shared edge direction (B -> C)
+	FVector E = C - B;
+	const float ELen = E.Length();
+	if (ELen < UE_SMALL_NUMBER) 
+		return 0.0f;
+
+	E /= ELen;
+
+	/// Triangle normals (make sure they are consistent with hinge BC)
+	FVector N0 = (B - A).Cross(C - A);	/// normal of ABC
+	FVector N1 = (C - D).Cross(B - D);	/// normal of DCB (note order!)
+
+	const float N0Len = N0.Length();
+	const float N1Len = N1.Length();
+	if (N0Len < UE_SMALL_NUMBER || N1Len < UE_SMALL_NUMBER) 
+		return 0.0f;
+
+	N0 /= N0Len;
+	N1 /= N1Len;
+
+	/// Signed dihedral angle around edge e:
+	/// angle = atan2( dot(e, n0 x n1), dot(n0, n1) )
+	const float SinTerm = E.Dot(N0.Cross(N1));
+	const float CosTerm = N0.Dot(N1);
+
+	return FMath::Atan2(SinTerm, CosTerm);*/
 }
 
 void FLKAnimVerletConstraint_IsometricBending::Update(float DeltaTime, bool bFinalize)
@@ -199,7 +275,7 @@ void FLKAnimVerletConstraint_IsometricBending::Update(float DeltaTime, bool bFin
 	}
 	C -= RestAngle;
 
-	FVector Grad[4] = {};
+	FVector Grad[4];
 	for (int32 i = 0; i < 4; ++i)
 	{
 		Grad[i] = FVector::ZeroVector;
@@ -219,7 +295,11 @@ void FLKAnimVerletConstraint_IsometricBending::Update(float DeltaTime, bool bFin
 	if (bUseXPBDSolver)
 	{
 		const float Alpha = Compliance / (DeltaTime * DeltaTime);
-		const float DeltaLambda = -(C + Alpha * Lambda) / (Sum + Alpha);
+		const float Denom = Sum + Alpha;
+		if (Denom < UE_SMALL_NUMBER)
+			return;
+
+		const float DeltaLambda = -(C + Alpha * Lambda) / Denom;
 		Lambda += DeltaLambda;
 
 		for (int32 i = 0; i < 4; ++i)
@@ -238,6 +318,93 @@ void FLKAnimVerletConstraint_IsometricBending::Update(float DeltaTime, bool bFin
 				Bones[i]->Location += Grad[i] * (DeltaLambda * Bones[i]->InvMass);
 		}
 	}
+	
+
+
+	/*const FVector& A = BoneA->Location;
+	const FVector& B = BoneB->Location;
+	const FVector& C = BoneC->Location;
+	const FVector& D = BoneD->Location;
+
+	FVector E = C - B;
+	float ELen = E.Length();
+	if (ELen < UE_SMALL_NUMBER) 
+		return;
+
+	FVector EHat = E / ELen;
+	FVector N0 = (B - A).Cross(C - A);   /// ABC
+	FVector N1 = (C - D).Cross(B - D);   /// DCB (order matters)
+
+	float N0Len = N0.Length();
+	float N1Len = N1.Length();
+	if (N0Len < UE_SMALL_NUMBER || N1Len < UE_SMALL_NUMBER)
+		return;
+
+	FVector N0Hat = N0 / N0Len;
+	FVector N1Hat = N1 / N1Len;
+
+	/// Current signed dihedral angle around BC
+	float SinTerm = EHat.Dot(N0Hat.Cross(N1Hat));
+	float CosTerm = N0Hat.Dot(N1Hat);
+	float Theta = FMath::Atan2(SinTerm, CosTerm);
+
+	/// Constraint value: C = theta - RestAngle
+	float Cval = Theta - RestAngle;
+
+	const FVector GradA = (ELen / N0Len) * N0Hat;
+	const FVector GradD = (ELen / N1Len) * N1Hat;
+
+	const float InvELen = 1.0f / ELen;
+
+	float TB0 = (C - A).Dot(E) * (InvELen / N0Len);
+	float TB1 = (C - D).Dot(E) * (InvELen / N1Len);
+	const FVector GradB = -(TB0 * N0Hat + TB1 * N1Hat);
+
+	float TC0 = (B - A).Dot(E) * (InvELen / N0Len);
+	float TC1 = (B - D).Dot(E) * (InvELen / N1Len);
+	const FVector GradC = -(TC0 * N0Hat + TC1 * N1Hat);
+
+	const float InvMass[4] = { BoneA->InvMass, BoneB->InvMass, BoneC->InvMass, BoneD->InvMass };
+	const FVector Grad[4] = { GradA, GradB, GradC, GradD };
+
+	/// Sum w_i * |grad_i|^2
+	float Sum = 0.0f;
+	for (int i = 0; i < 4; ++i)
+		Sum += InvMass[i] * Grad[i].Dot(Grad[i]);
+
+	/// XPBD
+	if (bUseXPBDSolver)
+	{
+		float Alpha = Compliance / (DeltaTime * DeltaTime);
+		float Denom = Sum + Alpha;
+		if (Denom < UE_SMALL_NUMBER)
+			return;
+
+		float DLambda = -(Cval + Alpha * Lambda) / Denom;
+		Lambda += DLambda;
+
+		if (BoneA->IsPinned() == false)
+			BoneA->Location += GradA * (DLambda * BoneA->InvMass);
+		if (BoneB->IsPinned() == false)
+			BoneB->Location += GradB * (DLambda * BoneB->InvMass);
+		if (BoneC->IsPinned() == false)
+			BoneC->Location += GradC * (DLambda * BoneC->InvMass);
+		if (BoneD->IsPinned() == false)
+			BoneD->Location += GradD * (DLambda * BoneD->InvMass);
+	}
+	/// PBD
+	else
+	{
+		const float DLambda = Cval * Stiffness;
+		if (BoneA->IsPinned() == false)
+			BoneA->Location += GradA * (DLambda * BoneA->InvMass);
+		if (BoneB->IsPinned() == false)
+			BoneB->Location += GradB * (DLambda * BoneB->InvMass);
+		if (BoneC->IsPinned() == false)
+			BoneC->Location += GradC * (DLambda * BoneC->InvMass);
+		if (BoneD->IsPinned() == false)
+			BoneD->Location += GradD * (DLambda * BoneD->InvMass);
+	}*/
 }
 
 void FLKAnimVerletConstraint_IsometricBending::PostUpdate(float DeltaTime)

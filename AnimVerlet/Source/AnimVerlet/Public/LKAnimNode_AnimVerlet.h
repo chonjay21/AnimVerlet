@@ -180,7 +180,7 @@ public:
 	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve")
 	bool bConstrainLeftDiagonalDistance = false;
 	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve")
-	/** Bending constraint for inextensible surfaces(for more realistic looking when bending but may cause performance impact) */
+	/** Bending constraint for inextensible surfaces(for more realistic looking when bending but may cause performance impact - BETA) */
 	bool bUseIsometricBendingConstraint = false;
 	/** Stiffness for Isometric Bending Constraint(XPBD) */
 	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve", meta = (EditCondition = "bUseIsometricBendingConstraint && bUseXPBDSolver", ClampMin = "0.0"))
