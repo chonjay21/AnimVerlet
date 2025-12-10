@@ -31,6 +31,7 @@ DECLARE_CYCLE_STAT(TEXT("AnimVerlet_SolveConstraints"), STAT_AnimVerlet_SolveCon
 DECLARE_CYCLE_STAT(TEXT("AnimVerlet_SolveConstraints_PinConstraints"), STAT_AnimVerlet_SolveConstraints_PinConstraints, STATGROUP_Anim);
 DECLARE_CYCLE_STAT(TEXT("AnimVerlet_SolveConstraints_DistanceConstraints"), STAT_AnimVerlet_SolveConstraints_DistanceConstraints, STATGROUP_Anim);
 DECLARE_CYCLE_STAT(TEXT("AnimVerlet_SolveConstraints_BendingConstraints"), STAT_AnimVerlet_SolveConstraints_BendingConstraints, STATGROUP_Anim);
+DECLARE_CYCLE_STAT(TEXT("AnimVerlet_SolveConstraints_FlatBendingConstraints"), STAT_AnimVerlet_SolveConstraints_FlatBendingConstraints, STATGROUP_Anim);
 DECLARE_CYCLE_STAT(TEXT("AnimVerlet_SolveConstraints_StraightenConstraints"), STAT_AnimVerlet_SolveConstraints_StraightenConstraints, STATGROUP_Anim);
 DECLARE_CYCLE_STAT(TEXT("AnimVerlet_SolveConstraints_BallSocketConstraints"), STAT_AnimVerlet_SolveConstraints_BallSocketConstraints, STATGROUP_Anim);
 DECLARE_CYCLE_STAT(TEXT("AnimVerlet_SolveConstraints_SphereCollisionConstraints"), STAT_AnimVerlet_SolveConstraints_SphereCollisionConstraints, STATGROUP_Anim);
@@ -329,21 +330,87 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 
 			while (BoneChainIndexes.IsValidIndex(RightIndex) || BoneChainIndexes.IsValidIndex(LeftIndex))
 			{
-				if (bStraightenBendedBone)
+				if (LeftCurIndex != MidIndex)
 				{
-					if (BoneChainIndexes.IsValidIndex(LeftIndex) && BoneChainIndexes.IsValidIndex(RightIndex))
+					const int32 LeftCurRightIndex = LeftCurIndex + 1;
+					if (BoneChainIndexes.IsValidIndex(LeftIndex) && BoneChainIndexes.IsValidIndex(LeftCurRightIndex))
 					{
 						const TArray<int32>& CurBoneChain = BoneChainIndexes[LeftCurIndex];
 						const TArray<int32>& LeftBoneChain = BoneChainIndexes[LeftIndex];
-						const TArray<int32>& RightBoneChain = BoneChainIndexes[RightIndex];
+						const TArray<int32>& RightBoneChain = BoneChainIndexes[LeftCurRightIndex];
 						if (i < CurBoneChain.Num() && i < LeftBoneChain.Num() && i < RightBoneChain.Num())
 						{
 							verify(SimulateBones.IsValidIndex(CurBoneChain[i]));
 							verify(SimulateBones.IsValidIndex(LeftBoneChain[i]));
 							verify(SimulateBones.IsValidIndex(RightBoneChain[i]));
 
+							if (bStraightenBendedBone)
+							{
+								const FLKAnimVerletConstraint_Straighten StraightenConstraint(&SimulateBones[LeftBoneChain[i]], &SimulateBones[CurBoneChain[i]], &SimulateBones[RightBoneChain[i]], StraightenBendedBoneStrength, true);
+								StraightenConstraints.Emplace(StraightenConstraint);
+							}
+
+							if (bUseIsometricBendingConstraint)
+							{
+								const double BendingCompliance = static_cast<double>(1.0 / InvBendingCompliance);
+								if (i + 1 < RightBoneChain.Num() && i + 1 < CurBoneChain.Num())
+								{
+									const FLKAnimVerletConstraint_IsometricBending BendingConstraint(&SimulateBones[LeftBoneChain[i]], &SimulateBones[CurBoneChain[i]], &SimulateBones[CurBoneChain[i + 1]], &SimulateBones[RightBoneChain[i + 1]], bUseXPBDSolver, (bUseXPBDSolver ? BendingCompliance : BendingStiffness));
+									BendingConstraints.Emplace(BendingConstraint);
+								}
+							}
+
+							if (bUseFlatBendingConstraint)
+							{
+								const double FlatBendingCompliance = static_cast<double>(1.0 / InvFlatBendingCompliance);
+								if (i + 1 < RightBoneChain.Num() && i + 1 < CurBoneChain.Num())
+								{
+									const FLKAnimVerletConstraint_FlatBending FlatBendingConstraint(&SimulateBones[LeftBoneChain[i]], &SimulateBones[CurBoneChain[i]], &SimulateBones[CurBoneChain[i + 1]], &SimulateBones[RightBoneChain[i + 1]],
+																									bUseXPBDSolver, (bUseXPBDSolver ? FlatBendingCompliance : FlatBendingStiffness), FlatBendingAlpha);
+									FlatBendingConstraints.Emplace(FlatBendingConstraint);
+								}
+							}
+						}
+					}
+				}
+
+				const int32 RightCurLeftIndex = RightCurIndex - 1;
+				if (BoneChainIndexes.IsValidIndex(RightCurLeftIndex) && BoneChainIndexes.IsValidIndex(RightIndex))
+				{
+					const TArray<int32>& CurBoneChain = BoneChainIndexes[RightCurIndex];
+					const TArray<int32>& LeftBoneChain = BoneChainIndexes[RightCurLeftIndex];
+					const TArray<int32>& RightBoneChain = BoneChainIndexes[RightIndex];
+					if (i < CurBoneChain.Num() && i < LeftBoneChain.Num() && i < RightBoneChain.Num())
+					{
+						verify(SimulateBones.IsValidIndex(CurBoneChain[i]));
+						verify(SimulateBones.IsValidIndex(LeftBoneChain[i]));
+						verify(SimulateBones.IsValidIndex(RightBoneChain[i]));
+
+						if (bStraightenBendedBone)
+						{
 							const FLKAnimVerletConstraint_Straighten StraightenConstraint(&SimulateBones[LeftBoneChain[i]], &SimulateBones[CurBoneChain[i]], &SimulateBones[RightBoneChain[i]], StraightenBendedBoneStrength, true);
 							StraightenConstraints.Emplace(StraightenConstraint);
+						}
+
+						if (bUseIsometricBendingConstraint)
+						{
+							const double BendingCompliance = static_cast<double>(1.0 / InvBendingCompliance);
+							if (i + 1 < RightBoneChain.Num() && i + 1 < CurBoneChain.Num())
+							{
+								const FLKAnimVerletConstraint_IsometricBending BendingConstraint(&SimulateBones[LeftBoneChain[i]], &SimulateBones[CurBoneChain[i]], &SimulateBones[CurBoneChain[i + 1]], &SimulateBones[RightBoneChain[i + 1]], bUseXPBDSolver, (bUseXPBDSolver ? BendingCompliance : BendingStiffness));
+								BendingConstraints.Emplace(BendingConstraint);
+							}
+						}
+
+						if (bUseFlatBendingConstraint)
+						{
+							const double FlatBendingCompliance = static_cast<double>(1.0 / InvFlatBendingCompliance);
+							if (i + 1 < RightBoneChain.Num() && i + 1 < CurBoneChain.Num())
+							{
+								const FLKAnimVerletConstraint_FlatBending FlatBendingConstraint(&SimulateBones[LeftBoneChain[i]], &SimulateBones[CurBoneChain[i]], &SimulateBones[CurBoneChain[i + 1]], &SimulateBones[RightBoneChain[i + 1]],
+																								bUseXPBDSolver, (bUseXPBDSolver ? FlatBendingCompliance : FlatBendingStiffness), FlatBendingAlpha);
+								FlatBendingConstraints.Emplace(FlatBendingConstraint);
+							}
 						}
 					}
 				}
@@ -404,8 +471,20 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 						{
 							if (i + 1 < LeftBoneChain.Num() && i + 1 < CurBoneChain.Num())
 							{
+								const double BendingCompliance = static_cast<double>(1.0 / InvBendingCompliance);
 								const FLKAnimVerletConstraint_IsometricBending BendingConstraint(&SimulateBones[CurBoneChain[i]], &SimulateBones[LeftBoneChain[i]], &SimulateBones[CurBoneChain[i + 1]], &SimulateBones[LeftBoneChain[i + 1]], bUseXPBDSolver, (bUseXPBDSolver ? BendingCompliance : BendingStiffness));
 								BendingConstraints.Emplace(BendingConstraint);
+							}
+						}
+
+						if (bUseFlatBendingConstraint)
+						{
+							if (i + 1 < LeftBoneChain.Num() && i + 1 < CurBoneChain.Num())
+							{
+								const double FlatBendingCompliance = static_cast<double>(1.0 / InvFlatBendingCompliance);
+								const FLKAnimVerletConstraint_FlatBending FlatBendingConstraint(&SimulateBones[CurBoneChain[i]], &SimulateBones[LeftBoneChain[i]], &SimulateBones[CurBoneChain[i + 1]], &SimulateBones[LeftBoneChain[i + 1]], 
+																								bUseXPBDSolver, (bUseXPBDSolver ? FlatBendingCompliance : FlatBendingStiffness), FlatBendingAlpha);
+								FlatBendingConstraints.Emplace(FlatBendingConstraint);
 							}
 						}
 					}
@@ -469,8 +548,20 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 						{
 							if (i + 1 < RightBoneChain.Num() && i + 1 < CurBoneChain.Num())
 							{
-								const FLKAnimVerletConstraint_IsometricBending BendingConstraint(&SimulateBones[CurBoneChain[i]], &SimulateBones[RightBoneChain[i]], &SimulateBones[CurBoneChain[i + 1]], &SimulateBones[RightBoneChain[i + 1]], bUseXPBDSolver, (bUseXPBDSolver ? BendingCompliance : BendingStiffness));
+								const double BendingCompliance = static_cast<double>(1.0 / InvBendingCompliance);
+								const FLKAnimVerletConstraint_IsometricBending BendingConstraint(&SimulateBones[RightBoneChain[i]], &SimulateBones[CurBoneChain[i]], &SimulateBones[RightBoneChain[i + 1]], &SimulateBones[CurBoneChain[i + 1]], bUseXPBDSolver, (bUseXPBDSolver ? BendingCompliance : BendingStiffness));
 								BendingConstraints.Emplace(BendingConstraint);
+							}
+						}
+
+						if (bUseFlatBendingConstraint)
+						{
+							if (i + 1 < RightBoneChain.Num() && i + 1 < CurBoneChain.Num())
+							{
+								const double FlatBendingCompliance = static_cast<double>(1.0 / InvFlatBendingCompliance);
+								const FLKAnimVerletConstraint_FlatBending FlatBendingConstraint(&SimulateBones[RightBoneChain[i]], &SimulateBones[CurBoneChain[i]], &SimulateBones[RightBoneChain[i + 1]], &SimulateBones[CurBoneChain[i + 1]],
+																								bUseXPBDSolver, (bUseXPBDSolver ? FlatBendingCompliance : FlatBendingStiffness), FlatBendingAlpha);
+								FlatBendingConstraints.Emplace(FlatBendingConstraint);
 							}
 						}
 					}
@@ -1335,6 +1426,13 @@ void FLKAnimNode_AnimVerlet::SolveConstraints(float InDeltaTime)
 		#endif
 			BendingConstraints[i].Update(SubStepDeltaTime, bFinalizeUpdate);
 		}
+		for (int32 i = 0; i < FlatBendingConstraints.Num(); ++i)
+		{
+			#if LK_ENABLE_STAT
+			SCOPE_CYCLE_COUNTER(STAT_AnimVerlet_SolveConstraints_FlatBendingConstraints);
+			#endif
+			FlatBendingConstraints[i].Update(SubStepDeltaTime, bFinalizeUpdate);
+		}
 		for (int32 i = 0; i < StraightenConstraints.Num(); ++i)
 		{
 		#if LK_ENABLE_STAT
@@ -1709,6 +1807,7 @@ void FLKAnimNode_AnimVerlet::ClearSimulateBones()
 	PinConstraints.Reset();
 	DistanceConstraints.Reset();
 	BendingConstraints.Reset();
+	FlatBendingConstraints.Reset();
 	StraightenConstraints.Reset();
 	FixedDistanceConstraints.Reset();
 	BallSocketConstraints.Reset();
@@ -1751,6 +1850,10 @@ void FLKAnimNode_AnimVerlet::ForEachConstraints(Predicate Pred)
 		Pred(CurConstraint);
 	}
 	for (FLKAnimVerletConstraint_IsometricBending& CurConstraint : BendingConstraints)
+	{
+		Pred(CurConstraint);
+	}
+	for (FLKAnimVerletConstraint_FlatBending& CurConstraint : FlatBendingConstraints)
 	{
 		Pred(CurConstraint);
 	}
@@ -1916,7 +2019,7 @@ void FLKAnimNode_AnimVerlet::SyncFromOtherAnimVerletNode(const FLKAnimNode_AnimV
 	bConstrainRightDiagonalDistance = Other.bConstrainRightDiagonalDistance;
 	bConstrainLeftDiagonalDistance = Other.bConstrainLeftDiagonalDistance;
 	bUseIsometricBendingConstraint = Other.bUseIsometricBendingConstraint;
-	BendingCompliance = Other.BendingCompliance;
+	InvBendingCompliance = Other.InvBendingCompliance;
 	BendingStiffness = Other.BendingStiffness;
 
 	bPreserveLengthFromParent = Other.bPreserveLengthFromParent;

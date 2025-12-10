@@ -96,6 +96,11 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Preview", meta = (EditCondition = "bShowConstraints", EditConditionHides))
 	bool bShowSimulatingPlaneCollisionConstraints = false;
 
+	UPROPERTY(EditAnywhere, Category = "Preview")
+	bool bShowIsometricBendingConstraints = false;
+	///UPROPERTY(EditAnywhere, Category = "Preview")
+	bool bShowFlatBendingConstraints = false;
+
 private:
 	FNodeTitleTextTable CachedNodeTitles;
 	mutable TArray<FVector> VertexSpaceCache;

@@ -114,7 +114,8 @@ void FLKAnimVerletConstraint_Distance::ResetSimulation()
 ///=========================================================================================================================================
 /// FLKAnimVerletConstraint_IsometricBending
 ///=========================================================================================================================================
-FLKAnimVerletConstraint_IsometricBending::FLKAnimVerletConstraint_IsometricBending(FLKAnimVerletBone* InBoneA, FLKAnimVerletBone* InBoneB, FLKAnimVerletBone* InBoneC, FLKAnimVerletBone* InBoneD, bool bInUseXPBDSolver, float InStiffness)
+FLKAnimVerletConstraint_IsometricBending::FLKAnimVerletConstraint_IsometricBending(FLKAnimVerletBone* InBoneA, FLKAnimVerletBone* InBoneB, FLKAnimVerletBone* InBoneC, 
+																				   FLKAnimVerletBone* InBoneD, bool bInUseXPBDSolver, double InStiffness)
 	: BoneA(InBoneA)
 	, BoneB(InBoneB)
 	, BoneC(InBoneC)
@@ -311,7 +312,11 @@ void FLKAnimVerletConstraint_IsometricBending::Update(float DeltaTime, bool bFin
 	/// PBD
 	else
 	{
-		const float DeltaLambda = C * Stiffness;
+		const float Denom = Sum;
+		if (Denom < UE_SMALL_NUMBER)
+			return;
+
+		const float DeltaLambda = (-C / Denom) * Stiffness;
 		for (int32 i = 0; i < 4; ++i)
 		{
 			if (Bones[i]->IsPinned() == false)
@@ -395,7 +400,11 @@ void FLKAnimVerletConstraint_IsometricBending::Update(float DeltaTime, bool bFin
 	/// PBD
 	else
 	{
-		const float DLambda = Cval * Stiffness;
+		const float Denom = Sum;
+		if (Denom < UE_SMALL_NUMBER)
+			return;
+
+		const float DLambda = (-Cval / Denom) * Stiffness;
 		if (BoneA->IsPinned() == false)
 			BoneA->Location += GradA * (DLambda * BoneA->InvMass);
 		if (BoneB->IsPinned() == false)
@@ -413,6 +422,179 @@ void FLKAnimVerletConstraint_IsometricBending::PostUpdate(float DeltaTime)
 }
 
 void FLKAnimVerletConstraint_IsometricBending::ResetSimulation()
+{
+	Lambda = 0.0f;
+}
+///=========================================================================================================================================
+
+///=========================================================================================================================================
+/// FLKAnimVerletConstraint_FlatBending
+///=========================================================================================================================================
+FLKAnimVerletConstraint_FlatBending::FLKAnimVerletConstraint_FlatBending(FLKAnimVerletBone* InBoneA, FLKAnimVerletBone* InBoneB, FLKAnimVerletBone* InBoneC, 
+																		 FLKAnimVerletBone* InBoneD, bool bInUseXPBDSolver, double InStiffness, float InFlatAlpha)
+	: BoneA(InBoneA)
+	, BoneB(InBoneB)
+	, BoneC(InBoneC)
+	, BoneD(InBoneD)
+{
+	verify(BoneA != nullptr);
+	verify(BoneB != nullptr);
+	verify(BoneC != nullptr);
+	verify(BoneD != nullptr);
+
+	bUseXPBDSolver = bInUseXPBDSolver;
+	if (bUseXPBDSolver)
+		Compliance = InStiffness;
+	else
+		Stiffness = InStiffness;
+
+	FlatAlpha = InFlatAlpha;
+	TargetAngle = ComputeDihedralAngle_BC(InBoneA->Location, InBoneB->Location, InBoneC->Location, InBoneD->Location);
+	///TargetAngle = 0.0f;
+}
+
+float FLKAnimVerletConstraint_FlatBending::ComputeDihedralAngle_BC(const FVector& A, const FVector& B, const FVector& C, const FVector& D)
+{
+	const FVector E = C - B;
+	const float ELen = E.Size();
+	if (ELen < KINDA_SMALL_NUMBER) 
+		return 0.0f;
+
+	const FVector EN = E / ELen;
+
+	const FVector N0 = (C - B).Cross(A - B).GetSafeNormal();
+	const FVector N1 = (B - C).Cross(D - C).GetSafeNormal();
+
+	const float CosT = FMath::Clamp(N0.Dot(N1), -1.0f, 1.0f);
+	float Theta = FMath::Acos(CosT);
+
+	const float S = N0.Cross(N1).Dot(EN);
+	if (S < 0.0f) 
+		Theta = -Theta;
+
+	return Theta;
+}
+
+void FLKAnimVerletConstraint_FlatBending::ComputeBendingGradients(OUT FVector& GradientsA, OUT FVector& GradientsB, OUT FVector& GradientsC, OUT FVector& GradientsD,
+																  const FVector& A, const FVector& B, const FVector& C, const FVector& D)
+{
+	const FVector E = C - B;
+	const float ELen = E.Size();
+	if (ELen < KINDA_SMALL_NUMBER)
+	{
+		GradientsA = FVector::ZeroVector;
+		GradientsB = FVector::ZeroVector;
+		GradientsC = FVector::ZeroVector;
+		GradientsD = FVector::ZeroVector;
+		return;
+	}
+
+	const FVector N0 = (C - B).Cross(A - B);
+	const FVector N1 = (B - C).Cross(D - C);
+
+	const float N0Len2 = N0.SizeSquared();
+	const float N1Len2 = N1.SizeSquared();
+	if (N0Len2 < KINDA_SMALL_NUMBER || N1Len2 < KINDA_SMALL_NUMBER)
+	{
+		GradientsA = FVector::ZeroVector;
+		GradientsB = FVector::ZeroVector;
+		GradientsC = FVector::ZeroVector;
+		GradientsD = FVector::ZeroVector;
+		return;
+	}
+
+	const FVector QA = (ELen / N0Len2) * N0;
+	const FVector QD = (ELen / N1Len2) * N1;
+
+	const float InvELen2 = 1.0f / (ELen * ELen);
+
+	const float WB0 = (C - A).Dot(E) * InvELen2;
+	const float WC0 = (A - B).Dot(E) * InvELen2;
+
+	const float WB1 = (C - D).Dot(E) * InvELen2;
+	const float WC1 = (D - B).Dot(E) * InvELen2;
+
+	GradientsA = QA;
+	GradientsD = QD;
+	GradientsB = -WB0 * QA - WB1 * QD;
+	GradientsC = -WC0 * QA - WC1 * QD;
+}
+
+void FLKAnimVerletConstraint_FlatBending::Update(float DeltaTime, bool bFinalize)
+{
+	verify(BoneA != nullptr);
+	verify(BoneB != nullptr);
+	verify(BoneC != nullptr);
+	verify(BoneD != nullptr);
+
+	/// Dynamic Rest -> InitRestAngle
+	const float K = FMath::Max(0.0f, FlatAlpha);   /// Rest speed per sec
+	const float DT = FMath::Max(DeltaTime, 0.0f);
+
+	const float Decay = FMath::Exp(-K * DT);
+	RestAngle = TargetAngle + (RestAngle - TargetAngle) * Decay;
+
+	const FVector& A = BoneA->Location;
+	const FVector& B = BoneB->Location;
+	const FVector& C = BoneC->Location;
+	const FVector& D = BoneD->Location;
+	const float Theta = ComputeDihedralAngle_BC(A, B, C, D);
+
+	/// Constraint value: C = theta - RestAngle
+	const float Cval = Theta - RestAngle;
+
+	FVector GradientsA = FVector::ZeroVector;
+	FVector GradientsB = FVector::ZeroVector;
+	FVector GradientsC = FVector::ZeroVector;
+	FVector GradientsD = FVector::ZeroVector;
+	ComputeBendingGradients(OUT GradientsA, OUT GradientsB, OUT GradientsC, OUT GradientsD, A, B, C, D);
+
+	/// XPBD
+	if (bUseXPBDSolver)
+	{
+		const float Alpha = (Compliance > 0.0f && DT > KINDA_SMALL_NUMBER) ? Compliance / (DT * DT) : 0.0f;
+		const float Denom = BoneA->InvMass * GradientsA.SizeSquared() + BoneB->InvMass * GradientsB.SizeSquared() + BoneC->InvMass * GradientsC.SizeSquared() + BoneD->InvMass * GradientsD.SizeSquared() + Alpha;
+		if (Denom < UE_SMALL_NUMBER)
+			return;
+
+		const float DeltaLambda = -(Cval + Alpha * Lambda) / Denom;
+		Lambda += DeltaLambda;
+
+		if (BoneA->IsPinned() == false) 
+			BoneA->Location += BoneA->InvMass * DeltaLambda * GradientsA;
+		if (BoneB->IsPinned() == false)
+			BoneB->Location += BoneB->InvMass * DeltaLambda * GradientsB;
+		if (BoneC->IsPinned() == false)
+			BoneC->Location += BoneC->InvMass * DeltaLambda * GradientsC;
+		if (BoneD->IsPinned() == false)
+			BoneD->Location += BoneD->InvMass * DeltaLambda * GradientsD;
+	}
+	/// PBD
+	else
+	{
+		const float Denom = BoneA->InvMass * GradientsA.SizeSquared() + BoneB->InvMass * GradientsB.SizeSquared() + BoneC->InvMass * GradientsC.SizeSquared() + BoneD->InvMass * GradientsD.SizeSquared();
+		if (Denom < UE_SMALL_NUMBER)
+			return;
+
+		const float DeltaLambda = (-Cval / Denom) * Stiffness;
+
+		if (BoneA->IsPinned() == false)
+			BoneA->Location += BoneA->InvMass * DeltaLambda * GradientsA;
+		if (BoneB->IsPinned() == false)
+			BoneB->Location += BoneB->InvMass * DeltaLambda * GradientsB;
+		if (BoneC->IsPinned() == false)
+			BoneC->Location += BoneC->InvMass * DeltaLambda * GradientsC;
+		if (BoneD->IsPinned() == false)
+			BoneD->Location += BoneD->InvMass * DeltaLambda * GradientsD;
+	}
+}
+
+void FLKAnimVerletConstraint_FlatBending::PostUpdate(float DeltaTime)
+{
+	Lambda = 0.0f;
+}
+
+void FLKAnimVerletConstraint_FlatBending::ResetSimulation()
 {
 	Lambda = 0.0f;
 }

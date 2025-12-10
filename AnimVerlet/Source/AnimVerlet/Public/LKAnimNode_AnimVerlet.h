@@ -73,6 +73,8 @@ public:
 	const TArray<FLKAnimVerletConstraint_Capsule>& GetCapsuleCollisionConstraints() const { return CapsuleCollisionConstraints; }
 	const TArray<FLKAnimVerletConstraint_Box>& GetBoxCollisionConstraints() const { return BoxCollisionConstraints; }
 	const TArray<FLKAnimVerletConstraint_Plane>& GetPlaneCollisionConstraints() const { return PlaneCollisionConstraints; }
+	const TArray<FLKAnimVerletConstraint_IsometricBending>& GetIsometricBendingConstraints() const { return BendingConstraints; }
+	const TArray<FLKAnimVerletConstraint_FlatBending>& GetFlatBendingConstraints() const { return FlatBendingConstraints; }
 
 	void SetDynamicCollisionShapes(const FLKAnimVerletCollisionShapeList& InDynamicCollisionShapes) { DynamicCollisionShapes = InDynamicCollisionShapes; }
 	void ForceClearSimulateBones() { ClearSimulateBones(); }	/// for live editor preview
@@ -179,12 +181,12 @@ public:
 	bool bConstrainRightDiagonalDistance = false;
 	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve")
 	bool bConstrainLeftDiagonalDistance = false;
-	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve")
 	/** Bending constraint for inextensible surfaces(for more realistic looking when bending but may cause performance impact - BETA) */
+	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve")
 	bool bUseIsometricBendingConstraint = false;
 	/** Stiffness for Isometric Bending Constraint(XPBD) */
 	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve", meta = (EditCondition = "bUseIsometricBendingConstraint && bUseXPBDSolver", ClampMin = "0.0"))
-	float BendingCompliance = 100000.0f;
+	float InvBendingCompliance = 100000.0f;
 	/** Stiffness for Isometric Bending Constraint(PBD). */
 	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve", meta = (EditCondition = "bUseIsometricBendingConstraint && bUseXPBDSolver == false", ClampMin = "0.0"))
 	float BendingStiffness = 1.0f;
@@ -211,6 +213,19 @@ public:
 	bool bStraightenBendedBone = false;
 	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve", meta = (EditCondition = "bStraightenBendedBone", ClampMin = "0.0", ClampMax = "1.0"))
 	float StraightenBendedBoneStrength = 0.0003f;
+
+	/** Stretch constraint(BETA) */
+	///UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve")
+	bool bUseFlatBendingConstraint = false;
+	/** Stiffness for Stretch Constraint(XPBD) */
+	///UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve", meta = (EditCondition = "bUseFlatBendingConstraint && bUseXPBDSolver", ClampMin = "0.0"))
+	float InvFlatBendingCompliance = 100000.0f;
+	/** Stiffness for Stretch Constraint(PBD). */
+	///UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve", meta = (EditCondition = "bUseFlatBendingConstraint && bUseXPBDSolver == false", ClampMin = "0.0"))
+	float FlatBendingStiffness = 1.0f;
+	/** Stretch speed for Stretch Constraint(PBD). */
+	///UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve", meta = (EditCondition = "bUseFlatBendingConstraint", ClampMin = "0.0"))
+	float FlatBendingAlpha = 0.3f;
 
 	/** 
 		It is the number of iterations to solve Verlet Integraion. 
@@ -355,6 +370,7 @@ private:
 	TArray<FLKAnimVerletConstraint_Pin> PinConstraints;
 	TArray<FLKAnimVerletConstraint_Distance> DistanceConstraints;
 	TArray<FLKAnimVerletConstraint_IsometricBending> BendingConstraints;
+	TArray<FLKAnimVerletConstraint_FlatBending> FlatBendingConstraints;
 	TArray<FLKAnimVerletConstraint_Straighten> StraightenConstraints;
 	TArray<FLKAnimVerletConstraint_FixedDistance> FixedDistanceConstraints;
 	TArray<FLKAnimVerletConstraint_BallSocket> BallSocketConstraints;

@@ -341,6 +341,36 @@ void ULKAnimGraphNode_AnimVerlet::Draw(FPrimitiveDrawInterface* PDI, USkeletalMe
 			}
 		}
 	}
+
+	if (bShowIsometricBendingConstraints)
+	{
+		const TArray<FLKAnimVerletConstraint_IsometricBending>& IsometricBendingConstraints = AnimVerletNode->GetIsometricBendingConstraints();
+		for (const FLKAnimVerletConstraint_IsometricBending& CurConstraint : IsometricBendingConstraints)
+		{
+			PDI->DrawLine(CurConstraint.BoneA->Location, CurConstraint.BoneB->Location, FColor::White, SDPG_Foreground);
+			PDI->DrawLine(CurConstraint.BoneB->Location, CurConstraint.BoneC->Location, FColor::White, SDPG_Foreground);
+			PDI->DrawLine(CurConstraint.BoneC->Location, CurConstraint.BoneA->Location, FColor::White, SDPG_Foreground);
+
+			PDI->DrawLine(CurConstraint.BoneD->Location, CurConstraint.BoneB->Location, FColor::White, SDPG_Foreground);
+			PDI->DrawLine(CurConstraint.BoneB->Location, CurConstraint.BoneC->Location, FColor::White, SDPG_Foreground);
+			PDI->DrawLine(CurConstraint.BoneC->Location, CurConstraint.BoneD->Location, FColor::White, SDPG_Foreground);
+		}
+	}
+
+	if (bShowFlatBendingConstraints)
+	{
+		const TArray<FLKAnimVerletConstraint_FlatBending>& FlatBendingConstraints = AnimVerletNode->GetFlatBendingConstraints();
+		for (const FLKAnimVerletConstraint_FlatBending& CurConstraint : FlatBendingConstraints)
+		{
+			PDI->DrawLine(CurConstraint.BoneA->Location, CurConstraint.BoneB->Location, FColor::White, SDPG_Foreground);
+			PDI->DrawLine(CurConstraint.BoneB->Location, CurConstraint.BoneC->Location, FColor::White, SDPG_Foreground);
+			PDI->DrawLine(CurConstraint.BoneC->Location, CurConstraint.BoneA->Location, FColor::White, SDPG_Foreground);
+
+			PDI->DrawLine(CurConstraint.BoneD->Location, CurConstraint.BoneB->Location, FColor::White, SDPG_Foreground);
+			PDI->DrawLine(CurConstraint.BoneB->Location, CurConstraint.BoneC->Location, FColor::White, SDPG_Foreground);
+			PDI->DrawLine(CurConstraint.BoneC->Location, CurConstraint.BoneD->Location, FColor::White, SDPG_Foreground);
+		}
+	}
 }
 
 void ULKAnimGraphNode_AnimVerlet::ShowNotification(const FText& InText, bool bSuccess)

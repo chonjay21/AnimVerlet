@@ -79,12 +79,12 @@ public:
 	float Q[4][4] = {};
 	float RestAngle = 0.0f;
 	float Stiffness = 0.0f;
-	float Lambda = 0.0f;		///for XPBD
-	float Compliance = 0.0;	///for XPBD
+	double Lambda = 0.0f;		///for XPBD
+	double Compliance = 0.0;	///for XPBD
 
 public:
 	FLKAnimVerletConstraint_IsometricBending(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, struct FLKAnimVerletBone* InBoneC, 
-											 struct FLKAnimVerletBone* InBoneD, bool bInUseXPBDSolver, float InStiffness);
+											 struct FLKAnimVerletBone* InBoneD, bool bInUseXPBDSolver, double InStiffness);
 	virtual void Update(float DeltaTime, bool bFinalize) override;
 	virtual void PostUpdate(float DeltaTime) override;
 	virtual void ResetSimulation() override;
@@ -92,6 +92,40 @@ public:
 private:
 	void CalculateQMatrix(float Q[4][4], struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, struct FLKAnimVerletBone* InBoneC, struct FLKAnimVerletBone* InBoneD);
 	float CalculateRestAngle(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, struct FLKAnimVerletBone* InBoneC, struct FLKAnimVerletBone* InBoneD);
+};
+///=========================================================================================================================================
+
+///=========================================================================================================================================
+/// FLKAnimVerletConstraint_FlatBending
+///=========================================================================================================================================
+struct ANIMVERLET_API FLKAnimVerletConstraint_FlatBending : public FLKAnimVerletConstraint
+{
+public:
+	struct FLKAnimVerletBone* BoneA = nullptr;
+	struct FLKAnimVerletBone* BoneB = nullptr;
+	struct FLKAnimVerletBone* BoneC = nullptr;
+	struct FLKAnimVerletBone* BoneD = nullptr;
+
+	bool bUseXPBDSolver = false;
+	float Stiffness = 0.0f;
+	double Lambda = 0.0f;			///for XPBD
+	double Compliance = 0.0;		///for XPBD
+
+	float RestAngle = 0.0f;
+	float TargetAngle = 0.0f;
+	float FlatAlpha = 0.0f;
+
+public:
+	FLKAnimVerletConstraint_FlatBending(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, struct FLKAnimVerletBone* InBoneC, 
+										struct FLKAnimVerletBone* InBoneD, bool bInUseXPBDSolver, double InStiffness, float InFlatAlpha);
+	virtual void Update(float DeltaTime, bool bFinalize) override;
+	virtual void PostUpdate(float DeltaTime) override;
+	virtual void ResetSimulation() override;
+
+private:
+	float ComputeDihedralAngle_BC(const FVector& A, const FVector& B, const FVector& C, const FVector& D);	///Dihedral angle around shared edge BC (tri0=B,C,A / tri1=C,B,D)
+	void ComputeBendingGradients(OUT FVector& GradientsA, OUT FVector& GradientsB, OUT FVector& GradientsC, OUT FVector& GradientsD,
+								 const FVector& A, const FVector& B, const FVector& C, const FVector& D);
 };
 ///=========================================================================================================================================
 
