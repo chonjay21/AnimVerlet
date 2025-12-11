@@ -366,6 +366,14 @@ void ULKAnimGraphNode_AnimVerlet::Draw(FPrimitiveDrawInterface* PDI, USkeletalMe
 			PDI->DrawLine(CurConstraint.BoneB->Location, CurConstraint.BoneC->Location, FColor::White, SDPG_Foreground);
 			PDI->DrawLine(CurConstraint.BoneC->Location, CurConstraint.BoneD->Location, FColor::White, SDPG_Foreground);
 		}
+
+		const TArray<FLKAnimVerletConstraint_Bending_1D>& BendingConstraints_1D = AnimVerletNode->GetBendingConstraints_1D();
+		for (const FLKAnimVerletConstraint_Bending_1D& CurConstraint : BendingConstraints_1D)
+		{
+			PDI->DrawLine(CurConstraint.BoneA->Location, CurConstraint.BoneB->Location, FColor::White, SDPG_Foreground);
+			PDI->DrawLine(CurConstraint.BoneB->Location, CurConstraint.BoneC->Location, FColor::White, SDPG_Foreground);
+			PDI->DrawLine(CurConstraint.BoneC->Location, CurConstraint.BoneA->Location, FColor::White, SDPG_Foreground);
+		}
 	}
 
 	if (bShowFlatBendingConstraints)

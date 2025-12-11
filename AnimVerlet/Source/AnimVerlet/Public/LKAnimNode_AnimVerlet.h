@@ -75,6 +75,7 @@ public:
 	const TArray<FLKAnimVerletConstraint_Box>& GetBoxCollisionConstraints() const { return BoxCollisionConstraints; }
 	const TArray<FLKAnimVerletConstraint_Plane>& GetPlaneCollisionConstraints() const { return PlaneCollisionConstraints; }
 	const TArray<FLKAnimVerletConstraint_IsometricBending>& GetIsometricBendingConstraints() const { return BendingConstraints; }
+	const TArray<FLKAnimVerletConstraint_Bending_1D>& GetBendingConstraints_1D() const { return BendingConstraints_1D; }
 	const TArray<FLKAnimVerletConstraint_FlatBending>& GetFlatBendingConstraints() const { return FlatBendingConstraints; }
 
 	void SetDynamicCollisionShapes(const FLKAnimVerletCollisionShapeList& InDynamicCollisionShapes) { DynamicCollisionShapes = InDynamicCollisionShapes; }
@@ -374,6 +375,7 @@ private:
 	TArray<FLKAnimVerletConstraint_Pin> PinConstraints;
 	TArray<FLKAnimVerletConstraint_Distance> DistanceConstraints;
 	TArray<FLKAnimVerletConstraint_IsometricBending> BendingConstraints;
+	TArray<FLKAnimVerletConstraint_Bending_1D> BendingConstraints_1D;
 	TArray<FLKAnimVerletConstraint_FlatBending> FlatBendingConstraints;
 	TArray<FLKAnimVerletConstraint_Straighten> StraightenConstraints;
 	TArray<FLKAnimVerletConstraint_FixedDistance> FixedDistanceConstraints;

@@ -102,6 +102,33 @@ private:
 ///=========================================================================================================================================
 
 ///=========================================================================================================================================
+/// FLKAnimVerletConstraint_Bending_1D
+///=========================================================================================================================================
+struct ANIMVERLET_API FLKAnimVerletConstraint_Bending_1D : public FLKAnimVerletConstraint
+{
+public:
+	struct FLKAnimVerletBone* BoneA = nullptr;
+	struct FLKAnimVerletBone* BoneB = nullptr;
+	struct FLKAnimVerletBone* BoneC = nullptr;
+
+	bool bUseXPBDSolver = false;
+	float RestAngle = 0.0f;
+	float Stiffness = 0.0f;
+	double Lambda = 0.0f;		///for XPBD
+	double Compliance = 0.0;	///for XPBD
+
+public:
+	FLKAnimVerletConstraint_Bending_1D(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, struct FLKAnimVerletBone* InBoneC, bool bInUseXPBDSolver, double InStiffness);
+	virtual void Update(float DeltaTime, bool bFinalize) override;
+	virtual void PostUpdate(float DeltaTime) override;
+	virtual void ResetSimulation() override;
+
+private:
+	float CalculateRestAngle(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, struct FLKAnimVerletBone* InBoneC);
+};
+///=========================================================================================================================================
+
+///=========================================================================================================================================
 /// FLKAnimVerletConstraint_FlatBending
 ///=========================================================================================================================================
 struct ANIMVERLET_API FLKAnimVerletConstraint_FlatBending : public FLKAnimVerletConstraint
