@@ -194,7 +194,7 @@ public:
 	float InvBendingCompliance = 100000.0f;
 	/** Stiffness for Isometric Bending Constraint(PBD). */
 	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve", meta = (EditCondition = "bUseIsometricBendingConstraint && bUseXPBDSolver == false", ClampMin = "0.0"))
-	float BendingStiffness = 1.0f;
+	float BendingStiffness = 0.01f;
 
 	/** The option to keep the distance between parent and child bones in the bone chain helps to keep SolveIteration small. */
 	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve")
