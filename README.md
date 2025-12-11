@@ -52,6 +52,7 @@ The UnrealEngine versions supported by this plugin are:
 1. Download AnimVerlet example from [GitHub](https://github.com/chonjay21/AnimVerlet)
 2. Put the "AnimVerlet" directory to your Project`s "Plugins" directory
 3. Use AnimVerlet Animation Node in Animation Blueprint
+4. You can choose preset in AnimVerlet Node(AnimationPose, Physics_XPBD, Physics_PBD) or customize each settings
 
 <br />
 
