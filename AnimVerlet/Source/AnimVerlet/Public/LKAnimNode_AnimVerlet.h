@@ -186,7 +186,7 @@ public:
 	bool bConstrainRightDiagonalDistance = false;
 	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve")
 	bool bConstrainLeftDiagonalDistance = false;
-	/** Bending constraint for inextensible surfaces(for more realistic looking when bending but may cause performance impact - BETA) */
+	/** Bending constraint for inextensible surfaces(for more realistic looking when bending and realistic stretch effect. but may cause performance impact) - BETA */
 	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve")
 	bool bUseIsometricBendingConstraint = false;
 	/** Stiffness for Isometric Bending Constraint(XPBD) */
