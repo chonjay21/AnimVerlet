@@ -25,6 +25,17 @@ FText ULKAnimGraphNode_AnimVerlet::GetControllerDescription() const
 
 void ULKAnimGraphNode_AnimVerlet::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
+	/// Apply PresetType
+	const FName PropertyName = PropertyChangedEvent.Property ? PropertyChangedEvent.Property->GetFName() : NAME_None;
+	if (PropertyName == GET_MEMBER_NAME_CHECKED(ULKAnimGraphNode_AnimVerlet, PresetType))
+	{
+		ApplyAnimVerletPresetType(Node);
+	}
+	else if (Node.IsPresetTypeRelatedProperty(PropertyName))
+	{
+		PresetType = ELKAnimVerletPreset::Custom;
+	}
+
 	FLKAnimNode_AnimVerlet* PreviewNode = GetPreviewAnimVerletNode();
 	if (PreviewNode != nullptr)
 	{
@@ -520,6 +531,11 @@ FReply ULKAnimGraphNode_AnimVerlet::ConvertFromPaButtonClicked(IDetailLayoutBuil
 	}
 
 	return FReply::Handled();
+}
+
+void ULKAnimGraphNode_AnimVerlet::ApplyAnimVerletPresetType(FLKAnimNode_AnimVerlet& InNode)
+{
+	InNode.ApplyPresetType(PresetType);
 }
 
 FLKAnimNode_AnimVerlet* ULKAnimGraphNode_AnimVerlet::GetPreviewAnimVerletNode() const

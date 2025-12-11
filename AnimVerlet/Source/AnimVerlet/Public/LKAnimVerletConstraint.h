@@ -83,6 +83,12 @@ public:
 	double Compliance = 0.0;	///for XPBD
 
 public:
+	/// [Edge B-C is shared]
+	///	A---B
+	///	\  | \
+	///	 \ |  \
+	///   \|   \
+	///	   C----D
 	FLKAnimVerletConstraint_IsometricBending(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, struct FLKAnimVerletBone* InBoneC, 
 											 struct FLKAnimVerletBone* InBoneD, bool bInUseXPBDSolver, double InStiffness);
 	virtual void Update(float DeltaTime, bool bFinalize) override;
@@ -116,6 +122,12 @@ public:
 	float FlatAlpha = 0.0f;
 
 public:
+	/// [Edge B-C is shared]
+	///	A---B
+	///	\  | \
+	///	 \ |  \
+	///   \|   \
+	///	   C----D
 	FLKAnimVerletConstraint_FlatBending(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, struct FLKAnimVerletBone* InBoneC, 
 										struct FLKAnimVerletBone* InBoneD, bool bInUseXPBDSolver, double InStiffness, float InFlatAlpha);
 	virtual void Update(float DeltaTime, bool bFinalize) override;

@@ -67,9 +67,16 @@ void FLKAnimVerletConstraint_Distance::Update(float DeltaTime, bool bFinalize)
 	/// XPBD
 	if (bUseXPBDSolver)
 	{
+		if (FMath::IsNearlyZero(DeltaTime, KINDA_SMALL_NUMBER))
+			return;
+
 		const float C = Distance - Length;
 		const double Alpha = Compliance / (DeltaTime * DeltaTime);
-		const double DeltaLambda = -(C + Alpha * Lambda) / (BoneA->InvMass + BoneB->InvMass + Alpha);
+		const double Denom = (BoneA->InvMass + BoneB->InvMass + Alpha);
+		if (FMath::IsNearlyZero(Denom, KINDA_SMALL_NUMBER))
+			return;
+
+		const double DeltaLambda = -(C + Alpha * Lambda) / Denom;
 		Lambda += DeltaLambda;
 
 		if (bStretchEachBone)
@@ -85,6 +92,9 @@ void FLKAnimVerletConstraint_Distance::Update(float DeltaTime, bool bFinalize)
 	/// PBD
 	else
 	{
+		if (FMath::IsNearlyZero(Distance, KINDA_SMALL_NUMBER))
+			return;
+
 		/// Calculate the resting distance
 		const float Diff = ((Length - Distance) / Distance) * Stiffness;
 		
@@ -130,7 +140,7 @@ FLKAnimVerletConstraint_IsometricBending::FLKAnimVerletConstraint_IsometricBendi
 	if (bUseXPBDSolver)
 		Compliance = InStiffness;
 	else
-		Stiffness = InStiffness;
+		Stiffness = static_cast<float>(InStiffness);
 
 	CalculateQMatrix(Q, BoneA, BoneB, BoneC, BoneD);
 	RestAngle = CalculateRestAngle(BoneA, BoneB, BoneC, BoneD);
@@ -295,12 +305,15 @@ void FLKAnimVerletConstraint_IsometricBending::Update(float DeltaTime, bool bFin
 	/// XPBD
 	if (bUseXPBDSolver)
 	{
-		const float Alpha = Compliance / (DeltaTime * DeltaTime);
-		const float Denom = Sum + Alpha;
-		if (Denom < UE_SMALL_NUMBER)
+		if (FMath::IsNearlyZero(DeltaTime, KINDA_SMALL_NUMBER))
 			return;
 
-		const float DeltaLambda = -(C + Alpha * Lambda) / Denom;
+		const double Alpha = Compliance / (DeltaTime * DeltaTime);
+		const double Denom = Sum + Alpha;
+		if (FMath::IsNearlyZero(Denom, KINDA_SMALL_NUMBER))
+			return;
+
+		const double DeltaLambda = -(C + Alpha * Lambda) / Denom;
 		Lambda += DeltaLambda;
 
 		for (int32 i = 0; i < 4; ++i)
@@ -313,7 +326,7 @@ void FLKAnimVerletConstraint_IsometricBending::Update(float DeltaTime, bool bFin
 	else
 	{
 		const float Denom = Sum;
-		if (Denom < UE_SMALL_NUMBER)
+		if (FMath::IsNearlyZero(Denom, KINDA_SMALL_NUMBER))
 			return;
 
 		const float DeltaLambda = (-C / Denom) * Stiffness;
@@ -380,12 +393,15 @@ void FLKAnimVerletConstraint_IsometricBending::Update(float DeltaTime, bool bFin
 	/// XPBD
 	if (bUseXPBDSolver)
 	{
-		float Alpha = Compliance / (DeltaTime * DeltaTime);
-		float Denom = Sum + Alpha;
-		if (Denom < UE_SMALL_NUMBER)
+		if (FMath::IsNearlyZero(DeltaTime, KINDA_SMALL_NUMBER))
 			return;
 
-		float DLambda = -(Cval + Alpha * Lambda) / Denom;
+		const double Alpha = Compliance / (DeltaTime * DeltaTime);
+		const double Denom = Sum + Alpha;
+		if (FMath::IsNearlyZero(Denom, KINDA_SMALL_NUMBER))
+			return;
+
+		const double DLambda = -(Cval + Alpha * Lambda) / Denom;
 		Lambda += DLambda;
 
 		if (BoneA->IsPinned() == false)
@@ -401,7 +417,7 @@ void FLKAnimVerletConstraint_IsometricBending::Update(float DeltaTime, bool bFin
 	else
 	{
 		const float Denom = Sum;
-		if (Denom < UE_SMALL_NUMBER)
+		if (FMath::IsNearlyZero(Denom, KINDA_SMALL_NUMBER))
 			return;
 
 		const float DLambda = (-Cval / Denom) * Stiffness;
@@ -552,12 +568,15 @@ void FLKAnimVerletConstraint_FlatBending::Update(float DeltaTime, bool bFinalize
 	/// XPBD
 	if (bUseXPBDSolver)
 	{
-		const float Alpha = (Compliance > 0.0f && DT > KINDA_SMALL_NUMBER) ? Compliance / (DT * DT) : 0.0f;
-		const float Denom = BoneA->InvMass * GradientsA.SizeSquared() + BoneB->InvMass * GradientsB.SizeSquared() + BoneC->InvMass * GradientsC.SizeSquared() + BoneD->InvMass * GradientsD.SizeSquared() + Alpha;
-		if (Denom < UE_SMALL_NUMBER)
+		if (FMath::IsNearlyZero(DT, KINDA_SMALL_NUMBER))
 			return;
 
-		const float DeltaLambda = -(Cval + Alpha * Lambda) / Denom;
+		const double Alpha = Compliance / (DT * DT);
+		const double Denom = BoneA->InvMass * GradientsA.SizeSquared() + BoneB->InvMass * GradientsB.SizeSquared() + BoneC->InvMass * GradientsC.SizeSquared() + BoneD->InvMass * GradientsD.SizeSquared() + Alpha;
+		if (FMath::IsNearlyZero(Denom, KINDA_SMALL_NUMBER))
+			return;
+
+		const double DeltaLambda = -(Cval + Alpha * Lambda) / Denom;
 		Lambda += DeltaLambda;
 
 		if (BoneA->IsPinned() == false) 
@@ -573,7 +592,7 @@ void FLKAnimVerletConstraint_FlatBending::Update(float DeltaTime, bool bFinalize
 	else
 	{
 		const float Denom = BoneA->InvMass * GradientsA.SizeSquared() + BoneB->InvMass * GradientsB.SizeSquared() + BoneC->InvMass * GradientsC.SizeSquared() + BoneD->InvMass * GradientsD.SizeSquared();
-		if (Denom < UE_SMALL_NUMBER)
+		if (FMath::IsNearlyZero(Denom, KINDA_SMALL_NUMBER))
 			return;
 
 		const float DeltaLambda = (-Cval / Denom) * Stiffness;
@@ -852,9 +871,16 @@ void FLKAnimVerletConstraint_BallSocket::Update(float DeltaTime, bool bFinalize)
 	{
 		if (bUseXPBDSolver && bFinalize == false)
 		{
+			if (FMath::IsNearlyZero(DeltaTime, KINDA_SMALL_NUMBER))
+				return;
+
 			const float C = -AngleDiff;
 			const double Alpha = Compliance / (DeltaTime * DeltaTime);
-			const double DeltaLambda = -(C + Alpha * Lambda) / (BoneA->InvMass + BoneB->InvMass + Alpha);
+			const double Denom = (BoneA->InvMass + BoneB->InvMass + Alpha);
+			if (FMath::IsNearlyZero(Denom, KINDA_SMALL_NUMBER))
+				return;
+
+			const double DeltaLambda = -(C + Alpha * Lambda) / Denom;
 			Lambda += DeltaLambda;
 
 			if (BoneB->IsPinned() == false)
@@ -959,10 +985,17 @@ bool FLKAnimVerletConstraint_Sphere::CheckSphereSphere(IN OUT FLKAnimVerletBone&
 		const float PenetrationDepth = ConstraintDistance - SphereToBoneDist;
 		if (bUseXPBDSolver && bFinalize == false)
 		{
+			if (FMath::IsNearlyZero(DeltaTime, KINDA_SMALL_NUMBER))
+				return false;
+
 			double& CurLambda = Lambdas[LambdaIndex];
 			const float C = -PenetrationDepth;
 			const double Alpha = Compliance / (DeltaTime * DeltaTime);
-			const double DeltaLambda = -(C + Alpha * CurLambda) / (CurVerletBone.InvMass + Alpha);
+			const double Denom = (CurVerletBone.InvMass + Alpha);
+			if (FMath::IsNearlyZero(Denom, KINDA_SMALL_NUMBER))
+				return false;
+
+			const double DeltaLambda = -(C + Alpha * CurLambda) / Denom;
 			CurLambda += DeltaLambda;
 
 			CurVerletBone.Location = CurVerletBone.Location + (SphereToBoneDir * DeltaLambda);
@@ -1007,13 +1040,20 @@ bool FLKAnimVerletConstraint_Sphere::CheckSphereCapsule(IN OUT FLKAnimVerletBone
 		const float PenetrationDepth = ConstraintDistance - SphereToBoneDist;
 		if (bUseXPBDSolver && bFinalize == false)
 		{
+			if (FMath::IsNearlyZero(DeltaTime, KINDA_SMALL_NUMBER))
+				return false;
+
 			double& CurLambda = Lambdas[LambdaIndex];
 			const float C = -PenetrationDepth;
 			const double Alpha = Compliance / (DeltaTime * DeltaTime);
-			const double DeltaLambda = -(C + Alpha * CurLambda) / (CurVerletBone.InvMass + ParentVerletBone.InvMass + Alpha);
+			const double Denom = (CurVerletBone.InvMass + ParentVerletBone.InvMass + Alpha);
+			if (FMath::IsNearlyZero(Denom, KINDA_SMALL_NUMBER))
+				return false;
+
+			const double DeltaLambda = -(C + Alpha * CurLambda) / Denom;
 			CurLambda += DeltaLambda;
 
-			float ChildMoveAlpha = (ClosestOnBone - ParentVerletBone.Location).Size() / DistFromParent;
+			float ChildMoveAlpha = FMath::IsNearlyZero(DistFromParent, KINDA_SMALL_NUMBER) ? 0.0f : (ClosestOnBone - ParentVerletBone.Location).Size() / DistFromParent;
 			ChildMoveAlpha = ChildMoveAlpha * (2.0f - ChildMoveAlpha);	///EaseOutQuad for better movement(heuristic center of mass)
 
 			if (ParentVerletBone.IsPinned())
@@ -1028,7 +1068,7 @@ bool FLKAnimVerletConstraint_Sphere::CheckSphereCapsule(IN OUT FLKAnimVerletBone
 		}
 		else
 		{
-			float ChildMoveAlpha = (ClosestOnBone - ParentVerletBone.Location).Size() / DistFromParent;
+			float ChildMoveAlpha = FMath::IsNearlyZero(DistFromParent, KINDA_SMALL_NUMBER) ? 0.0f : (ClosestOnBone - ParentVerletBone.Location).Size() / DistFromParent;
 			ChildMoveAlpha = ChildMoveAlpha * (2.0f - ChildMoveAlpha);	///EaseOutQuad for better movement(heuristic center of mass)
 
 			if (ParentVerletBone.IsPinned())
@@ -1169,10 +1209,17 @@ bool FLKAnimVerletConstraint_Capsule::CheckCapsuleSphere(IN OUT FLKAnimVerletBon
 		const float PenetrationDepth = ConstraintDistance - CapsuleToBoneDist;
 		if (bUseXPBDSolver && bFinalize == false)
 		{
+			if (FMath::IsNearlyZero(DeltaTime, KINDA_SMALL_NUMBER))
+				return false;
+
 			double& CurLambda = Lambdas[LambdaIndex];
 			const float C = -PenetrationDepth;
 			const double Alpha = Compliance / (DeltaTime * DeltaTime);
-			const double DeltaLambda = -(C + Alpha * CurLambda) / (CurVerletBone.InvMass + Alpha);
+			const double Denom = (CurVerletBone.InvMass + Alpha);
+			if (FMath::IsNearlyZero(Denom, KINDA_SMALL_NUMBER))
+				return false;
+
+			const double DeltaLambda = -(C + Alpha * CurLambda) / Denom;
 			CurLambda += DeltaLambda;
 
 			CurVerletBone.Location = CurVerletBone.Location + (CapsuleToBoneDir * DeltaLambda);
@@ -1224,13 +1271,20 @@ bool FLKAnimVerletConstraint_Capsule::CheckCapsuleCapsule(IN OUT FLKAnimVerletBo
 		const float PenetrationDepth = ConstraintDistance - CapsuleToBoneDist;
 		if (bUseXPBDSolver && bFinalize == false)
 		{
+			if (FMath::IsNearlyZero(DeltaTime, KINDA_SMALL_NUMBER))
+				return false;
+
 			double& CurLambda = Lambdas[LambdaIndex];
 			const float C = -PenetrationDepth;
 			const double Alpha = Compliance / (DeltaTime * DeltaTime);
-			const double DeltaLambda = -(C + Alpha * CurLambda) / (CurVerletBone.InvMass + ParentVerletBone.InvMass + Alpha);
+			const double Denom = (CurVerletBone.InvMass + ParentVerletBone.InvMass + Alpha);
+			if (FMath::IsNearlyZero(Denom, KINDA_SMALL_NUMBER))
+				return false;
+
+			const double DeltaLambda = -(C + Alpha * CurLambda) / Denom;
 			CurLambda += DeltaLambda;
 
-			float ChildMoveAlpha = (ClosestOnBone - ParentVerletBone.Location).Size() / DistFromParent;
+			float ChildMoveAlpha = FMath::IsNearlyZero(DistFromParent, KINDA_SMALL_NUMBER) ? 0.0f : (ClosestOnBone - ParentVerletBone.Location).Size() / DistFromParent;
 			ChildMoveAlpha = ChildMoveAlpha * (2.0f - ChildMoveAlpha);	///EaseOutQuad for better movement(heuristic center of mass)
 
 			if (ParentVerletBone.IsPinned())
@@ -1245,7 +1299,7 @@ bool FLKAnimVerletConstraint_Capsule::CheckCapsuleCapsule(IN OUT FLKAnimVerletBo
 		}
 		else
 		{
-			float ChildMoveAlpha = (ClosestOnBone - ParentVerletBone.Location).Size() / DistFromParent;
+			float ChildMoveAlpha = FMath::IsNearlyZero(DistFromParent, KINDA_SMALL_NUMBER) ? 0.0f : (ClosestOnBone - ParentVerletBone.Location).Size() / DistFromParent;
 			ChildMoveAlpha = ChildMoveAlpha * (2.0f - ChildMoveAlpha);	///EaseOutQuad for better movement(heuristic center of mass)
 
 			if (ParentVerletBone.IsPinned())
@@ -1440,10 +1494,17 @@ bool FLKAnimVerletConstraint_Box::CheckBoxSphere(IN OUT FLKAnimVerletBone& CurVe
 	{
 		if (bUseXPBDSolver && bFinalize == false)
 		{
+			if (FMath::IsNearlyZero(DeltaTime, KINDA_SMALL_NUMBER))
+				return false;
+
 			double& CurLambda = Lambdas[LambdaIndex];
 			const float C = -PenetrationDepth;
 			const double Alpha = Compliance / (DeltaTime * DeltaTime);
-			const double DeltaLambda = -(C + Alpha * CurLambda) / (CurVerletBone.InvMass + Alpha);
+			const double Denom = (CurVerletBone.InvMass + Alpha);
+			if (FMath::IsNearlyZero(Denom, KINDA_SMALL_NUMBER))
+				return false;
+
+			const double DeltaLambda = -(C + Alpha * CurLambda) / Denom;
 			CurLambda += DeltaLambda;
 
 			const FVector NewLocation = CurVerletBone.Location + CollisionNormal * DeltaLambda;
@@ -1608,13 +1669,20 @@ bool FLKAnimVerletConstraint_Box::CheckBoxCapsule(IN OUT FLKAnimVerletBone& CurV
 
 	if (bUseXPBDSolver && bFinalize == false)
 	{
+		if (FMath::IsNearlyZero(DeltaTime, KINDA_SMALL_NUMBER))
+			return false;
+
 		double& CurLambda = Lambdas[LambdaIndex];
 		const float C = -PenetrationDepth;
 		const double Alpha = Compliance / (DeltaTime * DeltaTime);
-		const double DeltaLambda = -(C + Alpha * CurLambda) / (CurVerletBone.InvMass + ParentVerletBone.InvMass + Alpha);
+		const double Denom = (CurVerletBone.InvMass + ParentVerletBone.InvMass + Alpha);
+		if (FMath::IsNearlyZero(Denom, KINDA_SMALL_NUMBER))
+			return false;
+
+		const double DeltaLambda = -(C + Alpha * CurLambda) / Denom;
 		CurLambda += DeltaLambda;
 
-		float ChildMoveAlpha = (ClosestOnBone - ParentVerletBone.Location).Size() / DistFromParent;
+		float ChildMoveAlpha = FMath::IsNearlyZero(DistFromParent, KINDA_SMALL_NUMBER) ? 0.0f : (ClosestOnBone - ParentVerletBone.Location).Size() / DistFromParent;
 		ChildMoveAlpha = ChildMoveAlpha * (2.0f - ChildMoveAlpha);	///EaseOutQuad for better movement(heuristic center of mass)
 
 		if (ParentVerletBone.IsPinned())
@@ -1629,7 +1697,7 @@ bool FLKAnimVerletConstraint_Box::CheckBoxCapsule(IN OUT FLKAnimVerletBone& CurV
 	}
 	else
 	{
-		float ChildMoveAlpha = (ClosestOnBone - ParentVerletBone.Location).Size() / DistFromParent;
+		float ChildMoveAlpha = FMath::IsNearlyZero(DistFromParent, KINDA_SMALL_NUMBER) ? 0.0f : (ClosestOnBone - ParentVerletBone.Location).Size() / DistFromParent;
 		ChildMoveAlpha = ChildMoveAlpha * (2.0f - ChildMoveAlpha);	///EaseOutQuad for better movement(heuristic center of mass)
 
 		if (ParentVerletBone.IsPinned())
@@ -1729,13 +1797,20 @@ bool FLKAnimVerletConstraint_Box::CheckBoxBox(IN OUT FLKAnimVerletBone& CurVerle
 	{
 		if (bUseXPBDSolver && bFinalize == false)
 		{
+			if (FMath::IsNearlyZero(DeltaTime, KINDA_SMALL_NUMBER))
+				return false;
+
 			double& CurLambda = Lambdas[LambdaIndex];
 			const float C = -PenetrationDepth;
 			const double Alpha = Compliance / (DeltaTime * DeltaTime);
-			const double DeltaLambda = -(C + Alpha * CurLambda) / (CurVerletBone.InvMass + ParentVerletBone.InvMass + Alpha);
+			const double Denom = (CurVerletBone.InvMass + ParentVerletBone.InvMass + Alpha);
+			if (FMath::IsNearlyZero(Denom, KINDA_SMALL_NUMBER))
+				return false;
+
+			const double DeltaLambda = -(C + Alpha * CurLambda) / Denom;
 			CurLambda += DeltaLambda;
 
-			float ChildMoveAlpha = (ClosestOnBone - ParentVerletBone.Location).Size() / DistFromParent;
+			float ChildMoveAlpha = FMath::IsNearlyZero(DistFromParent, KINDA_SMALL_NUMBER) ? 0.0f : (ClosestOnBone - ParentVerletBone.Location).Size() / DistFromParent;
 			ChildMoveAlpha = ChildMoveAlpha * (2.0f - ChildMoveAlpha);	///EaseOutQuad for better movement(heuristic center of mass)
 
 			if (ParentVerletBone.IsPinned())
@@ -1750,7 +1825,7 @@ bool FLKAnimVerletConstraint_Box::CheckBoxBox(IN OUT FLKAnimVerletBone& CurVerle
 		}
 		else
 		{
-			float ChildMoveAlpha = (ClosestOnBone - ParentVerletBone.Location).Size() / DistFromParent;
+			float ChildMoveAlpha = FMath::IsNearlyZero(DistFromParent, KINDA_SMALL_NUMBER) ? 0.0f : (ClosestOnBone - ParentVerletBone.Location).Size() / DistFromParent;
 			ChildMoveAlpha = ChildMoveAlpha * (2.0f - ChildMoveAlpha);	///EaseOutQuad for better movement(heuristic center of mass)
 
 			if (ParentVerletBone.IsPinned())
@@ -1887,10 +1962,17 @@ bool FLKAnimVerletConstraint_Plane::CheckPlaneSphere(IN OUT FLKAnimVerletBone& C
 		const float PenetrationDepth = (CurVerletBone.Thickness - DistToPlane);
 		if (bUseXPBDSolver && bFinalize == false)
 		{
+			if (FMath::IsNearlyZero(DeltaTime, KINDA_SMALL_NUMBER))
+				return false;
+
 			double& CurLambda = Lambdas[LambdaIndex];
 			const float C = -PenetrationDepth;
 			const double Alpha = Compliance / (DeltaTime * DeltaTime);
-			const double DeltaLambda = -(C + Alpha * CurLambda) / (CurVerletBone.InvMass + Alpha);
+			const double Denom = (CurVerletBone.InvMass + Alpha);
+			if (FMath::IsNearlyZero(Denom, KINDA_SMALL_NUMBER))
+				return false;
+
+			const double DeltaLambda = -(C + Alpha * CurLambda) / Denom;
 			CurLambda += DeltaLambda;
 
 			CurVerletBone.Location += (PlaneNormal * DeltaLambda);
@@ -1949,13 +2031,20 @@ bool FLKAnimVerletConstraint_Plane::CheckPlaneCapsule(IN OUT FLKAnimVerletBone& 
 		const float PenetrationDepth = (CurVerletBone.Thickness - DistToPlane);
 		if (bUseXPBDSolver && bFinalize == false)
 		{
+			if (FMath::IsNearlyZero(DeltaTime, KINDA_SMALL_NUMBER))
+				return false;
+
 			double& CurLambda = Lambdas[LambdaIndex];
 			const float C = -PenetrationDepth;
 			const double Alpha = Compliance / (DeltaTime * DeltaTime);
-			const double DeltaLambda = -(C + Alpha * CurLambda) / (CurVerletBone.InvMass + ParentVerletBone.InvMass + Alpha);
+			const double Denom = (CurVerletBone.InvMass + ParentVerletBone.InvMass + Alpha);
+			if (FMath::IsNearlyZero(Denom, KINDA_SMALL_NUMBER))
+				return false;
+
+			const double DeltaLambda = -(C + Alpha * CurLambda) / Denom;
 			CurLambda += DeltaLambda;
 
-			float ChildMoveAlpha = (ClosestOnBone - ParentVerletBone.Location).Size() / DistFromParent;
+			float ChildMoveAlpha = FMath::IsNearlyZero(DistFromParent, KINDA_SMALL_NUMBER) ? 0.0f : (ClosestOnBone - ParentVerletBone.Location).Size() / DistFromParent;
 			ChildMoveAlpha = ChildMoveAlpha * (2.0f - ChildMoveAlpha);	///EaseOutQuad for better movement(heuristic center of mass)
 
 			if (ParentVerletBone.IsPinned())
@@ -1970,7 +2059,7 @@ bool FLKAnimVerletConstraint_Plane::CheckPlaneCapsule(IN OUT FLKAnimVerletBone& 
 		}
 		else
 		{
-			float ChildMoveAlpha = (ClosestOnBone - ParentVerletBone.Location).Size() / DistFromParent;
+			float ChildMoveAlpha = FMath::IsNearlyZero(DistFromParent, KINDA_SMALL_NUMBER) ? 0.0f : (ClosestOnBone - ParentVerletBone.Location).Size() / DistFromParent;
 			ChildMoveAlpha = ChildMoveAlpha * (2.0f - ChildMoveAlpha);	///EaseOutQuad for better movement(heuristic center of mass)
 
 			if (ParentVerletBone.IsPinned())
@@ -2113,7 +2202,8 @@ bool FLKAnimVerletConstraint_World::CheckWorldCapsule(IN OUT FLKAnimVerletBone& 
 	const bool bHit = World->SweepSingleByProfile(OUT HitResult, PrevWorldLoc, CurWorldLoc, FRotationMatrix::MakeFromZ(-DirFromParent).ToQuat(), WorldCollisionProfileName, FCollisionShape::MakeCapsule(CurVerletBone.Thickness, CapsuleHalfHeight), CollisionQueryParams);
 	if (bHit)
 	{
-		float ChildMoveAlpha = FMath::Clamp((HitResult.Location - ParentVerletBone.Location).Size() / DistFromParent, 0.0f, 1.0f);
+		float ChildMoveAlpha = FMath::IsNearlyZero(DistFromParent, KINDA_SMALL_NUMBER) ? 0.0f : (HitResult.Location - ParentVerletBone.Location).Size() / DistFromParent;
+		ChildMoveAlpha = FMath::Clamp(ChildMoveAlpha, 0.0f, 1.0f);
 		ChildMoveAlpha = ChildMoveAlpha * (2.0f - ChildMoveAlpha);	///EaseOutQuad for better movement(heuristic center of mass)
 
 		if (ParentVerletBone.IsPinned() || CurVerletBone.IsPinned())

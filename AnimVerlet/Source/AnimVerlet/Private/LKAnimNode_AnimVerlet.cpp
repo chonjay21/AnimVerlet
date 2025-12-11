@@ -44,6 +44,8 @@ DECLARE_CYCLE_STAT(TEXT("AnimVerlet_UpdateSleep"), STAT_AnimVerlet_UpdateSleep, 
 DECLARE_CYCLE_STAT(TEXT("AnimVerlet_PostUpdateBones"), STAT_AnimVerlet_PostUpdateBones, STATGROUP_Anim);
 DECLARE_CYCLE_STAT(TEXT("AnimVerlet_ApplyResult"), STAT_AnimVerlet_ApplyResult, STATGROUP_Anim);
 
+static constexpr float LKG_MINFPS = 30.0f;
+static constexpr float LKG_MAXFPS = 500.0f;
 
 FLKAnimNode_AnimVerlet::FLKAnimNode_AnimVerlet()
 	: FAnimNode_SkeletalControlBase()
@@ -1297,6 +1299,7 @@ void FLKAnimNode_AnimVerlet::PreUpdateBones(const UWorld* World, float InDeltaTi
 	FLKAnimVerletUpdateParam VerletUpdateParam;
 	{
 		extern ENGINE_API float GAverageFPS;
+		const float ClampedAverageFPS = FMath::Clamp(GAverageFPS, LKG_MINFPS, LKG_MAXFPS);
 		/// Clamp Move Intertia
 		{
 			const FVector PrevComponentLocation = PrevComponentTransform.GetLocation();
@@ -1307,7 +1310,7 @@ void FLKAnimNode_AnimVerlet::PreUpdateBones(const UWorld* World, float InDeltaTi
 
 			MoveDiffDist = bClampMoveInertia ? FMath::Clamp(MoveDiffDist, 0.0f, MoveInertiaClampMaxDistance) : MoveDiffDist;
 
-			const float TargetMoveInertiaScale = bApplyMoveInertiaScaleCorrection ? (MoveInertiaScale * GAverageFPS / FMath::Max(KINDA_SMALL_NUMBER, MoveInertiaScaleTargetFrameRate)) : MoveInertiaScale;
+			const float TargetMoveInertiaScale = bApplyMoveInertiaScaleCorrection ? (MoveInertiaScale * ClampedAverageFPS / FMath::Max(LKG_MINFPS, MoveInertiaScaleTargetFrameRate)) : MoveInertiaScale;
 			VerletUpdateParam.ComponentMoveDiff = MoveDiffDir * MoveDiffDist * TargetMoveInertiaScale;
 		}
 
@@ -1323,7 +1326,7 @@ void FLKAnimNode_AnimVerlet::PreUpdateBones(const UWorld* World, float InDeltaTi
 			if (bClampRotationInertia && FMath::Abs(DiffAngeDegrees) > RotationInertiaClampDegrees)
 				DiffAngeDegrees = FMath::Sign(DiffAngeDegrees) * RotationInertiaClampDegrees;
 
-			const float TargetRotationInertiaScale = bApplyRotationInertiaScaleCorrection ? (RotationInertiaScale * GAverageFPS / FMath::Max(KINDA_SMALL_NUMBER, RotationInertiaScaleTargetFrameRate)) : RotationInertiaScale;
+			const float TargetRotationInertiaScale = bApplyRotationInertiaScaleCorrection ? (RotationInertiaScale * ClampedAverageFPS / FMath::Max(LKG_MINFPS, RotationInertiaScaleTargetFrameRate)) : RotationInertiaScale;
 			VerletUpdateParam.ComponentRotDiff = FQuat(RotDiffAxis, FMath::DegreesToRadians(DiffAngeDegrees));
 			VerletUpdateParam.RotationInertiaScale = TargetRotationInertiaScale;
 		}
@@ -1348,7 +1351,7 @@ void FLKAnimNode_AnimVerlet::PreUpdateBones(const UWorld* World, float InDeltaTi
 			NewWind.RandomForceSizeMax = CurWind.RandomForceSizeMax;
 			NewWind.bRandomForceDirectionInWorldSpace = CurWind.bRandomForceDirectionInWorldSpace;
 		}
-		VerletUpdateParam.Damping = bApplyDampingCorrection ? FMath::Clamp(FMath::Pow(Damping, (DampingCorrectionTargetFrameRate / FMath::Max(KINDA_SMALL_NUMBER, GAverageFPS))), 0.0f, 1.0f) : Damping;
+		VerletUpdateParam.Damping = bApplyDampingCorrection ? FMath::Clamp(FMath::Pow(Damping, (DampingCorrectionTargetFrameRate / ClampedAverageFPS)), 0.0f, 1.0f) : Damping;
 	}
 
 	/// Simulate each bones	
@@ -1376,11 +1379,12 @@ void FLKAnimNode_AnimVerlet::PreUpdateBones(const UWorld* World, float InDeltaTi
 		if (bIgnoreAnimationPose == false && CurVerletBone.HasParentBone())
 		{
 			extern ENGINE_API float GAverageFPS;
+			const float ClampedAverageFPS = FMath::Clamp(GAverageFPS, LKG_MINFPS, LKG_MAXFPS);
 
 			FLKAnimVerletBone& ParentVerletBone = SimulateBones[CurVerletBone.ParentVerletBoneIndex];
-			///const float AnimPoseDeltaInertiaScaled = bApplyAnimationPoseInertiaCorrection ? (AnimationPoseDeltaInertia * AnimationPoseDeltaInertiaScale * AnimationPoseInertiaTargetFrameRate / FMath::Max(KINDA_SMALL_NUMBER, GAverageFPS)) : AnimationPoseDeltaInertia * AnimationPoseDeltaInertiaScale;
+			///const float AnimPoseDeltaInertiaScaled = bApplyAnimationPoseInertiaCorrection ? (AnimationPoseDeltaInertia * AnimationPoseDeltaInertiaScale * AnimationPoseInertiaTargetFrameRate / ClampedAverageFPS) : AnimationPoseDeltaInertia * AnimationPoseDeltaInertiaScale;
 			const float AnimPoseDeltaInertiaScaled = AnimationPoseDeltaInertia * AnimationPoseDeltaInertiaScale;
-			const float TargetAnimationPoseInertia = bApplyAnimationPoseInertiaCorrection ? (AnimationPoseInertia * AnimationPoseInertiaTargetFrameRate / FMath::Max(KINDA_SMALL_NUMBER, GAverageFPS)) : AnimationPoseInertia;
+			const float TargetAnimationPoseInertia = bApplyAnimationPoseInertiaCorrection ? (AnimationPoseInertia * AnimationPoseInertiaTargetFrameRate / ClampedAverageFPS) : AnimationPoseInertia;
 			CurVerletBone.AdjustPoseTransform(InDeltaTime, ParentVerletBone.Location, ParentVerletBone.PoseLocation, TargetAnimationPoseInertia, AnimPoseDeltaInertiaScaled, bClampAnimationPoseDeltaInertia, AnimationPoseDeltaInertiaClampMax);
 		}
 	}
@@ -2086,6 +2090,72 @@ void FLKAnimNode_AnimVerlet::SyncFromOtherAnimVerletNode(const FLKAnimNode_AnimV
 	RotationInertiaScaleTargetFrameRate = Other.RotationInertiaScaleTargetFrameRate;
 	bClampRotationInertia = Other.bClampRotationInertia;
 	RotationInertiaClampDegrees = Other.RotationInertiaClampDegrees;
+}
+
+void FLKAnimNode_AnimVerlet::ApplyPresetType(ELKAnimVerletPreset InPresetType)
+{
+	switch (InPresetType)
+	{
+		case ELKAnimVerletPreset::AnimationPose:
+		{
+			bIgnoreAnimationPose = false;
+			bUseXPBDSolver = false;
+			bUseSquaredDeltaTime = false;
+
+			bUseIsometricBendingConstraint = false;
+			Damping = 0.8f;
+			SolveIteration = 1;
+			Gravity = FVector(0.0f, 0.0f, -9.8f);
+			break;
+		}
+
+		case ELKAnimVerletPreset::Physics_XPBD:
+		{
+			bIgnoreAnimationPose = true;
+			bUseXPBDSolver = true;
+			bUseSquaredDeltaTime = true;
+
+			bUseIsometricBendingConstraint = true;
+			Damping = 0.99f;
+			SolveIteration = 4;
+			Gravity = FVector(0.0f, 0.0f, -980.0f);
+			break;
+		}
+
+		case ELKAnimVerletPreset::Physics_PBD:
+		{
+			bIgnoreAnimationPose = true;
+			bUseXPBDSolver = false;
+			bUseSquaredDeltaTime = true;
+
+			bUseIsometricBendingConstraint = false;
+			Damping = 0.9f;
+			SolveIteration = 4;
+			Gravity = FVector(0.0f, 0.0f, -980.0f);
+			break;
+		}
+
+		default:
+			break;
+	}
+}
+
+bool FLKAnimNode_AnimVerlet::IsPresetTypeRelatedProperty(const FName& InPropertyName) const
+{
+	#if WITH_EDITOR
+	if (InPropertyName == GET_MEMBER_NAME_CHECKED(FLKAnimNode_AnimVerlet, bIgnoreAnimationPose)
+		|| InPropertyName == GET_MEMBER_NAME_CHECKED(FLKAnimNode_AnimVerlet, bUseXPBDSolver)
+		|| InPropertyName == GET_MEMBER_NAME_CHECKED(FLKAnimNode_AnimVerlet, bUseSquaredDeltaTime)
+		|| InPropertyName == GET_MEMBER_NAME_CHECKED(FLKAnimNode_AnimVerlet, bUseIsometricBendingConstraint)
+		|| InPropertyName == GET_MEMBER_NAME_CHECKED(FLKAnimNode_AnimVerlet, SolveIteration)
+		///|| InPropertyName == GET_MEMBER_NAME_CHECKED(FLKAnimNode_AnimVerlet, Gravity)
+		///|| InPropertyName == GET_MEMBER_NAME_CHECKED(FLKAnimNode_AnimVerlet, Damping)
+		)
+	{
+		return true;
+	}
+	#endif
+	return false;
 }
 
 void FLKAnimNode_AnimVerlet::DebugDrawAnimVerlet(const FComponentSpacePoseContext& Output)

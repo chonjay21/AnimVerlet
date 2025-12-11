@@ -6,6 +6,7 @@
 #include "LKAnimVerletConstraint.h"
 #include "LKAnimVerletConstraintType.h"
 #include "LKAnimVerletSetting.h"
+#include "LKAnimVerletType.h"
 #include "LKAnimNode_AnimVerlet.generated.h"
 
 #if ENABLE_ANIM_DEBUG && ENABLE_VISUAL_LOG
@@ -88,6 +89,9 @@ public:
 	bool ConvertPhysicsAssetToDataAsset();
 	bool ConvertCollisionShapesFromPhysicsAsset();
 	void SyncFromOtherAnimVerletNode(const FLKAnimNode_AnimVerlet& Other);
+
+	void ApplyPresetType(ELKAnimVerletPreset InPresetType);
+	bool IsPresetTypeRelatedProperty(const FName& InPropertyName) const;
 
 	void DebugDrawAnimVerlet(const FComponentSpacePoseContext& Output);
 

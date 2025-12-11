@@ -25,6 +25,8 @@ public:
 	void ConvertPhysicsAssetToDataAsset();
 	void ConvertCollisionShapesFromPhysicsAsset();
 
+	void ApplyAnimVerletPresetType(FLKAnimNode_AnimVerlet& InNode);
+
 	FLKAnimNode_AnimVerlet* GetPreviewAnimVerletNode() const;
 
 public:
@@ -100,6 +102,10 @@ public:
 	bool bShowIsometricBendingConstraints = false;
 	///UPROPERTY(EditAnywhere, Category = "Preview")
 	bool bShowFlatBendingConstraints = false;
+
+
+	UPROPERTY(EditAnywhere, Category = "Preset")
+	ELKAnimVerletPreset PresetType = ELKAnimVerletPreset::Custom;
 
 private:
 	FNodeTitleTextTable CachedNodeTitles;
