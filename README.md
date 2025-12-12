@@ -36,7 +36,7 @@ Find me at:
 
 The UnrealEngine versions supported by this plugin are:
 
-| Engine | Engine Version | Precompiled Version | SourceCode Version |
+| Engine | Engine Version | Precompiled Version(Win64 only) | SourceCode Version(All platforms) |
 | :----: | --- | --- | --- |
 | UE4 | 4.27 or later | v.220628 | Latest |
 | UE5 | 5.0.2 ~ 5.2.1 | v.220628 | Latest |
