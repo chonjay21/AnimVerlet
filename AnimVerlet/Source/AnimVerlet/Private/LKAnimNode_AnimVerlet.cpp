@@ -256,6 +256,24 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 			{
 				const FLKAnimVerletConstraint_FixedDistance FixedDistanceConstraint(&ParentSimulateBone, &CurSimulateBone, bStretchEachBone, StretchStrength, false, LengthFromParentMargin);
 				FixedDistanceConstraints.Emplace(FixedDistanceConstraint);
+
+				if (bPreserveLengthFromParentBetweenRealBones && bSubDivideBones && NumSubDividedBone >= 1 && CurSimulateBone.bFakeBone == false)
+				{
+					FLKAnimVerletBone* RealParentSimulateBone = &ParentSimulateBone;
+					while (RealParentSimulateBone != nullptr && RealParentSimulateBone->bFakeBone)
+					{
+						if (RealParentSimulateBone->HasParentBone())
+							RealParentSimulateBone = &SimulateBones[RealParentSimulateBone->ParentVerletBoneIndex];
+						else
+							RealParentSimulateBone = nullptr;
+					}
+
+					if (RealParentSimulateBone != nullptr)
+					{
+						const FLKAnimVerletConstraint_FixedDistance RealFixedDistanceConstraint(RealParentSimulateBone, &CurSimulateBone, bStretchEachBone, StretchStrength, false, LengthFromParentMargin);
+						FixedDistanceConstraints.Emplace(RealFixedDistanceConstraint);
+					}
+				}
 			}
 
 			if (CurSimulateBone.ConeAngleConstraint > 0.0f)
@@ -453,6 +471,28 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 						{
 							const FLKAnimVerletConstraint_FixedDistance FixedDistanceConstraint(&SimulateBones[CurBoneChain[i]], &SimulateBones[LeftBoneChain[i]], bStretchEachBone, StretchStrength, false, SideLengthMargin);
 							FixedDistanceConstraints.Emplace(FixedDistanceConstraint);
+
+							if (bPreserveSideLengthBetweenRealBones && bSubDivideBones && NumSubDividedBone >= 1 && SimulateBones[CurBoneChain[i]].bFakeBone == false)
+							{
+								int32 LeftIndexForRealBone = LeftIndex;
+								FLKAnimVerletBone* RealLeftSimulateBone = &SimulateBones[LeftBoneChain[i]];
+								while (RealLeftSimulateBone != nullptr && RealLeftSimulateBone->bFakeBone)
+								{
+									if (BoneChainIndexes.IsValidIndex(--LeftIndexForRealBone))
+									{
+										const TArray<int32>& LeftBoneChainForRealBone = BoneChainIndexes[LeftIndexForRealBone];
+										RealLeftSimulateBone = &SimulateBones[LeftBoneChainForRealBone[i]];
+									}
+									else
+										RealLeftSimulateBone = nullptr;
+								}
+
+								if (RealLeftSimulateBone != nullptr)
+								{
+									const FLKAnimVerletConstraint_FixedDistance RealFixedDistanceConstraint(&SimulateBones[CurBoneChain[i]], RealLeftSimulateBone, bStretchEachBone, StretchStrength, false, SideLengthMargin);
+									FixedDistanceConstraints.Emplace(RealFixedDistanceConstraint);
+								}
+							}
 						}
 
 						if (bConstrainRightDiagonalDistance)
@@ -530,6 +570,28 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 						{
 							const FLKAnimVerletConstraint_FixedDistance FixedDistanceConstraint(&SimulateBones[CurBoneChain[i]], &SimulateBones[RightBoneChain[i]], bStretchEachBone, StretchStrength, false, SideLengthMargin);
 							FixedDistanceConstraints.Emplace(FixedDistanceConstraint);
+
+							if (bPreserveSideLengthBetweenRealBones && bSubDivideBones && NumSubDividedBone >= 1 && SimulateBones[CurBoneChain[i]].bFakeBone == false)
+							{
+								int32 RightIndexForRealBone = RightIndex;
+								FLKAnimVerletBone* RealRightSimulateBone = &SimulateBones[RightBoneChain[i]];
+								while (RealRightSimulateBone != nullptr && RealRightSimulateBone->bFakeBone)
+								{
+									if (BoneChainIndexes.IsValidIndex(++RightIndexForRealBone))
+									{
+										const TArray<int32>& RightBoneChainForRealBone = BoneChainIndexes[RightIndexForRealBone];
+										RealRightSimulateBone = &SimulateBones[RightBoneChainForRealBone[i]];
+									}
+									else
+										RealRightSimulateBone = nullptr;
+								}
+
+								if (RealRightSimulateBone != nullptr)
+								{
+									const FLKAnimVerletConstraint_FixedDistance RealFixedDistanceConstraint(&SimulateBones[CurBoneChain[i]], RealRightSimulateBone, bStretchEachBone, StretchStrength, false, SideLengthMargin);
+									FixedDistanceConstraints.Emplace(RealFixedDistanceConstraint);
+								}
+							}
 						}
 
 						if (bConstrainRightDiagonalDistance)

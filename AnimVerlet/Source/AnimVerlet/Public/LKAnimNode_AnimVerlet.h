@@ -199,11 +199,17 @@ public:
 	/** The option to keep the distance between parent and child bones in the bone chain helps to keep SolveIteration small. */
 	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve")
 	bool bPreserveLengthFromParent = true;
+	/** The option to keep the distance between real parent and real child bones in the bone chain(when subdivided bone exists). */
+	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve", meta = (EditCondition = "bPreserveLengthFromParent"))
+	bool bPreserveLengthFromParentBetweenRealBones = false;
 	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve", meta = (EditCondition = "bPreserveLengthFromParent", ClampMin = "0.0", ForceUnits = "cm"))
 	float LengthFromParentMargin = 0.1f;
 	/** The option to keep the distance between side bones helps to keep SolveIteration small. */
 	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve")
 	bool bPreserveSideLength = true;
+	/** The option to keep the distance between real side bones(when subdivided bone exists). */
+	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve", meta = (EditCondition = "bPreserveSideLength"))
+	bool bPreserveSideLengthBetweenRealBones = false;
 	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve", meta = (EditCondition = "bPreserveSideLength", ClampMin = "0.0", ForceUnits = "cm"))
 	float SideLengthMargin = 0.1f;
 	
