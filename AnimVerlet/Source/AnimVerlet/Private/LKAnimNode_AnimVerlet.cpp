@@ -2110,8 +2110,10 @@ void FLKAnimNode_AnimVerlet::SyncFromOtherAnimVerletNode(const FLKAnimNode_AnimV
 	BendingStiffness = Other.BendingStiffness;
 
 	bPreserveLengthFromParent = Other.bPreserveLengthFromParent;
+	bPreserveLengthFromParentBetweenRealBones = Other.bPreserveLengthFromParentBetweenRealBones;
 	LengthFromParentMargin = Other.LengthFromParentMargin;
 	bPreserveSideLength = Other.bPreserveSideLength;
+	bPreserveSideLengthBetweenRealBones = Other.bPreserveSideLengthBetweenRealBones;
 	SideLengthMargin = Other.SideLengthMargin;
 
 	bStretchEachBone = Other.bStretchEachBone;
@@ -2119,6 +2121,11 @@ void FLKAnimNode_AnimVerlet::SyncFromOtherAnimVerletNode(const FLKAnimNode_AnimV
 
 	bStraightenBendedBone = Other.bStraightenBendedBone;
 	StraightenBendedBoneStrength = Other.StraightenBendedBoneStrength;
+
+	bUseFlatBendingConstraint = Other.bUseFlatBendingConstraint;
+	InvFlatBendingCompliance = Other.InvFlatBendingCompliance;
+	FlatBendingStiffness = Other.FlatBendingStiffness;
+	FlatBendingAlpha = Other.FlatBendingAlpha;
 
 	SolveIteration = Other.SolveIteration;
 
@@ -2129,6 +2136,7 @@ void FLKAnimNode_AnimVerlet::SyncFromOtherAnimVerletNode(const FLKAnimNode_AnimV
 	MaxDeltaTime = Other.MaxDeltaTime;
 	bUseSquaredDeltaTime = Other.bUseSquaredDeltaTime;
 
+	bConstrainConeAngleFromParent = Other.bConstrainConeAngleFromParent;
 	ConeAngle = Other.ConeAngle;
 	Thickness = Other.Thickness;
 	bUseCapsuleCollisionForChain = Other.bUseCapsuleCollisionForChain;
