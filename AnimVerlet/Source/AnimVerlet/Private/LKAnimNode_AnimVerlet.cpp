@@ -2305,21 +2305,67 @@ void FLKAnimNode_AnimVerlet::DebugDrawAnimVerlet(const FComponentSpacePoseContex
 	}
 
 #if (ENGINE_MINOR_VERSION >= 4)
-	for (const FLKAnimVerletBoneIndicatorPair& CurPair : SimulateBonePairIndicators)
+	const bool bDrawTriangle = bUseCapsuleCollisionForChain && (IsSingleChain() == false);
+	if (bDrawTriangle)
 	{
-		if (CurPair.BoneB.IsValidBoneIndicator() == false || SimulateBones.IsValidIndex(CurPair.BoneB.AnimVerletBoneIndex) == false)
-			continue;
+		for (const FLKAnimVerletBoneIndicatorTriangle& CurTriangle : SimulateBoneTriangleIndicators)
+		{
+			if (CurTriangle.BoneA.IsValidBoneIndicator() == false || SimulateBones.IsValidIndex(CurTriangle.BoneA.AnimVerletBoneIndex) == false)
+				continue;
+			if (CurTriangle.BoneB.IsValidBoneIndicator() == false || SimulateBones.IsValidIndex(CurTriangle.BoneB.AnimVerletBoneIndex) == false)
+				continue;
+			if (CurTriangle.BoneC.IsValidBoneIndicator() == false || SimulateBones.IsValidIndex(CurTriangle.BoneC.AnimVerletBoneIndex) == false)
+				continue;
 
-		const FLKAnimVerletBone& CurVerletBone = SimulateBones[CurPair.BoneB.AnimVerletBoneIndex];
-		if (CurPair.BoneA.IsValidBoneIndicator() == false || CurVerletBone.bOverrideToUseSphereCollisionForChain)
-			continue;
+			const FLKAnimVerletBone& AVerletBone = SimulateBones[CurTriangle.BoneA.AnimVerletBoneIndex];
+			if (AVerletBone.bOverrideToUseSphereCollisionForChain)
+				continue;
+			const FLKAnimVerletBone& BVerletBone = SimulateBones[CurTriangle.BoneB.AnimVerletBoneIndex];
+			if (BVerletBone.bOverrideToUseSphereCollisionForChain)
+				continue;
+			const FLKAnimVerletBone& CVerletBone = SimulateBones[CurTriangle.BoneC.AnimVerletBoneIndex];
+			if (CVerletBone.bOverrideToUseSphereCollisionForChain)
+				continue;
 
-		const FLKAnimVerletBone& ParentVerletBone = SimulateBones[CurPair.BoneA.AnimVerletBoneIndex];
+			const float TriThickness = FMath::Max3(AVerletBone.Thickness, BVerletBone.Thickness, CVerletBone.Thickness);
+			{
+				const FVector WorldLocation = ComponentToWorld.TransformPosition((BVerletBone.Location + AVerletBone.Location) * 0.5f);
+				const FQuat CapsuleRotation = FRotationMatrix::MakeFromZ(BVerletBone.Location - AVerletBone.Location).ToQuat();
+				const FQuat WorldRotation = ComponentToWorld.TransformRotation(CapsuleRotation);
+				AnimInstanceProxy->AnimDrawDebugCapsule(WorldLocation, (BVerletBone.Location - AVerletBone.Location).Size() * 0.5f + TriThickness, TriThickness, WorldRotation.Rotator(), FColor::Blue, false, -1.0f, SDPG_Foreground);
+			}
+			{
+				const FVector WorldLocation = ComponentToWorld.TransformPosition((CVerletBone.Location + AVerletBone.Location) * 0.5f);
+				const FQuat CapsuleRotation = FRotationMatrix::MakeFromZ(CVerletBone.Location - AVerletBone.Location).ToQuat();
+				const FQuat WorldRotation = ComponentToWorld.TransformRotation(CapsuleRotation);
+				AnimInstanceProxy->AnimDrawDebugCapsule(WorldLocation, (CVerletBone.Location - AVerletBone.Location).Size() * 0.5f + TriThickness, TriThickness, WorldRotation.Rotator(), FColor::Blue, false, -1.0f, SDPG_Foreground);
+			}
+			{
+				const FVector WorldLocation = ComponentToWorld.TransformPosition((CVerletBone.Location + BVerletBone.Location) * 0.5f);
+				const FQuat CapsuleRotation = FRotationMatrix::MakeFromZ(CVerletBone.Location - BVerletBone.Location).ToQuat();
+				const FQuat WorldRotation = ComponentToWorld.TransformRotation(CapsuleRotation);
+				AnimInstanceProxy->AnimDrawDebugCapsule(WorldLocation, (CVerletBone.Location - BVerletBone.Location).Size() * 0.5f + TriThickness, TriThickness, WorldRotation.Rotator(), FColor::Blue, false, -1.0f, SDPG_Foreground);
+			}
+		}
+	}
+	else
+	{
+		for (const FLKAnimVerletBoneIndicatorPair& CurPair : SimulateBonePairIndicators)
+		{
+			if (CurPair.BoneB.IsValidBoneIndicator() == false || SimulateBones.IsValidIndex(CurPair.BoneB.AnimVerletBoneIndex) == false)
+				continue;
 
-		const FVector WorldLocation = ComponentToWorld.TransformPosition((CurVerletBone.Location + ParentVerletBone.Location) * 0.5f);
-		const FQuat CapsuleRotation = FRotationMatrix::MakeFromZ(ParentVerletBone.Location - CurVerletBone.Location).ToQuat();
-		const FQuat WorldRotation = ComponentToWorld.TransformRotation(CapsuleRotation);
-		AnimInstanceProxy->AnimDrawDebugCapsule(WorldLocation, (CurVerletBone.Location - ParentVerletBone.Location).Size() * 0.5f + CurVerletBone.Thickness, CurVerletBone.Thickness, WorldRotation.Rotator(), FColor::Blue, false, -1.0f, SDPG_Foreground);
+			const FLKAnimVerletBone& CurVerletBone = SimulateBones[CurPair.BoneB.AnimVerletBoneIndex];
+			if (CurPair.BoneA.IsValidBoneIndicator() == false || CurVerletBone.bOverrideToUseSphereCollisionForChain)
+				continue;
+
+			const FLKAnimVerletBone& ParentVerletBone = SimulateBones[CurPair.BoneA.AnimVerletBoneIndex];
+
+			const FVector WorldLocation = ComponentToWorld.TransformPosition((CurVerletBone.Location + ParentVerletBone.Location) * 0.5f);
+			const FQuat CapsuleRotation = FRotationMatrix::MakeFromZ(ParentVerletBone.Location - CurVerletBone.Location).ToQuat();
+			const FQuat WorldRotation = ComponentToWorld.TransformRotation(CapsuleRotation);
+			AnimInstanceProxy->AnimDrawDebugCapsule(WorldLocation, (CurVerletBone.Location - ParentVerletBone.Location).Size() * 0.5f + CurVerletBone.Thickness, CurVerletBone.Thickness, WorldRotation.Rotator(), FColor::Blue, false, -1.0f, SDPG_Foreground);
+		}
 	}
 #endif
 

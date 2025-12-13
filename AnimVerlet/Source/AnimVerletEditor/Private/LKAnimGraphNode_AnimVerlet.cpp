@@ -184,30 +184,32 @@ void ULKAnimGraphNode_AnimVerlet::Draw(FPrimitiveDrawInterface* PDI, USkeletalMe
 				const TArray<FLKAnimVerletBoneIndicatorTriangle>& AnimVerletBoneIndicatorTriangleList = AnimVerletNode->GetSimulateBoneTriangleIndicators();
 				for (const FLKAnimVerletBoneIndicatorTriangle& CurTriangle : AnimVerletBoneIndicatorTriangleList)
 				{
+					if (CurTriangle.BoneA.IsValidBoneIndicator() == false || AnimVerletBones.IsValidIndex(CurTriangle.BoneA.AnimVerletBoneIndex) == false)
+						continue;
+					if (CurTriangle.BoneB.IsValidBoneIndicator() == false || AnimVerletBones.IsValidIndex(CurTriangle.BoneB.AnimVerletBoneIndex) == false)
+						continue;
 					if (CurTriangle.BoneC.IsValidBoneIndicator() == false || AnimVerletBones.IsValidIndex(CurTriangle.BoneC.AnimVerletBoneIndex) == false)
 						continue;
 
-					if (CurTriangle.BoneB.IsValidBoneIndicator() == false || AnimVerletBones.IsValidIndex(CurTriangle.BoneB.AnimVerletBoneIndex) == false)
+					const FLKAnimVerletBone& AVerletBone = AnimVerletBones[CurTriangle.BoneA.AnimVerletBoneIndex];
+					if (AVerletBone.bOverrideToUseSphereCollisionForChain)
 						continue;
-
-					if (CurTriangle.BoneA.IsValidBoneIndicator() == false || AnimVerletBones.IsValidIndex(CurTriangle.BoneA.AnimVerletBoneIndex) == false)
+					const FLKAnimVerletBone& BVerletBone = AnimVerletBones[CurTriangle.BoneB.AnimVerletBoneIndex];
+					if (BVerletBone.bOverrideToUseSphereCollisionForChain)
 						continue;
-
 					const FLKAnimVerletBone& CVerletBone = AnimVerletBones[CurTriangle.BoneC.AnimVerletBoneIndex];
 					if (CVerletBone.bOverrideToUseSphereCollisionForChain)
 						continue;
 
-					const FLKAnimVerletBone& AVerletBone = AnimVerletBones[CurTriangle.BoneA.AnimVerletBoneIndex];
-					const FLKAnimVerletBone& BVerletBone = AnimVerletBones[CurTriangle.BoneB.AnimVerletBoneIndex];
-
+					const float TriThickness = FMath::Max3(AVerletBone.Thickness, BVerletBone.Thickness, CVerletBone.Thickness);
 					const FQuat ACCapsuleRotation = FRotationMatrix::MakeFromZ(AVerletBone.Location - CVerletBone.Location).ToQuat();
-					DrawWireCapsule(PDI, (AVerletBone.Location + CVerletBone.Location) * 0.5f, ACCapsuleRotation.GetAxisX(), ACCapsuleRotation.GetAxisY(), ACCapsuleRotation.GetAxisZ(), FColor::Emerald, CVerletBone.Thickness * BoneThicknessRenderScale, ((AVerletBone.Location - CVerletBone.Location).Size() * 0.5f) + CVerletBone.Thickness * BoneThicknessRenderScale, 16, SDPG_Foreground);
+					DrawWireCapsule(PDI, (AVerletBone.Location + CVerletBone.Location) * 0.5f, ACCapsuleRotation.GetAxisX(), ACCapsuleRotation.GetAxisY(), ACCapsuleRotation.GetAxisZ(), FColor::Emerald, TriThickness * BoneThicknessRenderScale, ((AVerletBone.Location - CVerletBone.Location).Size() * 0.5f) + TriThickness * BoneThicknessRenderScale, 16, SDPG_Foreground);
 
 					const FQuat BCCapsuleRotation = FRotationMatrix::MakeFromZ(BVerletBone.Location - CVerletBone.Location).ToQuat();
-					DrawWireCapsule(PDI, (BVerletBone.Location + CVerletBone.Location) * 0.5f, BCCapsuleRotation.GetAxisX(), BCCapsuleRotation.GetAxisY(), BCCapsuleRotation.GetAxisZ(), FColor::Emerald, CVerletBone.Thickness * BoneThicknessRenderScale, ((AVerletBone.Location - CVerletBone.Location).Size() * 0.5f) + CVerletBone.Thickness * BoneThicknessRenderScale, 16, SDPG_Foreground);
+					DrawWireCapsule(PDI, (BVerletBone.Location + CVerletBone.Location) * 0.5f, BCCapsuleRotation.GetAxisX(), BCCapsuleRotation.GetAxisY(), BCCapsuleRotation.GetAxisZ(), FColor::Emerald, TriThickness * BoneThicknessRenderScale, ((AVerletBone.Location - CVerletBone.Location).Size() * 0.5f) + TriThickness * BoneThicknessRenderScale, 16, SDPG_Foreground);
 
 					const FQuat ABCapsuleRotation = FRotationMatrix::MakeFromZ(AVerletBone.Location - BVerletBone.Location).ToQuat();
-					DrawWireCapsule(PDI, (AVerletBone.Location + BVerletBone.Location) * 0.5f, ABCapsuleRotation.GetAxisX(), ABCapsuleRotation.GetAxisY(), ABCapsuleRotation.GetAxisZ(), FColor::Emerald, CVerletBone.Thickness * BoneThicknessRenderScale, ((AVerletBone.Location - BVerletBone.Location).Size() * 0.5f) + CVerletBone.Thickness * BoneThicknessRenderScale, 16, SDPG_Foreground);
+					DrawWireCapsule(PDI, (AVerletBone.Location + BVerletBone.Location) * 0.5f, ABCapsuleRotation.GetAxisX(), ABCapsuleRotation.GetAxisY(), ABCapsuleRotation.GetAxisZ(), FColor::Emerald, TriThickness * BoneThicknessRenderScale, ((AVerletBone.Location - BVerletBone.Location).Size() * 0.5f) + TriThickness * BoneThicknessRenderScale, 16, SDPG_Foreground);
 				}
 			}
 		}
