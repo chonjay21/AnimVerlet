@@ -11,7 +11,9 @@ public:
 	TExcludeBoneBits ExcludeBones;
 
 	bool bUseCapsuleCollisionForChain = false;
+	bool bSingleChain = false;
 	TArray<FLKAnimVerletBoneIndicatorPair>* SimulateBonePairIndicators = nullptr;
+	TArray<FLKAnimVerletBoneIndicatorTriangle>* SimulateBoneTriangleIndicators = nullptr;
 
 	bool bUseXPBDSolver = false;
 	double Compliance = 0.0;

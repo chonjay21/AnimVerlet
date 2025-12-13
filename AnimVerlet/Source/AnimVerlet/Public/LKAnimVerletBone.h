@@ -184,6 +184,29 @@ public:
 
 
 ///=========================================================================================================================================
+/// FLKAnimVerletBoneIndicatorTriangle
+///=========================================================================================================================================
+struct FLKAnimVerletBoneIndicatorTriangle
+{
+public:
+	FLKAnimVerletBoneIndicator BoneA;
+	FLKAnimVerletBoneIndicator BoneB;
+	FLKAnimVerletBoneIndicator BoneC;
+
+public:
+	FLKAnimVerletBoneIndicatorTriangle() = default;
+	FLKAnimVerletBoneIndicatorTriangle(const FLKAnimVerletBoneIndicator& InBoneA, const FLKAnimVerletBoneIndicator& InBoneB, const FLKAnimVerletBoneIndicator& InBoneC)
+		: BoneA(InBoneA), BoneB(InBoneB), BoneC(InBoneC)
+	{
+	}
+
+	inline bool operator==(const FLKAnimVerletBoneIndicatorTriangle& RHS) const { return (BoneA == RHS.BoneA && BoneB == RHS.BoneB && BoneC == RHS.BoneC); }
+	inline friend uint32 GetTypeHash(const FLKAnimVerletBoneIndicatorTriangle& InPair) { return GetTypeHash(TTuple<FLKAnimVerletBoneIndicator, FLKAnimVerletBoneIndicator, FLKAnimVerletBoneIndicator>(InPair.BoneA, InPair.BoneB, InPair.BoneC)); }
+};
+///=========================================================================================================================================
+
+
+///=========================================================================================================================================
 /// FLKAnimVerletBoneKey
 ///=========================================================================================================================================
 struct FLKAnimVerletBoneKey

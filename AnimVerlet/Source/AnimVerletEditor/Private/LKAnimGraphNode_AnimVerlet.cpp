@@ -162,19 +162,53 @@ void ULKAnimGraphNode_AnimVerlet::Draw(FPrimitiveDrawInterface* PDI, USkeletalMe
 
 		if (bShowCapsuleBoneChainConstraints && AnimVerletNode->bUseCapsuleCollisionForChain)
 		{
-			const TArray<FLKAnimVerletBoneIndicatorPair>& AnimVerletBoneIndicatorPairList = AnimVerletNode->GetSimulateBonePairIndicators();
-			for (const FLKAnimVerletBoneIndicatorPair& CurPair : AnimVerletBoneIndicatorPairList)
+			if (AnimVerletNode->IsSingleChain())
 			{
-				if (CurPair.BoneB.IsValidBoneIndicator() == false || AnimVerletBones.IsValidIndex(CurPair.BoneB.AnimVerletBoneIndex) == false)
-					continue;
+				const TArray<FLKAnimVerletBoneIndicatorPair>& AnimVerletBoneIndicatorPairList = AnimVerletNode->GetSimulateBonePairIndicators();
+				for (const FLKAnimVerletBoneIndicatorPair& CurPair : AnimVerletBoneIndicatorPairList)
+				{
+					if (CurPair.BoneB.IsValidBoneIndicator() == false || AnimVerletBones.IsValidIndex(CurPair.BoneB.AnimVerletBoneIndex) == false)
+						continue;
 
-				const FLKAnimVerletBone& CurVerletBone = AnimVerletBones[CurPair.BoneB.AnimVerletBoneIndex];
-				if (CurPair.BoneA.IsValidBoneIndicator() == false || CurVerletBone.bOverrideToUseSphereCollisionForChain)
-					continue;
+					const FLKAnimVerletBone& CurVerletBone = AnimVerletBones[CurPair.BoneB.AnimVerletBoneIndex];
+					if (CurPair.BoneA.IsValidBoneIndicator() == false || CurVerletBone.bOverrideToUseSphereCollisionForChain)
+						continue;
 
-				const FLKAnimVerletBone& ParentVerletBone = AnimVerletBones[CurPair.BoneA.AnimVerletBoneIndex];
-				const FQuat CapsuleRotation = FRotationMatrix::MakeFromZ(ParentVerletBone.Location - CurVerletBone.Location).ToQuat();
-				DrawWireCapsule(PDI, (CurVerletBone.Location + ParentVerletBone.Location) * 0.5f, CapsuleRotation.GetAxisX(), CapsuleRotation.GetAxisY(), CapsuleRotation.GetAxisZ(), FColor::Emerald, CurVerletBone.Thickness * BoneThicknessRenderScale, ((CurVerletBone.Location - ParentVerletBone.Location).Size() * 0.5f) + CurVerletBone.Thickness * BoneThicknessRenderScale, 16, SDPG_Foreground);
+					const FLKAnimVerletBone& ParentVerletBone = AnimVerletBones[CurPair.BoneA.AnimVerletBoneIndex];
+					const FQuat CapsuleRotation = FRotationMatrix::MakeFromZ(ParentVerletBone.Location - CurVerletBone.Location).ToQuat();
+					DrawWireCapsule(PDI, (CurVerletBone.Location + ParentVerletBone.Location) * 0.5f, CapsuleRotation.GetAxisX(), CapsuleRotation.GetAxisY(), CapsuleRotation.GetAxisZ(), FColor::Emerald, CurVerletBone.Thickness * BoneThicknessRenderScale, ((CurVerletBone.Location - ParentVerletBone.Location).Size() * 0.5f) + CurVerletBone.Thickness * BoneThicknessRenderScale, 16, SDPG_Foreground);
+				}
+			}
+			else
+			{
+				const TArray<FLKAnimVerletBoneIndicatorTriangle>& AnimVerletBoneIndicatorTriangleList = AnimVerletNode->GetSimulateBoneTriangleIndicators();
+				for (const FLKAnimVerletBoneIndicatorTriangle& CurTriangle : AnimVerletBoneIndicatorTriangleList)
+				{
+					if (CurTriangle.BoneC.IsValidBoneIndicator() == false || AnimVerletBones.IsValidIndex(CurTriangle.BoneC.AnimVerletBoneIndex) == false)
+						continue;
+
+					if (CurTriangle.BoneB.IsValidBoneIndicator() == false || AnimVerletBones.IsValidIndex(CurTriangle.BoneB.AnimVerletBoneIndex) == false)
+						continue;
+
+					if (CurTriangle.BoneA.IsValidBoneIndicator() == false || AnimVerletBones.IsValidIndex(CurTriangle.BoneA.AnimVerletBoneIndex) == false)
+						continue;
+
+					const FLKAnimVerletBone& CVerletBone = AnimVerletBones[CurTriangle.BoneC.AnimVerletBoneIndex];
+					if (CVerletBone.bOverrideToUseSphereCollisionForChain)
+						continue;
+
+					const FLKAnimVerletBone& AVerletBone = AnimVerletBones[CurTriangle.BoneA.AnimVerletBoneIndex];
+					const FLKAnimVerletBone& BVerletBone = AnimVerletBones[CurTriangle.BoneB.AnimVerletBoneIndex];
+
+					const FQuat ACCapsuleRotation = FRotationMatrix::MakeFromZ(AVerletBone.Location - CVerletBone.Location).ToQuat();
+					DrawWireCapsule(PDI, (AVerletBone.Location + CVerletBone.Location) * 0.5f, ACCapsuleRotation.GetAxisX(), ACCapsuleRotation.GetAxisY(), ACCapsuleRotation.GetAxisZ(), FColor::Emerald, CVerletBone.Thickness * BoneThicknessRenderScale, ((AVerletBone.Location - CVerletBone.Location).Size() * 0.5f) + CVerletBone.Thickness * BoneThicknessRenderScale, 16, SDPG_Foreground);
+
+					const FQuat BCCapsuleRotation = FRotationMatrix::MakeFromZ(BVerletBone.Location - CVerletBone.Location).ToQuat();
+					DrawWireCapsule(PDI, (BVerletBone.Location + CVerletBone.Location) * 0.5f, BCCapsuleRotation.GetAxisX(), BCCapsuleRotation.GetAxisY(), BCCapsuleRotation.GetAxisZ(), FColor::Emerald, CVerletBone.Thickness * BoneThicknessRenderScale, ((AVerletBone.Location - CVerletBone.Location).Size() * 0.5f) + CVerletBone.Thickness * BoneThicknessRenderScale, 16, SDPG_Foreground);
+
+					const FQuat ABCapsuleRotation = FRotationMatrix::MakeFromZ(AVerletBone.Location - BVerletBone.Location).ToQuat();
+					DrawWireCapsule(PDI, (AVerletBone.Location + BVerletBone.Location) * 0.5f, ABCapsuleRotation.GetAxisX(), ABCapsuleRotation.GetAxisY(), ABCapsuleRotation.GetAxisZ(), FColor::Emerald, CVerletBone.Thickness * BoneThicknessRenderScale, ((AVerletBone.Location - BVerletBone.Location).Size() * 0.5f) + CVerletBone.Thickness * BoneThicknessRenderScale, 16, SDPG_Foreground);
+				}
 			}
 		}
 	}

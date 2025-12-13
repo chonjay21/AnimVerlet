@@ -5,7 +5,7 @@
 #pragma once
 #include <CoreMinimal.h>
 #include <PhysicsEngine/PhysicsAsset.h>
-#include "LKAnimVerletConstraint.h"
+#include "LKAnimVerletConstraint_Collision.h"
 #include "LKAnimVerletCollisionShapeType.h"
 #include "LKAnimVerletCollisionPhysicsAsset.generated.h"
 

@@ -227,7 +227,7 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 	}
 
 	/// Create constraints
-	const bool bSingleChain = (BoneChainIndexes.Num() == 1);
+	const bool bSingleChain = IsSingleChain();
 	const double Compliance = static_cast<double>(1.0 / InvCompliance);
 	for (int32 i = 0; i < SimulateBones.Num(); ++i)
 	{
@@ -459,6 +459,21 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 						const FLKAnimVerletConstraint_Distance DistanceConstraint(&SimulateBones[CurBoneChain[i]], &SimulateBones[LeftBoneChain[i]], bUseXPBDSolver, (bUseXPBDSolver ? Compliance : static_cast<double>(Stiffness)), bStretchEachBone, StretchStrength);
 						DistanceConstraints.Emplace(DistanceConstraint);
 
+						if (bUseCapsuleCollisionForChain)
+						{
+							if (i + 1 < CurBoneChain.Num())
+							{
+								const FLKAnimVerletBoneIndicatorTriangle IndicatorTriangle(FLKAnimVerletBoneIndicator(CurBoneChain[i], false), FLKAnimVerletBoneIndicator(LeftBoneChain[i], false), FLKAnimVerletBoneIndicator(CurBoneChain[i + 1], false));
+								SimulateBoneTriangleIndicators.Emplace(IndicatorTriangle);
+
+								if (i + 1 < LeftBoneChain.Num())
+								{
+									const FLKAnimVerletBoneIndicatorTriangle IndicatorTriangle2(FLKAnimVerletBoneIndicator(LeftBoneChain[i], false), FLKAnimVerletBoneIndicator(CurBoneChain[i + 1], false), FLKAnimVerletBoneIndicator(LeftBoneChain[i + 1], false));
+									SimulateBoneTriangleIndicators.Emplace(IndicatorTriangle2);
+								}
+							}
+						}
+
 						if (FMath::IsNearlyZero(SideStraightenForce, KINDA_SMALL_NUMBER) == false)
 						{
 							const FVector SideStraightenDir = (SimulateBones[LeftBoneChain[i]].PoseLocation - SimulateBones[CurBoneChain[i]].PoseLocation).GetSafeNormal();
@@ -557,6 +572,21 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 
 						const FLKAnimVerletConstraint_Distance DistanceConstraint(&SimulateBones[CurBoneChain[i]], &SimulateBones[RightBoneChain[i]], bUseXPBDSolver, (bUseXPBDSolver ? Compliance : static_cast<double>(Stiffness)), bStretchEachBone, StretchStrength);
 						DistanceConstraints.Emplace(DistanceConstraint);
+
+						if (bUseCapsuleCollisionForChain)
+						{
+							if (i + 1 < RightBoneChain.Num())
+							{
+								const FLKAnimVerletBoneIndicatorTriangle IndicatorTriangle(FLKAnimVerletBoneIndicator(RightBoneChain[i], false), FLKAnimVerletBoneIndicator(CurBoneChain[i], false), FLKAnimVerletBoneIndicator(RightBoneChain[i + 1], false));
+								SimulateBoneTriangleIndicators.Emplace(IndicatorTriangle);
+
+								if (i + 1 < CurBoneChain.Num())
+								{
+									const FLKAnimVerletBoneIndicatorTriangle IndicatorTriangle2(FLKAnimVerletBoneIndicator(CurBoneChain[i], false), FLKAnimVerletBoneIndicator(RightBoneChain[i + 1], false), FLKAnimVerletBoneIndicator(CurBoneChain[i + 1], false));
+									SimulateBoneTriangleIndicators.Emplace(IndicatorTriangle2);
+								}
+							}
+						}
 
 						if (FMath::IsNearlyZero(SideStraightenForce, KINDA_SMALL_NUMBER) == false)
 						{
@@ -657,7 +687,9 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 				{
 					CollisionConstraintInput.Bones = &SimulateBones;
 					CollisionConstraintInput.bUseCapsuleCollisionForChain = bUseCapsuleCollisionForChain;
+					CollisionConstraintInput.bSingleChain = bSingleChain;
 					CollisionConstraintInput.SimulateBonePairIndicators = &SimulateBonePairIndicators;
+					CollisionConstraintInput.SimulateBoneTriangleIndicators = &SimulateBoneTriangleIndicators;
 					CollisionConstraintInput.bUseXPBDSolver = bUseXPBDSolver;
 					CollisionConstraintInput.Compliance = Compliance;
 
@@ -1011,8 +1043,8 @@ void FLKAnimNode_AnimVerlet::PrepareLocalCollisionConstraints(FComponentSpacePos
 	SCOPE_CYCLE_COUNTER(STAT_AnimVerlet_PrepareLocalCollisionConstraints);
 #endif
 
+	const bool bSingleChain = IsSingleChain();
 	const double Compliance = static_cast<double>(1.0 / InvCompliance);
-
 	if (bLocalColliderDirty)
 	{
 		SimulatingCollisionShapes.ResetCollisionShapeList();
@@ -1023,7 +1055,9 @@ void FLKAnimNode_AnimVerlet::PrepareLocalCollisionConstraints(FComponentSpacePos
 	{
 		CollisionConstraintInput.Bones = &SimulateBones;
 		CollisionConstraintInput.bUseCapsuleCollisionForChain = bUseCapsuleCollisionForChain;
+		CollisionConstraintInput.bSingleChain = bSingleChain;
 		CollisionConstraintInput.SimulateBonePairIndicators = &SimulateBonePairIndicators;
+		CollisionConstraintInput.SimulateBoneTriangleIndicators = &SimulateBoneTriangleIndicators;
 		CollisionConstraintInput.bUseXPBDSolver = bUseXPBDSolver;
 		CollisionConstraintInput.Compliance = Compliance;
 	}
@@ -1904,6 +1938,7 @@ void FLKAnimNode_AnimVerlet::ClearSimulateBones()
 	MaxBoneChainLength = 0;
 	RelevantBoneIndicators.Reset();
 	SimulateBonePairIndicators.Reset();
+	SimulateBoneTriangleIndicators.Reset();
 	ExcludedBones.Reset();
 	SimulateBones.Reset();
 }

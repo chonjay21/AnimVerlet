@@ -4,6 +4,7 @@
 #include "LKAnimVerletBone.h"
 #include "LKAnimVerletCollisionShape.h"
 #include "LKAnimVerletConstraint.h"
+#include "LKAnimVerletConstraint_Collision.h"
 #include "LKAnimVerletConstraintType.h"
 #include "LKAnimVerletSetting.h"
 #include "LKAnimVerletType.h"
@@ -67,6 +68,7 @@ private:
 public:
 	const TArray<FLKAnimVerletBone>& GetSimulateBones() const { return SimulateBones; }
 	const TArray<FLKAnimVerletBoneIndicatorPair>& GetSimulateBonePairIndicators() const { return SimulateBonePairIndicators; }
+	const TArray<FLKAnimVerletBoneIndicatorTriangle>& GetSimulateBoneTriangleIndicators() const { return SimulateBoneTriangleIndicators; }
 	const TArray<FLKAnimVerletConstraint_Distance>& GetDistanceConstraints() const { return DistanceConstraints; }
 	const TArray<FLKAnimVerletConstraint_BallSocket>& GetBallSocketConstraints() const { return BallSocketConstraints; }
 	const TArray<FLKAnimVerletConstraint_Pin>& GetPinConstraints() const { return PinConstraints; }
@@ -81,6 +83,7 @@ public:
 	void SetDynamicCollisionShapes(const FLKAnimVerletCollisionShapeList& InDynamicCollisionShapes) { DynamicCollisionShapes = InDynamicCollisionShapes; }
 	void ForceClearSimulateBones() { ClearSimulateBones(); }	/// for live editor preview
 
+	bool IsSingleChain() const { return (BoneChainIndexes.Num() == 1); }
 	void ResetCollisionShapes();
 	void MarkLocalColliderDirty() { bLocalColliderDirty = true; }
 	void CollisionShapesToCollisionShapeList(OUT FLKAnimVerletCollisionShapeList& OutShapeList) const;
@@ -276,11 +279,18 @@ public:
 	/** The virtual thickness of the bone to be used in calculating various collisions and constraints.(radius) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Collision", meta = (ClampMin = "0.0", ForceUnits = "cm"))
 	float Thickness = 0.3f;
-	/** The Capsule shape between the 2 bones is used to calculate various collisions and constraints.(otherwise a sphere shape is used) */
+	/** 
+		* Single chain: The capsule shape between the 2 bones is used to calculate various collision constraints
+		* Multiple chain: The triangle shape between the 3 bones is used to calculate various collision constraints
+		* if false, then a sphere shape is used to calculate various collision constraints 
+	*/
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Collision")
 	bool bUseCapsuleCollisionForChain = true;
 
-	/** Enable collision against to world.(May cause performance impact by physics sweep test for each bone and fake bone) */
+	/** 
+		BETA -	Enable collision against to world.(May cause performance impact by physics sweep test for each bone and fake bone)
+				(In this case, the triangle shape is not used even if there are multiple chains.)
+	*/
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Collision", meta = (PinHiddenByDefault))
 	FName WorldCollisionProfile = NAME_None;
 	UPROPERTY(EditAnywhere, Category = "Collision", meta = (PinHiddenByDefault))
@@ -371,10 +381,11 @@ public:
 	float RotationInertiaClampDegrees = 30.0f;
 
 private:
-	TArray<FLKAnimVerletBone> SimulateBones;								///Simulating bones(real bones + fake virtual bones)
-	TArray<FLKAnimVerletExcludedBone> ExcludedBones;						///Excluded bones in Simulating bone chain(real bones)
-	TArray<FLKAnimVerletBoneIndicator> RelevantBoneIndicators;				///Simulating real bones + Excluded real bones + fake tip bone(for bone`s rotation at PostUpdate phase)
-	TArray<FLKAnimVerletBoneIndicatorPair> SimulateBonePairIndicators;		///Simulating bone`s each distance constraints pair(for capsule collision) nearly same as DistanceConstraint
+	TArray<FLKAnimVerletBone> SimulateBones;										///Simulating bones(real bones + fake virtual bones)
+	TArray<FLKAnimVerletExcludedBone> ExcludedBones;								///Excluded bones in Simulating bone chain(real bones)
+	TArray<FLKAnimVerletBoneIndicator> RelevantBoneIndicators;						///Simulating real bones + Excluded real bones + fake tip bone(for bone`s rotation at PostUpdate phase)
+	TArray<FLKAnimVerletBoneIndicatorPair> SimulateBonePairIndicators;				///Simulating bone`s each distance constraints pair(for capsule collision). nearly same as DistanceConstraint
+	TArray<FLKAnimVerletBoneIndicatorTriangle> SimulateBoneTriangleIndicators;		///Simulating bone`s each triangle constraints(for triangle collision). only used for multiple chain
 	FLKAnimVerletCollisionShapeList SimulatingCollisionShapes;
 	///TArray<FLKAnimVerletConstraint*> Constraints;
 	/// Unroll each constratins for better solve result(considering constraint`s solving order)

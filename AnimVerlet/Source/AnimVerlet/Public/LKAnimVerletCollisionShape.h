@@ -5,7 +5,7 @@
 
 #pragma once
 #include <CoreMinimal.h>
-#include "LKAnimVerletConstraint.h"
+#include "LKAnimVerletConstraint_Collision.h"
 #include "LKAnimVerletCollisionShapeType.h"
 #include "LKAnimVerletCollisionShape.generated.h"
 
