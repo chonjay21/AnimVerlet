@@ -229,7 +229,7 @@ void ULKAnimGraphNode_AnimVerlet::Draw(FPrimitiveDrawInterface* PDI, USkeletalMe
 				DrawWireBox(PDI, BoxMat, Box, FColor::Green, SDPG_Foreground);
 			}
 		}
-		else
+		else if (AnimVerletNode->IsSingleChain())
 		{
 			const TArray<FLKAnimVerletBoneIndicatorPair>& AnimVerletBoneIndicatorPairList = AnimVerletNode->GetSimulateBonePairIndicators();
 			for (const FLKAnimVerletBoneIndicatorPair& CurPair : AnimVerletBoneIndicatorPairList)
@@ -245,19 +245,62 @@ void ULKAnimGraphNode_AnimVerlet::Draw(FPrimitiveDrawInterface* PDI, USkeletalMe
 					const FMatrix BoxMat = BoxT.ToMatrixNoScale();
 					const FBox Box(-CurBound.GetHalfExtents(), CurBound.GetHalfExtents());
 					DrawWireBox(PDI, BoxMat, Box, FColor::Green, SDPG_Foreground);
-
 					continue;
 				}
 
 				const FLKAnimVerletBone& ParentVerletBone = AnimVerletBones[CurPair.BoneA.AnimVerletBoneIndex];
-				
-				const FLKAnimVerletBound ParentBound = FLKAnimVerletBone::MakeBound(ParentVerletBone.Location, CurVerletBone.Thickness);
-				FLKAnimVerletBound CurBound = CurVerletBone.MakeBound();
-				CurBound.Expand(ParentBound);
-
+				const FLKAnimVerletBound CurBound = FLKAnimVerletBone::MakePairBound(CurVerletBone, ParentVerletBone);
 				const FTransform BoxT(FQuat::Identity, CurBound.GetCenter());
 				const FMatrix BoxMat = BoxT.ToMatrixNoScale();
 				const FBox Box(-CurBound.GetHalfExtents(), CurBound.GetHalfExtents());
+				DrawWireBox(PDI, BoxMat, Box, FColor::Green, SDPG_Foreground);
+			}
+		}
+		else
+		{
+			const TArray<FLKAnimVerletBoneIndicatorTriangle>& AnimVerletBoneIndicatorTriangleList = AnimVerletNode->GetSimulateBoneTriangleIndicators();
+			for (const FLKAnimVerletBoneIndicatorTriangle& CurTriangle : AnimVerletBoneIndicatorTriangleList)
+			{
+				if (CurTriangle.BoneA.IsValidBoneIndicator() == false || AnimVerletBones.IsValidIndex(CurTriangle.BoneA.AnimVerletBoneIndex) == false)
+					continue;
+				if (CurTriangle.BoneB.IsValidBoneIndicator() == false || AnimVerletBones.IsValidIndex(CurTriangle.BoneB.AnimVerletBoneIndex) == false)
+					continue;
+				if (CurTriangle.BoneC.IsValidBoneIndicator() == false || AnimVerletBones.IsValidIndex(CurTriangle.BoneC.AnimVerletBoneIndex) == false)
+					continue;
+
+				const FLKAnimVerletBone& BoneA = AnimVerletBones[CurTriangle.BoneA.AnimVerletBoneIndex];
+				const FLKAnimVerletBone& BoneB = AnimVerletBones[CurTriangle.BoneB.AnimVerletBoneIndex];
+				const FLKAnimVerletBone& BoneC = AnimVerletBones[CurTriangle.BoneC.AnimVerletBoneIndex];
+				if (BoneA.bOverrideToUseSphereCollisionForChain || BoneB.bOverrideToUseSphereCollisionForChain || BoneC.bOverrideToUseSphereCollisionForChain)
+				{
+					{
+						const FLKAnimVerletBound CurBound = BoneA.MakeBound();
+						const FTransform BoxT(FQuat::Identity, CurBound.GetCenter());
+						const FMatrix BoxMat = BoxT.ToMatrixNoScale();
+						const FBox Box(-CurBound.GetHalfExtents(), CurBound.GetHalfExtents());
+						DrawWireBox(PDI, BoxMat, Box, FColor::Green, SDPG_Foreground);
+					}
+					{
+						const FLKAnimVerletBound CurBound = BoneB.MakeBound();
+						const FTransform BoxT(FQuat::Identity, CurBound.GetCenter());
+						const FMatrix BoxMat = BoxT.ToMatrixNoScale();
+						const FBox Box(-CurBound.GetHalfExtents(), CurBound.GetHalfExtents());
+						DrawWireBox(PDI, BoxMat, Box, FColor::Green, SDPG_Foreground);
+					}
+					{
+						const FLKAnimVerletBound CurBound = BoneC.MakeBound();
+						const FTransform BoxT(FQuat::Identity, CurBound.GetCenter());
+						const FMatrix BoxMat = BoxT.ToMatrixNoScale();
+						const FBox Box(-CurBound.GetHalfExtents(), CurBound.GetHalfExtents());
+						DrawWireBox(PDI, BoxMat, Box, FColor::Green, SDPG_Foreground);
+					}
+					continue;
+				}
+
+				const FLKAnimVerletBound TriangleBound = FLKAnimVerletBone::MakeTriangleBound(BoneA, BoneB, BoneC);
+				const FTransform BoxT(FQuat::Identity, TriangleBound.GetCenter());
+				const FMatrix BoxMat = BoxT.ToMatrixNoScale();
+				const FBox Box(-TriangleBound.GetHalfExtents(), TriangleBound.GetHalfExtents());
 				DrawWireBox(PDI, BoxMat, Box, FColor::Green, SDPG_Foreground);
 			}
 		}

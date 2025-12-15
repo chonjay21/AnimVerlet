@@ -6,7 +6,7 @@
 ///=========================================================================================================================================
 /// FLKAnimVerletBoneBase
 ///=========================================================================================================================================
-struct FLKAnimVerletBoneBase
+struct ANIMVERLET_API FLKAnimVerletBoneBase
 {
 public:
 	FBoneReference BoneReference;
@@ -32,7 +32,7 @@ public:
 ///=========================================================================================================================================
 /// FLKAnimVerletBone
 ///=========================================================================================================================================
-struct FLKAnimVerletBone : public FLKAnimVerletBoneBase
+struct ANIMVERLET_API FLKAnimVerletBone : public FLKAnimVerletBoneBase
 {
 public:
 	int32 ParentVerletBoneIndex = INDEX_NONE;
@@ -77,8 +77,8 @@ public:
 	FVector MakeFakeBonePoseLocation(const FTransform& PoseT) const;
 	FTransform MakeFakeBonePoseTransform(const FTransform& PoseT) const;
 
-	inline static FLKAnimVerletBound MakePairBound(const FLKAnimVerletBone& BoneA, const FLKAnimVerletBone& BoneB);
-	inline static FLKAnimVerletBound MakeTriangleBound(const FLKAnimVerletBone& BoneA, const FLKAnimVerletBone& BoneB, const FLKAnimVerletBone& BoneC);
+	static FLKAnimVerletBound MakePairBound(const FLKAnimVerletBone& BoneA, const FLKAnimVerletBone& BoneB);
+	static FLKAnimVerletBound MakeTriangleBound(const FLKAnimVerletBone& BoneA, const FLKAnimVerletBone& BoneB, const FLKAnimVerletBone& BoneC);
 	inline static FLKAnimVerletBound MakeBound(const FVector& InLocation, float InThickness) { return FLKAnimVerletBound::MakeBoundFromCenterHalfExtents(InLocation, FVector(InThickness, InThickness, InThickness)); }
 	inline FLKAnimVerletBound MakeBound() const { return MakeBound(Location, Thickness); }
 
@@ -102,7 +102,7 @@ public:
 ///=========================================================================================================================================
 /// FLKAnimVerletExcludedBone
 ///=========================================================================================================================================
-struct FLKAnimVerletExcludedBone : public FLKAnimVerletBoneBase
+struct ANIMVERLET_API FLKAnimVerletExcludedBone : public FLKAnimVerletBoneBase
 {
 public:
 	int32 ParentVerletBoneIndex = INDEX_NONE;
@@ -166,7 +166,7 @@ public:
 ///=========================================================================================================================================
 /// FLKAnimVerletBoneIndicatorPair
 ///=========================================================================================================================================
-struct FLKAnimVerletBoneIndicatorPair
+struct ANIMVERLET_API FLKAnimVerletBoneIndicatorPair
 {
 public:
 	FLKAnimVerletBoneIndicator BoneA;
@@ -190,7 +190,7 @@ public:
 ///=========================================================================================================================================
 /// FLKAnimVerletBoneIndicatorTriangle
 ///=========================================================================================================================================
-struct FLKAnimVerletBoneIndicatorTriangle
+struct ANIMVERLET_API FLKAnimVerletBoneIndicatorTriangle
 {
 public:
 	FLKAnimVerletBoneIndicator BoneA;
