@@ -77,6 +77,8 @@ public:
 	FVector MakeFakeBonePoseLocation(const FTransform& PoseT) const;
 	FTransform MakeFakeBonePoseTransform(const FTransform& PoseT) const;
 
+	inline static FLKAnimVerletBound MakePairBound(const FLKAnimVerletBone& BoneA, const FLKAnimVerletBone& BoneB);
+	inline static FLKAnimVerletBound MakeTriangleBound(const FLKAnimVerletBone& BoneA, const FLKAnimVerletBone& BoneB, const FLKAnimVerletBone& BoneC);
 	inline static FLKAnimVerletBound MakeBound(const FVector& InLocation, float InThickness) { return FLKAnimVerletBound::MakeBoundFromCenterHalfExtents(InLocation, FVector(InThickness, InThickness, InThickness)); }
 	inline FLKAnimVerletBound MakeBound() const { return MakeBound(Location, Thickness); }
 
@@ -179,6 +181,8 @@ public:
 
 	inline bool operator==(const FLKAnimVerletBoneIndicatorPair& RHS) const { return (BoneA == RHS.BoneA && BoneB == RHS.BoneB); }
 	inline friend uint32 GetTypeHash(const FLKAnimVerletBoneIndicatorPair& InPair) { return GetTypeHash(TPair<FLKAnimVerletBoneIndicator, FLKAnimVerletBoneIndicator>(InPair.BoneA, InPair.BoneB)); }
+
+	FLKAnimVerletBound MakeBound(const TArray<FLKAnimVerletBone>& Bones) const;
 };
 ///=========================================================================================================================================
 
@@ -202,6 +206,8 @@ public:
 
 	inline bool operator==(const FLKAnimVerletBoneIndicatorTriangle& RHS) const { return (BoneA == RHS.BoneA && BoneB == RHS.BoneB && BoneC == RHS.BoneC); }
 	inline friend uint32 GetTypeHash(const FLKAnimVerletBoneIndicatorTriangle& InPair) { return GetTypeHash(TTuple<FLKAnimVerletBoneIndicator, FLKAnimVerletBoneIndicator, FLKAnimVerletBoneIndicator>(InPair.BoneA, InPair.BoneB, InPair.BoneC)); }
+
+	FLKAnimVerletBound MakeBound(const TArray<FLKAnimVerletBone>& Bones) const;
 };
 ///=========================================================================================================================================
 

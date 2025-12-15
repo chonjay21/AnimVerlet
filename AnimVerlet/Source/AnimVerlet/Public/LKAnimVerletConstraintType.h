@@ -10,10 +10,12 @@ public:
 	TArray<FLKAnimVerletBone>* Bones = nullptr;
 	TExcludeBoneBits ExcludeBones;
 
+	bool bUseBroadphase = false;
 	bool bUseCapsuleCollisionForChain = false;
 	bool bSingleChain = false;
 	TArray<FLKAnimVerletBoneIndicatorPair>* SimulateBonePairIndicators = nullptr;
 	TArray<FLKAnimVerletBoneIndicatorTriangle>* SimulateBoneTriangleIndicators = nullptr;
+	class LKAnimVerletBroadphaseContainer* BroadphaseContainer = nullptr;
 
 	bool bUseXPBDSolver = false;
 	double Compliance = 0.0;

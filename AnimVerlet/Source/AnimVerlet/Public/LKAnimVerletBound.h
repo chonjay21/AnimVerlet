@@ -11,9 +11,18 @@ public:
 	FORCEINLINE static FLKAnimVerletBound MakeBoundFromCenterHalfExtents(const FVector& InCenter, const FVector& InHalfExtents) { return FLKAnimVerletBound(InCenter - InHalfExtents, InCenter + InHalfExtents); }
 	FORCEINLINE static FLKAnimVerletBound MakeBoundFromMinMax(const FVector& InMin, const FVector& InMax) { return FLKAnimVerletBound(InMin, InMax); }
 
+	FORCEINLINE static FLKAnimVerletBound Combine(const FLKAnimVerletBound& A, const FLKAnimVerletBound& B)
+	{
+		FLKAnimVerletBound C;
+		C += A;
+		C += B;
+		return C;
+	}
+
 public:
 	FORCEINLINE FLKAnimVerletBound() = default;
 	FORCEINLINE FLKAnimVerletBound(const FVector& InMin, const FVector& InMax) : Min(InMin), Max(InMax) {}
+	FORCEINLINE FLKAnimVerletBound(const FLKAnimVerletBound& Other) : Min(Other.Min), Max(Other.Max) {}
 
 	FORCEINLINE FVector GetCenter() const { return (Max + Min) * 0.5f; }
 	FORCEINLINE FVector GetHalfExtents() const { return GetExtents() * 0.5f; }
@@ -23,6 +32,7 @@ public:
 	FORCEINLINE const FVector& GetMax() const { return Max; }
 
 	FORCEINLINE bool IsNearlyEqual(const FLKAnimVerletBound& Other, float InEpsilon = KINDA_SMALL_NUMBER) const { return Min.Equals(Other.Min, InEpsilon) && Max.Equals(Other.Max, InEpsilon); }
+	FORCEINLINE void Reset() { Min = FVector::ZeroVector; Max = FVector::ZeroVector; }
 
 	FORCEINLINE FLKAnimVerletBound& Expand(float Thickness)
 	{
@@ -49,6 +59,32 @@ public:
 		return *this;
 	}
 
+	FORCEINLINE FLKAnimVerletBound& operator+=(const FLKAnimVerletBound& Other) { return Expand(Other); }
+	FORCEINLINE FLKAnimVerletBound operator+(const FLKAnimVerletBound& Other) const { return FLKAnimVerletBound(*this) += Other; }
+
+	/**
+	 * Gets reference to the min or max of this bounding volume.
+	 */
+	FORCEINLINE FVector& operator[](int32 Index)
+	{
+		check((Index >= 0) && (Index < 2));
+
+		if (Index == 0)
+			return Min;
+		return Max;
+	}
+
+	/* Gets reference to the min or max of this bounding volume.
+	 */
+	FORCEINLINE const FVector& operator[](int32 Index) const
+	{
+		check((Index >= 0) && (Index < 2));
+
+		if (Index == 0)
+			return Min;
+		return Max;
+	}
+
 	FORCEINLINE bool IsIntersect(const FLKAnimVerletBound& Other) const
 	{
 		for (int32 i = 0; i < 3; ++i)
@@ -64,14 +100,30 @@ public:
 		return FLKAnimVerletBound(Min.ComponentMin(Other.Min), Max.ComponentMin(Other.Max));
 	}
 
-	FORCEINLINE bool IsContain(const FVector& Point, float Tolerance = KINDA_SMALL_NUMBER) const
+	FORCEINLINE bool IsInside(const FVector& In) const
 	{
-		for (int32 i = 0; i < 3; i++)
-		{
-			if (Point[i] < Min[i] - Tolerance || Point[i] > Max[i] + Tolerance)
-				return false;
-		}
-		return true;
+		return ((In.X > Min.X) && (In.X < Max.X) && (In.Y > Min.Y) && (In.Y < Max.Y) && (In.Z > Min.Z) && (In.Z < Max.Z));
+	}
+
+	FORCEINLINE bool IsInsideOrOn(const FVector& In, float Tolerance = KINDA_SMALL_NUMBER) const
+	{
+		return ((In.X >= Min.X - Tolerance) && (In.X <= Max.X + Tolerance) && (In.Y >= Min.Y - Tolerance) && (In.Y <= Max.Y + Tolerance) && (In.Z >= Min.Z - Tolerance) && (In.Z <= Max.Z + Tolerance));
+	}
+
+	FORCEINLINE bool IsInside(const FLKAnimVerletBound& Other) const
+	{
+		return (IsInside(Other.Min) && IsInside(Other.Max));
+	}
+
+	FORCEINLINE bool IsInsideOrOn(const FLKAnimVerletBound& Other, float Tolerance = KINDA_SMALL_NUMBER) const
+	{
+		return (IsInsideOrOn(Other.Min, Tolerance) && IsInsideOrOn(Other.Max, Tolerance));
+	}
+
+	FORCEINLINE float GetSurfaceArea() const
+	{
+		const FVector Ext = GetExtents();
+		return 2.0f * (Ext.X * Ext.Y + Ext.Y * Ext.Z + Ext.Z * Ext.X);
 	}
 
 	FORCEINLINE friend uint32 GetTypeHash(const FLKAnimVerletBound& Bound) { return HashCombine(GetTypeHash(Bound.Min), GetTypeHash(Bound.Max)); }

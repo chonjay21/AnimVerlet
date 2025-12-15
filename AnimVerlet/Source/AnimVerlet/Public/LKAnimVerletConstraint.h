@@ -12,8 +12,8 @@ struct ANIMVERLET_API FLKAnimVerletConstraint
 {
 public:
 	virtual ~FLKAnimVerletConstraint() {}
-	virtual void Update(float DeltaTime, bool bFinalize) = 0;
-	virtual void BackwardUpdate(float DeltaTime, bool bFinalize) { Update(DeltaTime, bFinalize); }
+	virtual void Update(float DeltaTime, bool bInitialUpdate, bool bFinalize) = 0;
+	virtual void BackwardUpdate(float DeltaTime, bool bInitialUpdate, bool bFinalize) { Update(DeltaTime, bInitialUpdate, bFinalize); }
 	virtual void PostUpdate(float DeltaTime) = 0;
 	virtual void ResetSimulation() = 0;
 };
@@ -33,7 +33,7 @@ public:
 	{ 
 		verify(Bone != nullptr); 
 	}
-	virtual void Update(float DeltaTime, bool bFinalize) override;
+	virtual void Update(float DeltaTime, bool bInitialUpdate, bool bFinalize) override;
 	virtual void PostUpdate(float DeltaTime) override {}
 	virtual void ResetSimulation() override {}
 };
@@ -58,7 +58,7 @@ public:
 public:
 	FLKAnimVerletConstraint_Distance(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, bool bInUseXPBDSolver, 
 									 double InStiffness, bool bInStretchEachBone, float InStretchStrength);
-	virtual void Update(float DeltaTime, bool bFinalize) override;
+	virtual void Update(float DeltaTime, bool bInitialUpdate, bool bFinalize) override;
 	virtual void PostUpdate(float DeltaTime) override;
 	virtual void ResetSimulation() override;
 };
@@ -91,7 +91,7 @@ public:
 	///	   C----D
 	FLKAnimVerletConstraint_IsometricBending(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, struct FLKAnimVerletBone* InBoneC, 
 											 struct FLKAnimVerletBone* InBoneD, bool bInUseXPBDSolver, double InStiffness);
-	virtual void Update(float DeltaTime, bool bFinalize) override;
+	virtual void Update(float DeltaTime, bool bInitialUpdate, bool bFinalize) override;
 	virtual void PostUpdate(float DeltaTime) override;
 	virtual void ResetSimulation() override;
 
@@ -119,7 +119,7 @@ public:
 
 public:
 	FLKAnimVerletConstraint_Bending_1D(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, struct FLKAnimVerletBone* InBoneC, bool bInUseXPBDSolver, double InStiffness);
-	virtual void Update(float DeltaTime, bool bFinalize) override;
+	virtual void Update(float DeltaTime, bool bInitialUpdate, bool bFinalize) override;
 	virtual void PostUpdate(float DeltaTime) override;
 	virtual void ResetSimulation() override;
 
@@ -157,7 +157,7 @@ public:
 	///	   C----D
 	FLKAnimVerletConstraint_FlatBending(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, struct FLKAnimVerletBone* InBoneC, 
 										struct FLKAnimVerletBone* InBoneD, bool bInUseXPBDSolver, double InStiffness, float InFlatAlpha);
-	virtual void Update(float DeltaTime, bool bFinalize) override;
+	virtual void Update(float DeltaTime, bool bInitialUpdate, bool bFinalize) override;
 	virtual void PostUpdate(float DeltaTime) override;
 	virtual void ResetSimulation() override;
 
@@ -184,8 +184,7 @@ public:
 public:
 	FLKAnimVerletConstraint_Straighten(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, struct FLKAnimVerletBone* InBoneC, 
 									   float InStraightenStrength, bool bInStraightenCenterBone);
-	virtual void Update(float DeltaTime, bool bFinalize) override;
-	virtual void BackwardUpdate(float DeltaTime, bool bFinalize) override {}
+	virtual void Update(float DeltaTime, bool bInitialUpdate, bool bFinalize) override;
 	virtual void PostUpdate(float DeltaTime) override {}
 	virtual void ResetSimulation() override {}
 };
@@ -209,8 +208,8 @@ public:
 public:
 	FLKAnimVerletConstraint_FixedDistance(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, bool bInStretchEachBone, 
 										  float InStretchStrength, bool bInAwayFromEachOther, float InLengthMargin = 0.0f);
-	virtual void Update(float DeltaTime, bool bFinalize) override;
-	virtual void BackwardUpdate(float DeltaTime, bool bFinalize) override;
+	virtual void Update(float DeltaTime, bool bInitialUpdate, bool bFinalize) override;
+	virtual void BackwardUpdate(float DeltaTime, bool bInitialUpdate, bool bFinalize) override;
 	virtual void PostUpdate(float DeltaTime) override {}
 	virtual void ResetSimulation() override {}
 };
@@ -237,7 +236,7 @@ public:
 public:
 	FLKAnimVerletConstraint_BallSocket(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, struct FLKAnimVerletBone* InGrandParentNullable, struct FLKAnimVerletBone* InParentNullable,
 									   float InAngleDegrees, bool bInUseXPBDSolver, double InCompliance);
-	virtual void Update(float DeltaTime, bool bFinalize) override;
+	virtual void Update(float DeltaTime, bool bInitialUpdate, bool bFinalize) override;
 	virtual void PostUpdate(float DeltaTime) override { Lambda = 0.0; }
 	virtual void ResetSimulation() override { Lambda = 0.0; }
 };

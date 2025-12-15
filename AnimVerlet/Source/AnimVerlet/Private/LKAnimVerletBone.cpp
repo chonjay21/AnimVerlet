@@ -38,6 +38,22 @@ FTransform FLKAnimVerletBone::MakeFakeBonePoseTransform(const FTransform& PoseT)
 	return (PoseT * LocationOffsetT);
 }
 
+FLKAnimVerletBound FLKAnimVerletBone::MakePairBound(const FLKAnimVerletBone& BoneA, const FLKAnimVerletBone& BoneB)
+{
+	const float Thickness = FMath::Max(BoneA.Thickness, BoneB.Thickness);
+	const FVector AabbMin(FMath::Min(BoneA.Location.X, BoneB.Location.X) - Thickness, FMath::Min(BoneA.Location.Y, BoneB.Location.Y) - Thickness, FMath::Min(BoneA.Location.Z, BoneB.Location.Z) - Thickness);
+	const FVector AabbMax(FMath::Max(BoneA.Location.X, BoneB.Location.X) + Thickness, FMath::Max(BoneA.Location.Y, BoneB.Location.Y) + Thickness, FMath::Max(BoneA.Location.Z, BoneB.Location.Z) + Thickness);
+	return FLKAnimVerletBound::MakeBoundFromMinMax(AabbMin, AabbMax);
+}
+
+FLKAnimVerletBound FLKAnimVerletBone::MakeTriangleBound(const FLKAnimVerletBone& BoneA, const FLKAnimVerletBone& BoneB, const FLKAnimVerletBone& BoneC)
+{
+	const float Thickness = FMath::Max3(BoneA.Thickness, BoneB.Thickness, BoneC.Thickness);
+	const FVector AabbMin(FMath::Min3(BoneA.Location.X, BoneB.Location.X, BoneC.Location.X) - Thickness, FMath::Min3(BoneA.Location.Y, BoneB.Location.Y, BoneC.Location.Y) - Thickness, FMath::Min3(BoneA.Location.Z, BoneB.Location.Z, BoneC.Location.Z) - Thickness);
+	const FVector AabbMax(FMath::Max3(BoneA.Location.X, BoneB.Location.X, BoneC.Location.X) + Thickness, FMath::Max3(BoneA.Location.Y, BoneB.Location.Y, BoneC.Location.Y) + Thickness, FMath::Max3(BoneA.Location.Z, BoneB.Location.Z, BoneC.Location.Z) + Thickness);
+	return FLKAnimVerletBound::MakeBoundFromMinMax(AabbMin, AabbMax);
+}
+
 void FLKAnimVerletBone::PrepareSimulation(const FTransform& PoseT, const FVector& InPoseDirFromParent)
 {
 	MoveDelta = (Location - PrevLocation);
@@ -208,4 +224,49 @@ void FLKAnimVerletExcludedBone::PrepareSimulation(const FTransform& PoseT)
 	Rotation = PoseRotation;
 
 	PoseScale = PoseT.GetScale3D();
+}
+
+
+///=========================================================================================================================================
+/// FLKAnimVerletBoneIndicatorPair
+///=========================================================================================================================================
+FLKAnimVerletBound FLKAnimVerletBoneIndicatorPair::MakeBound(const TArray<FLKAnimVerletBone>& Bones) const
+{ 
+	const bool bValidA = Bones.IsValidIndex(BoneA.AnimVerletBoneIndex);
+	const bool bValidB = Bones.IsValidIndex(BoneB.AnimVerletBoneIndex);
+	if (bValidA && bValidB)
+		return FLKAnimVerletBone::MakePairBound(Bones[BoneA.AnimVerletBoneIndex], Bones[BoneB.AnimVerletBoneIndex]);
+	else if (bValidA)
+		return Bones[BoneA.AnimVerletBoneIndex].MakeBound();
+	else if (bValidB)
+		return Bones[BoneB.AnimVerletBoneIndex].MakeBound();
+
+	return FLKAnimVerletBound();
+}
+
+
+///=========================================================================================================================================
+/// FLKAnimVerletBoneIndicatorTriangle
+///=========================================================================================================================================
+FLKAnimVerletBound FLKAnimVerletBoneIndicatorTriangle::MakeBound(const TArray<FLKAnimVerletBone>& Bones) const
+{ 
+	const bool bValidA = Bones.IsValidIndex(BoneA.AnimVerletBoneIndex);
+	const bool bValidB = Bones.IsValidIndex(BoneB.AnimVerletBoneIndex);
+	const bool bValidC = Bones.IsValidIndex(BoneC.AnimVerletBoneIndex);
+	if (bValidA && bValidB && bValidC)
+		return FLKAnimVerletBone::MakeTriangleBound(Bones[BoneA.AnimVerletBoneIndex], Bones[BoneB.AnimVerletBoneIndex], Bones[BoneC.AnimVerletBoneIndex]);
+	else if (bValidA && bValidB)
+		return FLKAnimVerletBone::MakePairBound(Bones[BoneA.AnimVerletBoneIndex], Bones[BoneB.AnimVerletBoneIndex]);
+	else if (bValidB && bValidC)
+		return FLKAnimVerletBone::MakePairBound(Bones[BoneB.AnimVerletBoneIndex], Bones[BoneC.AnimVerletBoneIndex]);
+	else if (bValidA && bValidC)
+		return FLKAnimVerletBone::MakePairBound(Bones[BoneA.AnimVerletBoneIndex], Bones[BoneC.AnimVerletBoneIndex]);
+	else if (bValidA)
+		return Bones[BoneA.AnimVerletBoneIndex].MakeBound();
+	else if (bValidB)
+		return Bones[BoneB.AnimVerletBoneIndex].MakeBound();
+	else if (bValidC)
+		return Bones[BoneC.AnimVerletBoneIndex].MakeBound();
+
+	return FLKAnimVerletBound();
 }

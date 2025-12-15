@@ -2,6 +2,7 @@
 #include <CoreMinimal.h>
 #include <BoneControllers/AnimNode_SkeletalControlBase.h>
 #include "LKAnimVerletBone.h"
+#include "LKAnimVerletBroadphaseContainer.h"
 #include "LKAnimVerletCollisionShape.h"
 #include "LKAnimVerletConstraint.h"
 #include "LKAnimVerletConstraint_Collision.h"
@@ -41,6 +42,7 @@ protected:
 
 private:
 	void InitializeSimulateBones(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer);
+	void InitializeBroadphase();
 	void InitializeLocalCollisionConstraints(const FBoneContainer& BoneContainer);
 	void InitializeAttachedShape(struct FLKAnimVerletCollisionShape& InShape, const FBoneContainer& BoneContainer);
 	bool MakeSimulateBones(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer, const FReferenceSkeleton& ReferenceSkeleton, int32 BoneIndex, 
@@ -55,6 +57,7 @@ private:
 	void ConvertPhysicsAssetToShape(OUT FLKAnimVerletCollisionShapeList& OutShapeList, const class UPhysicsAsset& InPhysicsAsset, const FBoneContainer* BoneContainerNullable) const;
 	void SimulateVerlet(const UWorld* World, float InDeltaTime, const FTransform& ComponentTransform, const FTransform& PrevComponentTransform);
 	void PreUpdateBones(const UWorld* World, float InDeltaTime, const FTransform& ComponentTransform, const FTransform& PrevComponentTransform);
+	void UpdateBroadphase(const UWorld* World, float InDeltaTime, const FTransform& ComponentTransform);
 	void SolveConstraints(float InDeltaTime);
 	void UpdateSleep(float InDeltaTime);
 	void PostUpdateBones(float InDeltaTime);
@@ -276,6 +279,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Constraint", meta = (PinHiddenByDefault, ClampMin = "0.0", ClampMax = "90.0", ForceUnits = "deg"))
 	float ConeAngle = 0.0f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Collision")
+	bool bUseBroadphase = true;
+
 	/** The virtual thickness of the bone to be used in calculating various collisions and constraints.(radius) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Collision", meta = (ClampMin = "0.0", ForceUnits = "cm"))
 	float Thickness = 0.3f;
@@ -386,7 +392,9 @@ private:
 	TArray<FLKAnimVerletBoneIndicator> RelevantBoneIndicators;						///Simulating real bones + Excluded real bones + fake tip bone(for bone`s rotation at PostUpdate phase)
 	TArray<FLKAnimVerletBoneIndicatorPair> SimulateBonePairIndicators;				///Simulating bone`s each distance constraints pair(for capsule collision). nearly same as DistanceConstraint
 	TArray<FLKAnimVerletBoneIndicatorTriangle> SimulateBoneTriangleIndicators;		///Simulating bone`s each triangle constraints(for triangle collision). only used for multiple chain
+	LKAnimVerletBroadphaseContainer BroadphaseContainer;
 	FLKAnimVerletCollisionShapeList SimulatingCollisionShapes;
+
 	///TArray<FLKAnimVerletConstraint*> Constraints;
 	/// Unroll each constratins for better solve result(considering constraint`s solving order)
 	TArray<FLKAnimVerletConstraint_Pin> PinConstraints;
@@ -404,6 +412,7 @@ private:
 	TArray<FLKAnimVerletConstraint_World> WorldCollisionConstraints;
 	TArray<TArray<int32>> BoneChainIndexes;								///Simulating bone`s index list per single chain
 	int32 MaxBoneChainLength = 0;
+	float MaxThickness = 0.0f;
 
 private:
 	bool bLocalColliderDirty = false;

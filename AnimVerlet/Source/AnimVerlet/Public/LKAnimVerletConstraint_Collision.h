@@ -18,10 +18,12 @@ public:
 	TArray<FLKAnimVerletBone>* Bones = nullptr;
 	TExcludeBoneBits ExcludeBones;
 
+	bool bUseBroadphase = false;
 	bool bUseCapsuleCollisionForChain = false;
 	bool bSingleChain = false;
 	TArray<FLKAnimVerletBoneIndicatorPair>* BonePairs = nullptr;
 	TArray<FLKAnimVerletBoneIndicatorTriangle>* BoneTriangles = nullptr;
+	class LKAnimVerletBroadphaseContainer* BroadphaseContainer = nullptr;
 
 	bool bUseXPBDSolver = false;
 	double Compliance = 0.0;								///for XPBD
@@ -29,19 +31,26 @@ public:
 
 public:
 	FLKAnimVerletConstraint_Sphere(const FVector& InLocation, float InRadius, const FLKAnimVerletCollisionConstraintInput& InCollisionInput);
-	virtual void Update(float DeltaTime, bool bFinalize) override;
+	virtual void Update(float DeltaTime, bool bInitialUpdate, bool bFinalize) override;
 	virtual void PostUpdate(float DeltaTime) override { Lambdas.Reset(); }
 	virtual void ResetSimulation() override { Lambdas.Reset(); }
 
 	inline FLKAnimVerletBound MakeBound() const { return FLKAnimVerletBound::MakeBoundFromCenterHalfExtents(Location, FVector(Radius, Radius, Radius)); }
 
-private:
-	bool CheckSphereSphere(IN OUT FLKAnimVerletBone& CurVerletBone, float DeltaTime, bool bFinalize, int32 LambdaIndex);
-	void CheckSphereSphere(float DeltaTime, bool bFinalize);
-	bool CheckSphereCapsule(IN OUT FLKAnimVerletBone& CurVerletBone, IN OUT FLKAnimVerletBone& ParentVerletBone, float DeltaTime, bool bFinalize, int32 LambdaIndex);
-	void CheckSphereCapsule(float DeltaTime, bool bFinalize);
-	bool CheckSphereTriangle(IN OUT FLKAnimVerletBone& BoneA, IN OUT FLKAnimVerletBone& BoneB, IN OUT FLKAnimVerletBone& BoneC, float DeltaTime, bool bFinalize, int32 LambdaIndex);
-	void CheckSphereTriangle(float DeltaTime, bool bFinalize);
+public:
+	bool CheckSphereSphere(IN OUT FLKAnimVerletBone& CurVerletBone, float DeltaTime, bool bInitialUpdate, bool bFinalize, int32 LambdaIndex);
+	void CheckSphereSphere(float DeltaTime, bool bInitialUpdate, bool bFinalize, int32 LambdaIndex);
+	void CheckSphereSphere(float DeltaTime, bool bInitialUpdate, bool bFinalize);
+
+	bool CheckSphereCapsule(IN OUT FLKAnimVerletBone& CurVerletBone, IN OUT FLKAnimVerletBone& ParentVerletBone, float DeltaTime, bool bInitialUpdate, bool bFinalize, int32 LambdaIndex);
+	template <typename T>
+	void CheckSphereCapsule(const T& InPair, float DeltaTime, bool bInitialUpdate, bool bFinalize, int32 LambdaIndex);
+	void CheckSphereCapsule(float DeltaTime, bool bInitialUpdate, bool bFinalize);
+
+	bool CheckSphereTriangle(IN OUT FLKAnimVerletBone& BoneA, IN OUT FLKAnimVerletBone& BoneB, IN OUT FLKAnimVerletBone& BoneC, float DeltaTime, bool bInitialUpdate, bool bFinalize, int32 LambdaIndex);
+	template <typename T>
+	void CheckSphereTriangle(const T& InTriangle, float DeltaTime, bool bInitialUpdate, bool bFinalize, int32 LambdaIndex);
+	void CheckSphereTriangle(float DeltaTime, bool bInitialUpdate, bool bFinalize);
 };
 ///=========================================================================================================================================
 
@@ -59,10 +68,12 @@ public:
 	TArray<FLKAnimVerletBone>* Bones = nullptr;
 	TExcludeBoneBits ExcludeBones;
 
+	bool bUseBroadphase = false;
 	bool bUseCapsuleCollisionForChain = false;
 	bool bSingleChain = false;
 	TArray<FLKAnimVerletBoneIndicatorPair>* BonePairs = nullptr;
 	TArray<FLKAnimVerletBoneIndicatorTriangle>* BoneTriangles = nullptr;
+	class LKAnimVerletBroadphaseContainer* BroadphaseContainer = nullptr;
 
 	bool bUseXPBDSolver = false;
 	double Compliance = 0.0;								///for XPBD
@@ -71,19 +82,26 @@ public:
 public:
 	FLKAnimVerletConstraint_Capsule(const FVector& InLocation, const FQuat& InRot, float InRadius, 
 									float InHalfHeight, const FLKAnimVerletCollisionConstraintInput& InCollisionInput);
-	virtual void Update(float DeltaTime, bool bFinalize) override;
+	virtual void Update(float DeltaTime, bool bInitialUpdate, bool bFinalize) override;
 	virtual void PostUpdate(float DeltaTime) override { Lambdas.Reset(); }
 	virtual void ResetSimulation() override { Lambdas.Reset(); }
 
 	FLKAnimVerletBound MakeBound() const;
 
-private:
-	bool CheckCapsuleSphere(IN OUT FLKAnimVerletBone& CurVerletBone, float DeltaTime, bool bFinalize, const FVector& CapsuleStart, const FVector& CapsuleEnd, int32 LambdaIndex);
-	void CheckCapsuleSphere(float DeltaTime, bool bFinalize);
-	bool CheckCapsuleCapsule(IN OUT FLKAnimVerletBone& CurVerletBone, IN OUT FLKAnimVerletBone& ParentVerletBone, float DeltaTime, bool bFinalize, const FVector& CapsuleStart, const FVector& CapsuleEnd, int32 LambdaIndex);
-	void CheckCapsuleCapsule(float DeltaTime, bool bFinalize);
-	bool CheckCapsuleTriangle(IN OUT FLKAnimVerletBone& BoneA, IN OUT FLKAnimVerletBone& BoneB, IN OUT FLKAnimVerletBone& BoneC, float DeltaTime, bool bFinalize, const FVector& CapsuleStart, const FVector& CapsuleEnd, int32 LambdaIndex);
-	void CheckCapsuleTriangle(float DeltaTime, bool bFinalize);
+public:
+	bool CheckCapsuleSphere(IN OUT FLKAnimVerletBone& CurVerletBone, float DeltaTime, bool bInitialUpdate, bool bFinalize, const FVector& CapsuleStart, const FVector& CapsuleEnd, int32 LambdaIndex);
+	void CheckCapsuleSphere(float DeltaTime, bool bInitialUpdate, bool bFinalize, const FVector& CapsuleStart, const FVector& CapsuleEnd, int32 LambdaIndex);
+	void CheckCapsuleSphere(float DeltaTime, bool bInitialUpdate, bool bFinalize);
+
+	bool CheckCapsuleCapsule(IN OUT FLKAnimVerletBone& CurVerletBone, IN OUT FLKAnimVerletBone& ParentVerletBone, float DeltaTime, bool bInitialUpdate, bool bFinalize, const FVector& CapsuleStart, const FVector& CapsuleEnd, int32 LambdaIndex);
+	template <typename T>
+	void CheckCapsuleCapsule(const T& InPair, float DeltaTime, bool bInitialUpdate, bool bFinalize, const FVector& CapsuleStart, const FVector& CapsuleEnd, int32 LambdaIndex);
+	void CheckCapsuleCapsule(float DeltaTime, bool bInitialUpdate, bool bFinalize);
+
+	bool CheckCapsuleTriangle(IN OUT FLKAnimVerletBone& BoneA, IN OUT FLKAnimVerletBone& BoneB, IN OUT FLKAnimVerletBone& BoneC, float DeltaTime, bool bInitialUpdate, bool bFinalize, const FVector& CapsuleStart, const FVector& CapsuleEnd, int32 LambdaIndex);
+	template <typename T>
+	void CheckCapsuleTriangle(const T& InTriangle, float DeltaTime, bool bInitialUpdate, bool bFinalize, const FVector& CapsuleStart, const FVector& CapsuleEnd, int32 LambdaIndex);
+	void CheckCapsuleTriangle(float DeltaTime, bool bInitialUpdate, bool bFinalize);
 };
 ///=========================================================================================================================================
 
@@ -100,10 +118,12 @@ public:
 	TArray<FLKAnimVerletBone>* Bones = nullptr;
 	TExcludeBoneBits ExcludeBones;
 
+	bool bUseBroadphase = false;
 	bool bUseCapsuleCollisionForChain = false;
 	bool bSingleChain = false;
 	TArray<FLKAnimVerletBoneIndicatorPair>* BonePairs = nullptr;
 	TArray<FLKAnimVerletBoneIndicatorTriangle>* BoneTriangles = nullptr;
+	class LKAnimVerletBroadphaseContainer* BroadphaseContainer = nullptr;
 
 	bool bUseXPBDSolver = false;
 	double Compliance = 0.0;								///for XPBD
@@ -111,24 +131,30 @@ public:
 
 public:
 	FLKAnimVerletConstraint_Box(const FVector& InLocation, const FQuat& InRot, const FVector& InHalfExtents, const FLKAnimVerletCollisionConstraintInput& InCollisionInput);
-	virtual void Update(float DeltaTime, bool bFinalize) override;
+	virtual void Update(float DeltaTime, bool bInitialUpdate, bool bFinalize) override;
 	virtual void PostUpdate(float DeltaTime) override { Lambdas.Reset(); }
 	virtual void ResetSimulation() override { Lambdas.Reset(); }
 
 	FLKAnimVerletBound MakeBound() const;
 
-private:
+public:
 	bool IntersectOriginAabbSphere(OUT FVector& OutCollisionNormal, OUT float& OutPenetrationDepth, IN OUT FLKAnimVerletBone& CurVerletBone, const FVector& SphereLocation);
 	bool IntersectObbSphere(OUT FVector& OutCollisionNormal, OUT float& OutPenetrationDepth, IN OUT FLKAnimVerletBone& CurVerletBone, const FVector& SphereLocation, const FQuat& InvRotation);
-	bool CheckBoxSphere(IN OUT FLKAnimVerletBone& CurVerletBone, float DeltaTime, bool bFinalize, const FVector& SphereLocation, const FQuat& InvRotation, int32 LambdaIndex);
-	void CheckBoxSphere(float DeltaTime, bool bFinalize);
-	bool CheckBoxCapsule(IN OUT FLKAnimVerletBone& CurVerletBone, IN OUT FLKAnimVerletBone& ParentVerletBone, float DeltaTime, bool bFinalize, const FQuat& InvRotation, int32 LambdaIndex);
-	void CheckBoxCapsule(float DeltaTime, bool bFinalize);
+	bool CheckBoxSphere(IN OUT FLKAnimVerletBone& CurVerletBone, float DeltaTime, bool bInitialUpdate, bool bFinalize, const FVector& SphereLocation, const FQuat& InvRotation, int32 LambdaIndex);
+	void CheckBoxSphere(float DeltaTime, bool bInitialUpdate, bool bFinalize, const FQuat& InvRotation, int32 LambdaIndex);
+	void CheckBoxSphere(float DeltaTime, bool bInitialUpdate, bool bFinalize);
 
-	bool CheckBoxBox(IN OUT FLKAnimVerletBone& CurVerletBone, IN OUT FLKAnimVerletBone& ParentVerletBone, float DeltaTime, bool bFinalize, const FQuat& InvRotation, int32 LambdaIndex);
+	bool CheckBoxCapsule(IN OUT FLKAnimVerletBone& CurVerletBone, IN OUT FLKAnimVerletBone& ParentVerletBone, float DeltaTime, bool bInitialUpdate, bool bFinalize, const FQuat& InvRotation, int32 LambdaIndex);
+	template <typename T>
+	void CheckBoxCapsule(const T& InPair, float DeltaTime, bool bInitialUpdate, bool bFinalize, const FQuat& InvRotation, int32 LambdaIndex);
+	void CheckBoxCapsule(float DeltaTime, bool bInitialUpdate, bool bFinalize);
 
-	bool CheckBoxTriangle(IN OUT FLKAnimVerletBone& BoneA, IN OUT FLKAnimVerletBone& BoneB, IN OUT FLKAnimVerletBone& BoneC, float DeltaTime, bool bFinalize, const FQuat& InvRotation, int32 LambdaIndex);
-	void CheckBoxTriangle(float DeltaTime, bool bFinalize);
+	bool CheckBoxBox(IN OUT FLKAnimVerletBone& CurVerletBone, IN OUT FLKAnimVerletBone& ParentVerletBone, float DeltaTime, bool bInitialUpdate, bool bFinalize, const FQuat& InvRotation, int32 LambdaIndex);
+
+	bool CheckBoxTriangle(IN OUT FLKAnimVerletBone& BoneA, IN OUT FLKAnimVerletBone& BoneB, IN OUT FLKAnimVerletBone& BoneC, float DeltaTime, bool bInitialUpdate, bool bFinalize, const FQuat& InvRotation, int32 LambdaIndex);
+	template <typename T>
+	void CheckBoxTriangle(const T& InTriangle, float DeltaTime, bool bInitialUpdate, bool bFinalize, const FQuat& InvRotation, int32 LambdaIndex);
+	void CheckBoxTriangle(float DeltaTime, bool bInitialUpdate, bool bFinalize);
 };
 ///=========================================================================================================================================
 
@@ -158,17 +184,17 @@ public:
 public:
 	FLKAnimVerletConstraint_Plane(const FVector& InPlaneBase, const FVector& InPlaneNormal, const FQuat& InRotation, 
 								  const FVector2D& InPlaneHalfExtents, const FLKAnimVerletCollisionConstraintInput& InCollisionInput);
-	virtual void Update(float DeltaTime, bool bFinalize) override;
+	virtual void Update(float DeltaTime, bool bInitialUpdate, bool bFinalize) override;
 	virtual void PostUpdate(float DeltaTime) override { Lambdas.Reset(); }
 	virtual void ResetSimulation() override { Lambdas.Reset(); }
 
 private:
-	bool CheckPlaneSphere(IN OUT FLKAnimVerletBone& CurVerletBone, float DeltaTime, bool bFinalize, bool bFinitePlane, const FQuat& InvRotation, int32 LambdaIndex);
-	void CheckPlaneSphere(float DeltaTime, bool bFinalize);
-	bool CheckPlaneCapsule(IN OUT FLKAnimVerletBone& CurVerletBone, IN OUT FLKAnimVerletBone& ParentVerletBone, float DeltaTime, bool bFinalize, bool bFinitePlane, const FQuat& InvRotation, int32 LambdaIndex);
-	void CheckPlaneCapsule(float DeltaTime, bool bFinalize);
-	bool CheckPlaneTriangle(IN OUT FLKAnimVerletBone& BoneA, IN OUT FLKAnimVerletBone& BoneB, IN OUT FLKAnimVerletBone& BoneC, float DeltaTime, bool bFinalize, bool bFinitePlane, const FQuat& InvRotation, int32 LambdaIndex);
-	void CheckPlaneTriangle(float DeltaTime, bool bFinalize);
+	bool CheckPlaneSphere(IN OUT FLKAnimVerletBone& CurVerletBone, float DeltaTime, bool bInitialUpdate, bool bFinalize, bool bFinitePlane, const FQuat& InvRotation, int32 LambdaIndex);
+	void CheckPlaneSphere(float DeltaTime, bool bInitialUpdate, bool bFinalize);
+	bool CheckPlaneCapsule(IN OUT FLKAnimVerletBone& CurVerletBone, IN OUT FLKAnimVerletBone& ParentVerletBone, float DeltaTime, bool bInitialUpdate, bool bFinalize, bool bFinitePlane, const FQuat& InvRotation, int32 LambdaIndex);
+	void CheckPlaneCapsule(float DeltaTime, bool bInitialUpdate, bool bFinalize);
+	bool CheckPlaneTriangle(IN OUT FLKAnimVerletBone& BoneA, IN OUT FLKAnimVerletBone& BoneB, IN OUT FLKAnimVerletBone& BoneC, float DeltaTime, bool bInitialUpdate, bool bFinalize, bool bFinitePlane, const FQuat& InvRotation, int32 LambdaIndex);
+	void CheckPlaneTriangle(float DeltaTime, bool bInitialUpdate, bool bFinalize);
 };
 ///=========================================================================================================================================
 
@@ -190,16 +216,16 @@ public:
 
 public:
 	FLKAnimVerletConstraint_World(const class UWorld* InWorld, class UPrimitiveComponent* InSelfComponent, const FName& InCollisionProfileName, const FLKAnimVerletCollisionConstraintInput& InCollisionInput);
-	virtual void Update(float DeltaTime, bool bFinalize) override;
+	virtual void Update(float DeltaTime, bool bInitialUpdate, bool bFinalize) override;
 	virtual void PostUpdate(float DeltaTime) override {}
 	virtual void ResetSimulation() override {}
 
 private:
-	bool CheckWorldSphere(IN OUT FLKAnimVerletBone& CurVerletBone, float DeltaTime, bool bFinalize, const UWorld* World,
+	bool CheckWorldSphere(IN OUT FLKAnimVerletBone& CurVerletBone, float DeltaTime, bool bInitialUpdate, bool bFinalize, const UWorld* World,
 						  const struct FCollisionQueryParams& CollisionQueryParams, const FTransform& ComponentTransform, int32 LambdaIndex);
-	void CheckWorldSphere(float DeltaTime, bool bFinalize);
-	bool CheckWorldCapsule(IN OUT FLKAnimVerletBone& CurVerletBone, IN OUT FLKAnimVerletBone& ParentVerletBone, float DeltaTime, bool bFinalize, 
+	void CheckWorldSphere(float DeltaTime, bool bInitialUpdate, bool bFinalize);
+	bool CheckWorldCapsule(IN OUT FLKAnimVerletBone& CurVerletBone, IN OUT FLKAnimVerletBone& ParentVerletBone, float DeltaTime, bool bInitialUpdate, bool bFinalize,
 						   const UWorld* World, const struct FCollisionQueryParams& CollisionQueryParams, const FTransform& ComponentTransform, int32 LambdaIndex);
-	void CheckWorldCapsule(float DeltaTime, bool bFinalize);
+	void CheckWorldCapsule(float DeltaTime, bool bInitialUpdate, bool bFinalize);
 };
 ///=========================================================================================================================================

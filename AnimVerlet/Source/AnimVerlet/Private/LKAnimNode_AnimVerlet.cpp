@@ -27,6 +27,7 @@ DECLARE_CYCLE_STAT(TEXT("AnimVerlet_PrepareSimulation"), STAT_AnimVerlet_Prepare
 DECLARE_CYCLE_STAT(TEXT("AnimVerlet_PrepareLocalCollisionConstraints"), STAT_AnimVerlet_PrepareLocalCollisionConstraints, STATGROUP_Anim);
 DECLARE_CYCLE_STAT(TEXT("AnimVerlet_SimulateVerlet"), STAT_AnimVerlet_SimulateVerlet, STATGROUP_Anim);
 DECLARE_CYCLE_STAT(TEXT("AnimVerlet_PreUpdateBones"), STAT_AnimVerlet_PreUpdateBones, STATGROUP_Anim);
+DECLARE_CYCLE_STAT(TEXT("AnimVerlet_UpdateBroadphase"), STAT_AnimVerlet_UpdateBroadphase, STATGROUP_Anim);
 DECLARE_CYCLE_STAT(TEXT("AnimVerlet_SolveConstraints"), STAT_AnimVerlet_SolveConstraints, STATGROUP_Anim);
 DECLARE_CYCLE_STAT(TEXT("AnimVerlet_SolveConstraints_PinConstraints"), STAT_AnimVerlet_SolveConstraints_PinConstraints, STATGROUP_Anim);
 DECLARE_CYCLE_STAT(TEXT("AnimVerlet_SolveConstraints_DistanceConstraints"), STAT_AnimVerlet_SolveConstraints_DistanceConstraints, STATGROUP_Anim);
@@ -217,6 +218,8 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 
 	USkeleton* Skeleton = BoneContainer.GetSkeletonAsset();
 	const FReferenceSkeleton& ReferenceSkeleton = Skeleton->GetReferenceSkeleton();
+
+	MaxThickness = Thickness;
 
 	/// Create simulate bones
 	for (const FLKAnimVerletBoneSetting& CurBoneSetting : VerletBones)
@@ -675,6 +678,11 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 		}
 	}
 
+	if (bUseBroadphase)
+	{
+		InitializeBroadphase();
+	}
+
 	/// WorldCollision(Contact) constraints
 	if (WorldCollisionProfile != NAME_None)
 	{
@@ -686,10 +694,12 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 				FLKAnimVerletCollisionConstraintInput CollisionConstraintInput;
 				{
 					CollisionConstraintInput.Bones = &SimulateBones;
+					CollisionConstraintInput.bUseBroadphase = bUseBroadphase;
 					CollisionConstraintInput.bUseCapsuleCollisionForChain = bUseCapsuleCollisionForChain;
 					CollisionConstraintInput.bSingleChain = bSingleChain;
 					CollisionConstraintInput.SimulateBonePairIndicators = &SimulateBonePairIndicators;
 					CollisionConstraintInput.SimulateBoneTriangleIndicators = &SimulateBoneTriangleIndicators;
+					CollisionConstraintInput.BroadphaseContainer = &BroadphaseContainer;
 					CollisionConstraintInput.bUseXPBDSolver = bUseXPBDSolver;
 					CollisionConstraintInput.Compliance = Compliance;
 
@@ -713,6 +723,27 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 
 	/// LocalCollision(Contact) constraints
 	InitializeLocalCollisionConstraints(BoneContainer);
+}
+
+void FLKAnimNode_AnimVerlet::InitializeBroadphase()
+{
+	verify(bUseBroadphase);
+
+	if (bUseCapsuleCollisionForChain)
+	{
+		if (IsSingleChain())
+		{
+			BroadphaseContainer.InitializeFromPairs(&SimulateBones, &SimulateBonePairIndicators, MaxThickness);
+		}
+		else
+		{
+			BroadphaseContainer.InitializeFromTriangles(&SimulateBones, &SimulateBoneTriangleIndicators, MaxThickness);
+		}
+	}
+	else
+	{
+		BroadphaseContainer.InitializeFromBones(&SimulateBones, MaxThickness);
+	}
 }
 
 void FLKAnimNode_AnimVerlet::InitializeLocalCollisionConstraints(const FBoneContainer& BoneContainer)
@@ -847,6 +878,7 @@ bool FLKAnimNode_AnimVerlet::MakeSimulateBones(FComponentSpacePoseContext& PoseC
 			NewSimulateBone.ParentVerletBoneIndex = SubDividedParentSimulateBoneIndex;
 		}
 
+		MaxThickness = FMath::Max(MaxThickness, NewSimulateBone.Thickness);
 		CurSimulateBoneIndex = SimulateBones.Emplace(NewSimulateBone);
 		if (BoneSetting.bFakeBone == false)
 			RelevantBoneIndicators.Emplace(CurSimulateBoneIndex, false, bParentExcluded ? ParentExcludedBoneIndex : ParentSimulateBoneIndex, bParentExcluded);
@@ -926,6 +958,7 @@ bool FLKAnimNode_AnimVerlet::MakeSimulateBones(FComponentSpacePoseContext& PoseC
 			MakeFakeBoneTransform(OUT FakeBoneT, CurSimulateBoneIndex);
 			FakeSimulateBone.InitializeTransform(FakeBoneT);
 
+			MaxThickness = FMath::Max(MaxThickness, FakeSimulateBone.Thickness);
 			const int32 FakeBoneIndex = SimulateBones.Emplace(FakeSimulateBone);
 			if (BoneSetting.bFakeBone == false)
 				RelevantBoneIndicators.Emplace(FakeBoneIndex, false, bNewlyExcluded ? CurExcludedBoneIndex : CurSimulateBoneIndex, bNewlyExcluded);
@@ -1054,10 +1087,12 @@ void FLKAnimNode_AnimVerlet::PrepareLocalCollisionConstraints(FComponentSpacePos
 	FLKAnimVerletCollisionConstraintInput CollisionConstraintInput;
 	{
 		CollisionConstraintInput.Bones = &SimulateBones;
+		CollisionConstraintInput.bUseBroadphase = bUseBroadphase;
 		CollisionConstraintInput.bUseCapsuleCollisionForChain = bUseCapsuleCollisionForChain;
 		CollisionConstraintInput.bSingleChain = bSingleChain;
 		CollisionConstraintInput.SimulateBonePairIndicators = &SimulateBonePairIndicators;
 		CollisionConstraintInput.SimulateBoneTriangleIndicators = &SimulateBoneTriangleIndicators;
+		CollisionConstraintInput.BroadphaseContainer = &BroadphaseContainer;
 		CollisionConstraintInput.bUseXPBDSolver = bUseXPBDSolver;
 		CollisionConstraintInput.Compliance = Compliance;
 	}
@@ -1385,6 +1420,9 @@ void FLKAnimNode_AnimVerlet::SimulateVerlet(const UWorld* World, float InDeltaTi
 
 	PreUpdateBones(World, InDeltaTime, ComponentTransform, PrevComponentTransform);
 
+	if (bUseBroadphase)
+		UpdateBroadphase(World, InDeltaTime, ComponentTransform);
+
 	/// Solve
 	SolveConstraints(InDeltaTime);
 	
@@ -1495,6 +1533,15 @@ void FLKAnimNode_AnimVerlet::PreUpdateBones(const UWorld* World, float InDeltaTi
 	}
 }
 
+void FLKAnimNode_AnimVerlet::UpdateBroadphase(const UWorld* World, float InDeltaTime, const FTransform& ComponentTransform)
+{
+#if LK_ENABLE_STAT
+	SCOPE_CYCLE_COUNTER(STAT_AnimVerlet_UpdateBroadphase);
+#endif
+
+	BroadphaseContainer.Update();
+}
+
 void FLKAnimNode_AnimVerlet::SolveConstraints(float InDeltaTime)
 {
 #if LK_ENABLE_STAT
@@ -1505,6 +1552,7 @@ void FLKAnimNode_AnimVerlet::SolveConstraints(float InDeltaTime)
 	const float SubStepDeltaTime = FMath::Max(bUseXPBDSolver ? InDeltaTime / SolveIteration : InDeltaTime, KINDA_SMALL_NUMBER);
 	for (int32 Iteration = 0; Iteration < SolveIteration; ++Iteration)
 	{
+		const bool bInitialUpdate = (Iteration == 0);
 		const bool bFinalizeUpdate = (Iteration == SolveIteration - 1);
 
 		/// Simulate each constraints
@@ -1512,56 +1560,56 @@ void FLKAnimNode_AnimVerlet::SolveConstraints(float InDeltaTime)
 		/*for (int32 i = 0; i < Constraints.Num(); ++i)
 		{
 			verify(Constraints[i] != nullptr);
-			Constraints[i]->Update(SubStepDeltaTime, bFinalizeUpdate);
+			Constraints[i]->Update(SubStepDeltaTime, bInitialUpdate, bFinalizeUpdate);
 		}*/
 		for (int32 i = 0; i < PinConstraints.Num(); ++i)
 		{
 		#if LK_ENABLE_STAT
 			SCOPE_CYCLE_COUNTER(STAT_AnimVerlet_SolveConstraints_PinConstraints);
 		#endif
-			PinConstraints[i].Update(SubStepDeltaTime, false);
+			PinConstraints[i].Update(SubStepDeltaTime, bInitialUpdate, false);
 		}
 		for (int32 i = 0; i < DistanceConstraints.Num(); ++i)
 		{
 		#if LK_ENABLE_STAT
 			SCOPE_CYCLE_COUNTER(STAT_AnimVerlet_SolveConstraints_DistanceConstraints);
 		#endif
-			DistanceConstraints[i].Update(SubStepDeltaTime, bFinalizeUpdate);
+			DistanceConstraints[i].Update(SubStepDeltaTime, bInitialUpdate, bFinalizeUpdate);
 		}
 		for (int32 i = 0; i < BendingConstraints.Num(); ++i)
 		{
 		#if LK_ENABLE_STAT
 			SCOPE_CYCLE_COUNTER(STAT_AnimVerlet_SolveConstraints_BendingConstraints);
 		#endif
-			BendingConstraints[i].Update(SubStepDeltaTime, bFinalizeUpdate);
+			BendingConstraints[i].Update(SubStepDeltaTime, bInitialUpdate, bFinalizeUpdate);
 		}
 		for (int32 i = 0; i < BendingConstraints_1D.Num(); ++i)
 		{
 			#if LK_ENABLE_STAT
 			SCOPE_CYCLE_COUNTER(STAT_AnimVerlet_SolveConstraints_BendingConstraints_1D);
 			#endif
-			BendingConstraints_1D[i].Update(SubStepDeltaTime, bFinalizeUpdate);
+			BendingConstraints_1D[i].Update(SubStepDeltaTime, bInitialUpdate, bFinalizeUpdate);
 		}
 		for (int32 i = 0; i < FlatBendingConstraints.Num(); ++i)
 		{
 			#if LK_ENABLE_STAT
 			SCOPE_CYCLE_COUNTER(STAT_AnimVerlet_SolveConstraints_FlatBendingConstraints);
 			#endif
-			FlatBendingConstraints[i].Update(SubStepDeltaTime, bFinalizeUpdate);
+			FlatBendingConstraints[i].Update(SubStepDeltaTime, bInitialUpdate, bFinalizeUpdate);
 		}
 		for (int32 i = 0; i < StraightenConstraints.Num(); ++i)
 		{
 		#if LK_ENABLE_STAT
 			SCOPE_CYCLE_COUNTER(STAT_AnimVerlet_SolveConstraints_StraightenConstraints);
 		#endif
-			StraightenConstraints[i].Update(SubStepDeltaTime, bFinalizeUpdate);
+			StraightenConstraints[i].Update(SubStepDeltaTime, bInitialUpdate, bFinalizeUpdate);
 		}
 		for (int32 i = 0; i < BallSocketConstraints.Num(); ++i)
 		{
 		#if LK_ENABLE_STAT
 			SCOPE_CYCLE_COUNTER(STAT_AnimVerlet_SolveConstraints_BallSocketConstraints);
 		#endif
-			BallSocketConstraints[i].Update(SubStepDeltaTime, bFinalizeUpdate);
+			BallSocketConstraints[i].Update(SubStepDeltaTime, bInitialUpdate, bFinalizeUpdate);
 		}
 
 		///-------------------------------------------------------------------------------------
@@ -1571,28 +1619,28 @@ void FLKAnimNode_AnimVerlet::SolveConstraints(float InDeltaTime)
 		#if LK_ENABLE_STAT
 			SCOPE_CYCLE_COUNTER(STAT_AnimVerlet_SolveConstraints_SphereCollisionConstraints);
 		#endif
-			SphereCollisionConstraints[i].Update(SubStepDeltaTime, bFinalizeUpdate);
+			SphereCollisionConstraints[i].Update(SubStepDeltaTime, bInitialUpdate, bFinalizeUpdate);
 		}
 		for (int32 i = 0; i < CapsuleCollisionConstraints.Num(); ++i)
 		{
 		#if LK_ENABLE_STAT
 			SCOPE_CYCLE_COUNTER(STAT_AnimVerlet_SolveConstraints_CapsuleCollisionConstraints);
 		#endif
-			CapsuleCollisionConstraints[i].Update(SubStepDeltaTime, bFinalizeUpdate);
+			CapsuleCollisionConstraints[i].Update(SubStepDeltaTime, bInitialUpdate, bFinalizeUpdate);
 		}
 		for (int32 i = 0; i < BoxCollisionConstraints.Num(); ++i)
 		{
 		#if LK_ENABLE_STAT
 			SCOPE_CYCLE_COUNTER(STAT_AnimVerlet_SolveConstraints_BoxCollisionConstraints);
 		#endif
-			BoxCollisionConstraints[i].Update(SubStepDeltaTime, bFinalizeUpdate);
+			BoxCollisionConstraints[i].Update(SubStepDeltaTime, bInitialUpdate, bFinalizeUpdate);
 		}
 		for (int32 i = 0; i < PlaneCollisionConstraints.Num(); ++i)
 		{
 		#if LK_ENABLE_STAT
 			SCOPE_CYCLE_COUNTER(STAT_AnimVerlet_SolveConstraints_PlaneCollisionConstraints);
 		#endif
-			PlaneCollisionConstraints[i].Update(SubStepDeltaTime, bFinalizeUpdate);
+			PlaneCollisionConstraints[i].Update(SubStepDeltaTime, bInitialUpdate, bFinalizeUpdate);
 		}
 		///-------------------------------------------------------------------------------------
 
@@ -1601,7 +1649,7 @@ void FLKAnimNode_AnimVerlet::SolveConstraints(float InDeltaTime)
 		#if LK_ENABLE_STAT
 			SCOPE_CYCLE_COUNTER(STAT_AnimVerlet_SolveConstraints_WorldCollisionConstraints);
 		#endif
-			WorldCollisionConstraints[i].Update(SubStepDeltaTime, bFinalizeUpdate);
+			WorldCollisionConstraints[i].Update(SubStepDeltaTime, bInitialUpdate, bFinalizeUpdate);
 		}*/
 
 		/*for (int32 i = 0; i < PinConstraints.Num(); ++i)
@@ -1609,14 +1657,14 @@ void FLKAnimNode_AnimVerlet::SolveConstraints(float InDeltaTime)
 		#if LK_ENABLE_STAT
 			SCOPE_CYCLE_COUNTER(STAT_AnimVerlet_SolveConstraints_PinConstraints);
 		#endif
-			PinConstraints[i].Update(SubStepDeltaTime, bFinalizeUpdate);
+			PinConstraints[i].Update(SubStepDeltaTime, bInitialUpdate, bFinalizeUpdate);
 		}
 		for (int32 i = 0; i < FixedDistanceConstraints.Num(); ++i)
 		{
 		#if LK_ENABLE_STAT
 			SCOPE_CYCLE_COUNTER(STAT_AnimVerlet_SolveConstraints_FixedDistanceConstraints);
 		#endif
-			FixedDistanceConstraints[i].Update(SubStepDeltaTime, bFinalizeUpdate);
+			FixedDistanceConstraints[i].Update(SubStepDeltaTime, bInitialUpdate, bFinalizeUpdate);
 		}*/
 
 		/*if (bLockTipBone)
@@ -1627,14 +1675,14 @@ void FLKAnimNode_AnimVerlet::SolveConstraints(float InDeltaTime)
 			#if LK_ENABLE_STAT
 				SCOPE_CYCLE_COUNTER(STAT_AnimVerlet_SolveConstraints_PinConstraints);
 			#endif
-				PinConstraints[i].BackwardUpdate(SubStepDeltaTime, bFinalizeUpdate);
+				PinConstraints[i].BackwardUpdate(SubStepDeltaTime, bInitialUpdate, bFinalizeUpdate);
 			}
 			for (int32 i = FixedDistanceConstraints.Num() - 1; i >= 0; --i)
 			{
 			#if LK_ENABLE_STAT
 				SCOPE_CYCLE_COUNTER(STAT_AnimVerlet_SolveConstraints_FixedDistanceConstraints);
 			#endif
-				FixedDistanceConstraints[i].BackwardUpdate(SubStepDeltaTime, bFinalizeUpdate);
+				FixedDistanceConstraints[i].BackwardUpdate(SubStepDeltaTime, bInitialUpdate, bFinalizeUpdate);
 			}
 
 			for (int32 i = 0; i < PinConstraints.Num(); ++i)
@@ -1642,14 +1690,14 @@ void FLKAnimNode_AnimVerlet::SolveConstraints(float InDeltaTime)
 				#if LK_ENABLE_STAT
 					SCOPE_CYCLE_COUNTER(STAT_AnimVerlet_SolveConstraints_PinConstraints);
 				#endif
-				PinConstraints[i].Update(SubStepDeltaTime, bFinalizeUpdate);
+				PinConstraints[i].Update(SubStepDeltaTime, bInitialUpdate, bFinalizeUpdate);
 			}
 			for (int32 i = 0; i < FixedDistanceConstraints.Num(); ++i)
 			{
 			#if LK_ENABLE_STAT
 				SCOPE_CYCLE_COUNTER(STAT_AnimVerlet_SolveConstraints_FixedDistanceConstraints);
 			#endif
-				FixedDistanceConstraints[i].Update(SubStepDeltaTime, bFinalizeUpdate);
+				FixedDistanceConstraints[i].Update(SubStepDeltaTime, bInitialUpdate, bFinalizeUpdate);
 			}
 		}*/
 	}
@@ -1660,7 +1708,7 @@ void FLKAnimNode_AnimVerlet::SolveConstraints(float InDeltaTime)
 	#if LK_ENABLE_STAT
 		SCOPE_CYCLE_COUNTER(STAT_AnimVerlet_SolveConstraints_WorldCollisionConstraints);
 	#endif
-		WorldCollisionConstraints[i].Update(InDeltaTime, true);
+		WorldCollisionConstraints[i].Update(InDeltaTime, false, true);
 	}
 
 	for (int32 i = 0; i < PinConstraints.Num(); ++i)
@@ -1668,14 +1716,14 @@ void FLKAnimNode_AnimVerlet::SolveConstraints(float InDeltaTime)
 	#if LK_ENABLE_STAT
 		SCOPE_CYCLE_COUNTER(STAT_AnimVerlet_SolveConstraints_PinConstraints);
 	#endif
-		PinConstraints[i].Update(InDeltaTime, true);
+		PinConstraints[i].Update(InDeltaTime, false, true);
 	}
 	for (int32 i = 0; i < FixedDistanceConstraints.Num(); ++i)
 	{
 	#if LK_ENABLE_STAT
 		SCOPE_CYCLE_COUNTER(STAT_AnimVerlet_SolveConstraints_FixedDistanceConstraints);
 	#endif
-		FixedDistanceConstraints[i].Update(InDeltaTime, true);
+		FixedDistanceConstraints[i].Update(InDeltaTime, false, true);
 	}
 
 	if (bLockTipBone)
@@ -1686,14 +1734,14 @@ void FLKAnimNode_AnimVerlet::SolveConstraints(float InDeltaTime)
 		#if LK_ENABLE_STAT
 			SCOPE_CYCLE_COUNTER(STAT_AnimVerlet_SolveConstraints_PinConstraints);
 		#endif
-			PinConstraints[i].BackwardUpdate(InDeltaTime, true);
+			PinConstraints[i].BackwardUpdate(InDeltaTime, false, true);
 		}
 		for (int32 i = FixedDistanceConstraints.Num() - 1; i >= 0; --i)
 		{
 		#if LK_ENABLE_STAT
 			SCOPE_CYCLE_COUNTER(STAT_AnimVerlet_SolveConstraints_FixedDistanceConstraints);
 		#endif
-			FixedDistanceConstraints[i].BackwardUpdate(InDeltaTime, true);
+			FixedDistanceConstraints[i].BackwardUpdate(InDeltaTime, false, true);
 		}
 
 		for (int32 i = 0; i < PinConstraints.Num(); ++i)
@@ -1701,14 +1749,14 @@ void FLKAnimNode_AnimVerlet::SolveConstraints(float InDeltaTime)
 		#if LK_ENABLE_STAT
 			SCOPE_CYCLE_COUNTER(STAT_AnimVerlet_SolveConstraints_PinConstraints);
 		#endif
-			PinConstraints[i].Update(InDeltaTime, true);
+			PinConstraints[i].Update(InDeltaTime, false, true);
 		}
 		for (int32 i = 0; i < FixedDistanceConstraints.Num(); ++i)
 		{
 		#if LK_ENABLE_STAT
 			SCOPE_CYCLE_COUNTER(STAT_AnimVerlet_SolveConstraints_FixedDistanceConstraints);
 		#endif
-			FixedDistanceConstraints[i].Update(InDeltaTime, true);
+			FixedDistanceConstraints[i].Update(InDeltaTime, false, true);
 		}
 	}
 
@@ -1934,6 +1982,7 @@ void FLKAnimNode_AnimVerlet::ClearSimulateBones()
 	PlaneCollisionConstraints.Reset();
 	WorldCollisionConstraints.Reset();
 
+	BroadphaseContainer.Destroy();
 	BoneChainIndexes.Reset();
 	MaxBoneChainLength = 0;
 	RelevantBoneIndicators.Reset();
@@ -2173,6 +2222,7 @@ void FLKAnimNode_AnimVerlet::SyncFromOtherAnimVerletNode(const FLKAnimNode_AnimV
 
 	bConstrainConeAngleFromParent = Other.bConstrainConeAngleFromParent;
 	ConeAngle = Other.ConeAngle;
+	bUseBroadphase = Other.bUseBroadphase;
 	Thickness = Other.Thickness;
 	bUseCapsuleCollisionForChain = Other.bUseCapsuleCollisionForChain;
 

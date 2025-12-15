@@ -7,7 +7,7 @@
 ///=========================================================================================================================================
 /// FLKAnimVerletConstraint_Pin
 ///=========================================================================================================================================
-void FLKAnimVerletConstraint_Pin::Update(float DeltaTime, bool bFinalize)
+void FLKAnimVerletConstraint_Pin::Update(float DeltaTime, bool bInitialUpdate, bool bFinalize)
 {
 	verify(Bone != nullptr);
 
@@ -52,7 +52,7 @@ FLKAnimVerletConstraint_Distance::FLKAnimVerletConstraint_Distance(FLKAnimVerlet
 		Stiffness = static_cast<float>(InStiffness);
 }
 
-void FLKAnimVerletConstraint_Distance::Update(float DeltaTime, bool bFinalize)
+void FLKAnimVerletConstraint_Distance::Update(float DeltaTime, bool bInitialUpdate, bool bFinalize)
 {
 	verify(BoneA != nullptr);
 	verify(BoneB != nullptr);
@@ -251,7 +251,7 @@ float FLKAnimVerletConstraint_IsometricBending::CalculateRestAngle(FLKAnimVerlet
 	return FMath::Atan2(SinTerm, CosTerm);*/
 }
 
-void FLKAnimVerletConstraint_IsometricBending::Update(float DeltaTime, bool bFinalize)
+void FLKAnimVerletConstraint_IsometricBending::Update(float DeltaTime, bool bInitialUpdate, bool bFinalize)
 {
 	verify(BoneA != nullptr);
 	verify(BoneB != nullptr);
@@ -469,7 +469,7 @@ float FLKAnimVerletConstraint_Bending_1D::CalculateRestAngle(FLKAnimVerletBone* 
 	return CosTheta;
 }
 
-void FLKAnimVerletConstraint_Bending_1D::Update(float DeltaTime, bool bFinalize)
+void FLKAnimVerletConstraint_Bending_1D::Update(float DeltaTime, bool bInitialUpdate, bool bFinalize)
 {
 	verify(BoneA != nullptr);
 	verify(BoneB != nullptr);
@@ -659,7 +659,7 @@ void FLKAnimVerletConstraint_FlatBending::ComputeBendingGradients(OUT FVector& G
 	GradientsC = -WC0 * QA - WC1 * QD;
 }
 
-void FLKAnimVerletConstraint_FlatBending::Update(float DeltaTime, bool bFinalize)
+void FLKAnimVerletConstraint_FlatBending::Update(float DeltaTime, bool bInitialUpdate, bool bFinalize)
 {
 	verify(BoneA != nullptr);
 	verify(BoneB != nullptr);
@@ -757,7 +757,7 @@ FLKAnimVerletConstraint_Straighten::FLKAnimVerletConstraint_Straighten(FLKAnimVe
 	verify(BoneC != nullptr);
 }
 
-void FLKAnimVerletConstraint_Straighten::Update(float DeltaTime, bool bFinalize)
+void FLKAnimVerletConstraint_Straighten::Update(float DeltaTime, bool bInitialUpdate, bool bFinalize)
 {
 	verify(BoneA != nullptr);
 	verify(BoneB != nullptr);
@@ -839,7 +839,7 @@ FLKAnimVerletConstraint_FixedDistance::FLKAnimVerletConstraint_FixedDistance(FLK
 	LengthMargin = InLengthMargin;
 }
 
-void FLKAnimVerletConstraint_FixedDistance::Update(float DeltaTime, bool bFinalize)
+void FLKAnimVerletConstraint_FixedDistance::Update(float DeltaTime, bool bInitialUpdate, bool bFinalize)
 {
 	verify(BoneA != nullptr);
 	verify(BoneB != nullptr);
@@ -893,7 +893,7 @@ void FLKAnimVerletConstraint_FixedDistance::Update(float DeltaTime, bool bFinali
 	}
 }
 
-void FLKAnimVerletConstraint_FixedDistance::BackwardUpdate(float DeltaTime, bool bFinalize)
+void FLKAnimVerletConstraint_FixedDistance::BackwardUpdate(float DeltaTime, bool bInitialUpdate, bool bFinalize)
 {
 	verify(BoneA != nullptr);
 	verify(BoneB != nullptr);
@@ -966,7 +966,7 @@ FLKAnimVerletConstraint_BallSocket::FLKAnimVerletConstraint_BallSocket(FLKAnimVe
 	verify(BoneB != nullptr);
 }
 
-void FLKAnimVerletConstraint_BallSocket::Update(float DeltaTime, bool bFinalize)
+void FLKAnimVerletConstraint_BallSocket::Update(float DeltaTime, bool bInitialUpdate, bool bFinalize)
 {
 	verify(BoneA != nullptr);
 	verify(BoneB != nullptr);
