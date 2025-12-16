@@ -699,7 +699,7 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 			CollisionConstraintInput.bUseXPBDSolver = bUseXPBDSolver;
 			CollisionConstraintInput.Compliance = Compliance;
 		}
-		const FLKAnimVerletConstraint_Self SelfCollisionConstraint(SelfCollisionAdditionalThickness, CollisionConstraintInput);
+		const FLKAnimVerletConstraint_Self SelfCollisionConstraint(bUseTriangleSelfCollision, SelfCollisionAdditionalThickness, CollisionConstraintInput);
 		SelfCollisionConstraints.Emplace(SelfCollisionConstraint);
 	}
 
@@ -2263,6 +2263,7 @@ void FLKAnimNode_AnimVerlet::SyncFromOtherAnimVerletNode(const FLKAnimNode_AnimV
 	bUseCapsuleCollisionForChain = Other.bUseCapsuleCollisionForChain;
 
 	bUseSelfCollision = Other.bUseSelfCollision;
+	bUseTriangleSelfCollision = Other.bUseTriangleSelfCollision;
 	SelfCollisionAdditionalThickness = Other.SelfCollisionAdditionalThickness;
 
 	WorldCollisionProfile = Other.WorldCollisionProfile;

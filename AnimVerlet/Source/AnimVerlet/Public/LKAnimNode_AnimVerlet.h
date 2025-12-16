@@ -298,6 +298,13 @@ public:
 	*/
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Collision", meta = (PinHiddenByDefault))
 	bool bUseSelfCollision = false;
+	/**
+		* Single chain: Regardless of this value, The capsule shape between the 2 bones is used
+		* Multiple chain: if true, then the triangle - triangle check is used(May cause more performance impact)
+		*				  if false, then the sphere - triangle check is used
+	*/
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Collision", meta = (EditCondition = "bUseSelfCollision"))
+	bool bUseTriangleSelfCollision = false;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Collision", meta = (EditCondition = "bUseSelfCollision", ClampMin = "0.0", ForceUnits = "cm"))
 	float SelfCollisionAdditionalThickness = 0.1f;
 

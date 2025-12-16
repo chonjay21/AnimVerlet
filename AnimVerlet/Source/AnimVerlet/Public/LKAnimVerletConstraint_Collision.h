@@ -211,6 +211,7 @@ public:
 	float AdditionalMargin = 0.0f;
 	TArray<FLKAnimVerletBone>* Bones = nullptr;
 
+	bool bUseTriangleSelfCollision = false;
 	bool bUseBroadphase = false;
 	bool bUseCapsuleCollisionForChain = false;
 	bool bSingleChain = false;
@@ -224,8 +225,7 @@ public:
 	TArray<double> Lambdas;									///for XPBD
 
 public:
-	FLKAnimVerletConstraint_Self() = default;
-	FLKAnimVerletConstraint_Self(float InAdditionalMargin, const FLKAnimVerletCollisionConstraintInput& InCollisionInput);
+	FLKAnimVerletConstraint_Self(bool InbUseTriangleSelfCollision, float InAdditionalMargin, const FLKAnimVerletCollisionConstraintInput& InCollisionInput);
 	virtual void Update(float DeltaTime, bool bInitialUpdate, bool bFinalize) override;
 	virtual void PostUpdate(float DeltaTime) override { Lambdas.Reset(); BroadphaseTargetCache.Reset(); }
 	virtual void ResetSimulation() override { Lambdas.Reset(); BroadphaseTargetCache.Reset(); }
@@ -249,6 +249,13 @@ public:
 	template <typename T>
 	void CheckSphereTriangle(IN OUT FLKAnimVerletBone& BoneP, const T& InTriangle, float DeltaTime, bool bInitialUpdate, bool bFinalize, int32 LambdaIndex);
 	void CheckSphereTriangle(float DeltaTime, bool bInitialUpdate, bool bFinalize);
+
+	bool CheckTriangleTriangle(IN OUT FLKAnimVerletBone& BoneA1, IN OUT FLKAnimVerletBone& BoneA2, IN OUT FLKAnimVerletBone& BoneA3, 
+							   IN OUT FLKAnimVerletBone& BoneB1, IN OUT FLKAnimVerletBone& BoneB2, IN OUT FLKAnimVerletBone& BoneB3, 
+							   float DeltaTime, bool bInitialUpdate, bool bFinalize, int32 LambdaIndex);
+	template <typename T, typename K>
+	void CheckTriangleTriangle(const T& InTriangleA, const K& InTriangleB, float DeltaTime, bool bInitialUpdate, bool bFinalize, int32 LambdaIndex);
+	void CheckTriangleTriangle(float DeltaTime, bool bInitialUpdate, bool bFinalize);
 };
 ///=========================================================================================================================================
 
