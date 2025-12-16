@@ -475,4 +475,32 @@ namespace LKAnimVerletUtil
 		}
 		OutClosest = P; /// inside: "closest" is itself for our constraint formulation
 	}
+
+	inline bool TestTriangleAABBAxisOverlap(OUT float& OutOverlap, const FVector& AxisIn, const FVector& TriA, const FVector& TriB, const FVector& TriC, float TriangleThickness, const FVector& HalfExt)
+	{
+		const float AxisLen2 = AxisIn.SizeSquared();
+		if (AxisLen2 < KINDA_SMALL_NUMBER)
+		{
+			OutOverlap = TNumericLimits<float>::Max();
+			return true;
+		}
+
+		const FVector Axis = AxisIn / FMath::Sqrt(AxisLen2);
+
+		/// Project triangle
+		const float PA = Axis.Dot(TriA);
+		const float PB = Axis.Dot(TriB);
+		const float PC = Axis.Dot(TriC);
+		const float TriMin = FMath::Min3(PA, PB, PC) - TriangleThickness;
+		const float TriMax = FMath::Max3(PA, PB, PC) + TriangleThickness;
+
+		/// Project AABB centered at origin
+		const float R = FMath::Abs(Axis.X) * HalfExt.X + FMath::Abs(Axis.Y) * HalfExt.Y + FMath::Abs(Axis.Z) * HalfExt.Z;
+		const float BoxMin = -R;
+		const float BoxMax = +R;
+
+		const float Overlap = FMath::Min(TriMax, BoxMax) - FMath::Max(TriMin, BoxMin);
+		OutOverlap = Overlap;
+		return (Overlap >= 0.0f);
+	}
 };

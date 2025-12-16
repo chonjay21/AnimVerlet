@@ -1549,6 +1549,157 @@ void FLKAnimVerletConstraint_Box::CheckBoxCapsule(float DeltaTime, bool bInitial
 
 bool FLKAnimVerletConstraint_Box::CheckBoxTriangle(IN OUT FLKAnimVerletBone& BoneA, IN OUT FLKAnimVerletBone& BoneB, IN OUT FLKAnimVerletBone& BoneC, float DeltaTime, bool bInitialUpdate, bool bFinalize, const FQuat& InvRotation, int32 LambdaIndex)
 {
+	/// SAT
+	/// Transform triangle vertices into box-local (AABB space)
+	const FVector AInLocal = InvRotation.RotateVector(BoneA.Location - Location);
+	const FVector BInLocal = InvRotation.RotateVector(BoneB.Location - Location);
+	const FVector CInLocal = InvRotation.RotateVector(BoneC.Location - Location);
+
+	/// Consider triangle thickness
+	const float TriThickness = FMath::Max3(BoneA.Thickness, BoneB.Thickness, BoneC.Thickness);
+
+	/// Expanded box (triangle thickness as margin)
+	const FVector HalfExt = HalfExtents + FVector(TriThickness);
+
+	// SAT axes (13)
+	const FVector AxesBox[3] = { FVector(1,0,0), FVector(0,1,0), FVector(0,0,1) };
+
+	const FVector Edge0 = BInLocal - AInLocal;
+	const FVector Edge1 = CInLocal - BInLocal;
+	const FVector Edge2 = AInLocal - CInLocal;
+	const FVector TriN = (BInLocal - AInLocal).Cross(CInLocal - AInLocal);
+
+	float MinOverlap = TNumericLimits<float>::Max();
+	FVector MinAxis = FVector::ZeroVector;
+	auto ConsiderAxis = [&](const FVector& AxisCand) -> bool
+	{
+		float Overlap = 0.f;
+		if (LKAnimVerletUtil::TestTriangleAABBAxisOverlap(OUT Overlap, AxisCand, AInLocal, BInLocal, CInLocal, TriThickness, HalfExtents) == false)
+			return false;
+
+		if (Overlap < MinOverlap)
+		{
+			MinOverlap = Overlap;
+			MinAxis = AxisCand;
+		}
+		return true;
+	};
+
+	/// Box normals
+	for (int32 i = 0; i < 3; ++i)
+	{
+		if (ConsiderAxis(AxesBox[i]) == false) 
+			return false;
+	}
+
+	/// Triangle normal
+	if (ConsiderAxis(TriN) == false) 
+		return false;
+
+	/// Edge cross box axes
+	const FVector TriEdges[3] = { Edge0, Edge1, Edge2 };
+	for (int32 i = 0; i < 3; ++i)
+	{
+		for (int32 j = 0; j < 3; ++j)
+		{
+			const FVector Axis = TriEdges[i].Cross(AxesBox[j]);
+			if (ConsiderAxis(Axis) == false) 
+				return false;
+		}
+	}
+
+	if (MinAxis.SizeSquared() < KINDA_SMALL_NUMBER)
+		return false;
+
+	FVector NormalInLocal = MinAxis.GetSafeNormal();
+
+	/// orient normal from box -> triangle (use centroid)
+	const FVector CentroidL = (AInLocal + BInLocal + CInLocal) * (1.0f / 3.0f);
+	if (NormalInLocal.Dot(CentroidL) < 0.0f)
+		NormalInLocal = -NormalInLocal;
+
+	const float PenetrationDepth = MinOverlap;
+	if (PenetrationDepth <= 0.0f)
+		return false;
+
+	/// ClampToAABB (inline) to get a point on/inside box
+	///const FVector BoxPointL(FMath::Clamp(CentroidL.X, -HalfExt.X, HalfExt.X), FMath::Clamp(CentroidL.Y, -HalfExt.Y, HalfExt.Y), FMath::Clamp(CentroidL.Z, -HalfExt.Z, HalfExt.Z));
+	const FVector BoxPointL(FMath::Clamp(CentroidL.X, -HalfExtents.X, HalfExtents.X), FMath::Clamp(CentroidL.Y, -HalfExtents.Y, HalfExtents.Y), FMath::Clamp(CentroidL.Z, -HalfExtents.Z, HalfExtents.Z));
+
+	/// Contact point on triangle
+	float WA = 0.0f;
+	float WB = 0.0f;
+	float WC = 0.0f;
+	const FVector TriPointL = LKAnimVerletUtil::ClosestPointOnTriangleWeights(OUT WA, OUT WB, OUT WC, BoxPointL, AInLocal, BInLocal, CInLocal);
+	LKAnimVerletUtil::BarycentricOnTriangle(OUT WA, OUT WB, OUT WC, TriPointL, AInLocal, BInLocal, CInLocal);
+
+	WA = FMath::Clamp(WA, 0.f, 1.f);
+	WB = FMath::Clamp(WB, 0.f, 1.f);
+	WC = FMath::Clamp(WC, 0.f, 1.f);
+	const float WSum = WA + WB + WC;
+	if (WSum > KINDA_SMALL_NUMBER)
+	{
+		const float InvWSum = 1.0f / WSum;
+		WA *= InvWSum; 
+		WB *= InvWSum; 
+		WC *= InvWSum;
+	}
+	else
+	{
+		WA = 1.0f / 3.0f;
+		WB = 1.0f / 3.0f;
+		WC = 1.0f / 3.0f;
+	}
+
+	const float Cval = PenetrationDepth;
+
+	/// Normal in world space (box local -> world)
+	const FQuat BoxRotation = InvRotation.Inverse();
+	const FVector Nworld = BoxRotation.RotateVector(NormalInLocal).GetSafeNormal();
+	if (bUseXPBDSolver && bFinalize == false)
+	{
+		if (FMath::IsNearlyZero(DeltaTime, KINDA_SMALL_NUMBER))
+			return false;
+
+		double& CurLambda = Lambdas[LambdaIndex];
+		const double Alpha = Compliance / (DeltaTime * DeltaTime);
+		const float SumGrad = BoneA.InvMass * (WA * WA) + BoneB.InvMass * (WB * WB) + BoneC.InvMass * (WC * WC);
+		const float Denom = SumGrad + Alpha;
+		if (FMath::IsNearlyZero(Denom, KINDA_SMALL_NUMBER))
+			return false;
+
+		const double DeltaLambda = -(Cval + Alpha * CurLambda) / Denom;
+		CurLambda += DeltaLambda;
+
+		if (BoneA.IsPinned() == false)
+			BoneA.Location = BoneA.Location + (BoneA.InvMass * DeltaLambda) * (-WA * Nworld);
+		if (BoneB.IsPinned() == false)
+			BoneB.Location = BoneB.Location + (BoneB.InvMass * DeltaLambda) * (-WB * Nworld);
+		if (BoneC.IsPinned() == false)
+			BoneC.Location = BoneC.Location + (BoneC.InvMass * DeltaLambda) * (-WC * Nworld);
+	}
+	else
+	{
+		const float W0 = BoneA.InvMass * (WA * WA);
+		const float W1 = BoneB.InvMass * (WB * WB);
+		const float W2 = BoneC.InvMass * (WC * WC);
+		const double Denom = (W0 + W1 + W2);
+		if (FMath::IsNearlyZero(Denom, KINDA_SMALL_NUMBER))
+			return false;
+
+		const float DeltaLambda = -Cval / Denom;
+
+		if (BoneA.IsPinned() == false)
+			BoneA.Location = BoneA.Location + (BoneA.InvMass * DeltaLambda) * (-WA * Nworld);
+		if (BoneB.IsPinned() == false)
+			BoneB.Location = BoneB.Location + (BoneB.InvMass * DeltaLambda) * (-WB * Nworld);
+		if (BoneC.IsPinned() == false)
+			BoneC.Location = BoneC.Location + (BoneC.InvMass * DeltaLambda) * (-WC * Nworld);
+	}
+	return true;
+
+	/*
+	/// SDF
 	/// Transform triangle vertices into box-local (AABB space)
 	const FVector AInLocal = InvRotation.RotateVector(BoneA.Location - Location);
 	const FVector BInLocal = InvRotation.RotateVector(BoneB.Location - Location);
@@ -1622,6 +1773,7 @@ bool FLKAnimVerletConstraint_Box::CheckBoxTriangle(IN OUT FLKAnimVerletBone& Bon
 			BoneC.Location = BoneC.Location + (BoneC.InvMass * DeltaLambda) * (-WC * Nworld);
 	}
 	return true;
+	*/
 }
 
 template <typename T>
