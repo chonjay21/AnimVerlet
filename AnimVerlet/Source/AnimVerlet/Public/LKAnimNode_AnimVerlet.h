@@ -293,6 +293,14 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Collision")
 	bool bUseCapsuleCollisionForChain = true;
 
+	/**
+		BETA -	Enable collision against each other in bone chain.(May cause performance impact)
+	*/
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Collision", meta = (PinHiddenByDefault))
+	bool bUseSelfCollision = false;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Collision", meta = (EditCondition = "bUseSelfCollision", ClampMin = "0.0", ForceUnits = "cm"))
+	float SelfCollisionAdditionalThickness = 0.1f;
+
 	/** 
 		BETA -	Enable collision against to world.(May cause performance impact by physics sweep test for each bone and fake bone)
 				(In this case, the triangle shape is not used even if there are multiple chains.)
@@ -410,6 +418,7 @@ private:
 	TArray<FLKAnimVerletConstraint_Box> BoxCollisionConstraints;
 	TArray<FLKAnimVerletConstraint_Plane> PlaneCollisionConstraints;
 	TArray<FLKAnimVerletConstraint_World> WorldCollisionConstraints;
+	TArray<FLKAnimVerletConstraint_Self> SelfCollisionConstraints;
 	TArray<TArray<int32>> BoneChainIndexes;								///Simulating bone`s index list per single chain
 	int32 MaxBoneChainLength = 0;
 	float MaxThickness = 0.0f;

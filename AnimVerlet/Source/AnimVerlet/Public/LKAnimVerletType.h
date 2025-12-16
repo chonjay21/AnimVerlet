@@ -19,7 +19,7 @@ enum class ELKAnimVerletPreset : uint8
 		bUseSquaredDeltaTime = false;
 		bUseIsometricBendingConstraint = false;
 		Damping = 0.8f;
-		SolveIteration = 1;
+		SolveIteration = 2;
 		Gravity = FVector(0.0f, 0.0f, -9.8f);
 	*/
 	AnimationPose,
