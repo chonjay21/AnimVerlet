@@ -43,7 +43,8 @@ The UnrealEngine versions supported by this plugin are:
 | UE5 | 5.3.0 ~ 5.4.3 | v3.0 | Latest |
 | UE5 | 5.5.4 | v3.3 | Latest |
 | UE5 | 5.6.1 | v3.5 | Latest |
-| UE5 | 5.7.1 or later | Latest | Latest |
+| UE5 | 5.7.1 | v4.0 | Latest |
+| UE5 | 5.8.0 or later | Latest | Latest |
 
 <br />
 
