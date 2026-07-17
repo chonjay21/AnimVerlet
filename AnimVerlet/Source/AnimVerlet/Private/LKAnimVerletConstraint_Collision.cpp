@@ -257,6 +257,9 @@ void FLKAnimVerletConstraint_Sphere::CheckSphereSphere(float DeltaTime, bool bIn
 
 bool FLKAnimVerletConstraint_Sphere::CheckSphereCapsule(IN OUT FLKAnimVerletBone& CurVerletBone, IN OUT FLKAnimVerletBone& ParentVerletBone, float DeltaTime, bool bInitialUpdate, bool bFinalize, int32 LambdaIndex)
 {
+	if (ParentVerletBone.IsPinned() && CurVerletBone.IsPinned())
+		return false;
+
 	const float ConstraintDistance = CurVerletBone.Thickness + Radius;
 	const float ConstraintDistanceSQ = FMath::Square(ConstraintDistance);
 
@@ -396,6 +399,9 @@ void FLKAnimVerletConstraint_Sphere::CheckSphereCapsule(float DeltaTime, bool bI
 
 bool FLKAnimVerletConstraint_Sphere::CheckSphereTriangle(IN OUT FLKAnimVerletBone& BoneA, IN OUT FLKAnimVerletBone& BoneB, IN OUT FLKAnimVerletBone& BoneC, float DeltaTime, bool bInitialUpdate, bool bFinalize, int32 LambdaIndex)
 {
+	if (BoneA.IsPinned() && BoneB.IsPinned() && BoneC.IsPinned())
+		return false;
+
 	float WA = 0.0f;
 	float WB = 0.0f;
 	float WC = 0.0f;
@@ -755,6 +761,9 @@ void FLKAnimVerletConstraint_Capsule::CheckCapsuleSphere(float DeltaTime, bool b
 
 bool FLKAnimVerletConstraint_Capsule::CheckCapsuleCapsule(IN OUT FLKAnimVerletBone& CurVerletBone, IN OUT FLKAnimVerletBone& ParentVerletBone, float DeltaTime, bool bInitialUpdate, bool bFinalize, const FVector& CapsuleStart, const FVector& CapsuleEnd, int32 LambdaIndex)
 {
+	if (ParentVerletBone.IsPinned() && CurVerletBone.IsPinned())
+		return false;
+
 	const float ConstraintDistance = CurVerletBone.Thickness + Radius;
 	const float ConstraintDistanceSQ = FMath::Square(ConstraintDistance);
 
@@ -902,6 +911,9 @@ void FLKAnimVerletConstraint_Capsule::CheckCapsuleCapsule(float DeltaTime, bool 
 
 bool FLKAnimVerletConstraint_Capsule::CheckCapsuleTriangle(IN OUT FLKAnimVerletBone& BoneA, IN OUT FLKAnimVerletBone& BoneB, IN OUT FLKAnimVerletBone& BoneC, float DeltaTime, bool bInitialUpdate, bool bFinalize, const FVector& CapsuleStart, const FVector& CapsuleEnd, int32 LambdaIndex)
 {
+	if (BoneA.IsPinned() && BoneB.IsPinned() && BoneC.IsPinned())
+		return false;
+
 	/// 1) Find closest points between capsule axis segment and triangle
 	FVector Pc = FVector::ZeroVector;
 	FVector Qt = FVector::ZeroVector;
@@ -1234,6 +1246,9 @@ bool FLKAnimVerletConstraint_Box::IntersectObbSphere(OUT FVector& OutCollisionNo
 
 bool FLKAnimVerletConstraint_Box::CheckBoxSphere(IN OUT FLKAnimVerletBone& CurVerletBone, float DeltaTime, bool bInitialUpdate, bool bFinalize, const FVector& SphereLocation, const FQuat& InvRotation, int32 LambdaIndex)
 {
+	if (CurVerletBone.IsPinned())
+		return false;
+
 	float PenetrationDepth = 0.0f;
 	FVector CollisionNormal = FVector::ZeroVector;
 	if (IntersectObbSphere(OUT CollisionNormal, OUT PenetrationDepth, CurVerletBone, SphereLocation, InvRotation))
@@ -1320,60 +1335,124 @@ void FLKAnimVerletConstraint_Box::CheckBoxSphere(float DeltaTime, bool bInitialU
 
 bool FLKAnimVerletConstraint_Box::CheckBoxCapsule(IN OUT FLKAnimVerletBone& CurVerletBone, IN OUT FLKAnimVerletBone& ParentVerletBone, float DeltaTime, bool bInitialUpdate, bool bFinalize, const FQuat& InvRotation, int32 LambdaIndex)
 {
+	if (ParentVerletBone.IsPinned() && CurVerletBone.IsPinned())
+		return false;
+
 	const FVector ParentBoneLocationInBoxLocal = InvRotation.RotateVector(ParentVerletBone.Location - Location);
 	const FVector CurBoneLocationInBoxLocal = InvRotation.RotateVector(CurVerletBone.Location - Location);
 
 	float SegT = 0.0f;
 	FVector SegPtL = FVector::ZeroVector;
 	FVector	BoxPtL = FVector::ZeroVector;
-	LKAnimVerletUtil::ClosestPtSegmentAABB(OUT SegT, OUT SegPtL, OUT BoxPtL, ParentBoneLocationInBoxLocal, CurBoneLocationInBoxLocal, HalfExtents);
-
-	const FVector DeltaL = SegPtL - BoxPtL;
-	const float DistSqr = DeltaL.SizeSquared();
-	const float Dist = FMath::Sqrt(DistSqr);
-
-	if (Dist > CurVerletBone.Thickness)
-		return false;
-
-	const float PenetrationDepth = CurVerletBone.Thickness - Dist;
-
 	FVector NormalInLocal = FVector::ZeroVector;
-	if (Dist > KINDA_SMALL_NUMBER)
+	float PenetrationDepth = 0.0f;
+
+	float SegmentTMin = 0.0f;
+	float SegmentTMax = 0.0f;
+	if (LKAnimVerletUtil::SegmentIntersectsAABB(OUT SegmentTMin, OUT SegmentTMax, ParentBoneLocationInBoxLocal, CurBoneLocationInBoxLocal, HalfExtents))
 	{
-		NormalInLocal = DeltaL / Dist; /// box -> capsule
+		/// The segment core is inside the box, so closest-point distance is zero and does not provide an MTD.
+		/// Find the shortest SAT-axis translation that separates the entire capsule projection from the AABB.
+		float BestPenetrationDepth = TNumericLimits<float>::Max();
+		FVector BestNormalInLocal = FVector::ZeroVector;
+		float BestMovablePenetrationDepth = TNumericLimits<float>::Max();
+		FVector BestMovableNormalInLocal = FVector::ZeroVector;
+
+		const FVector SegmentDirectionInLocal = CurBoneLocationInBoxLocal - ParentBoneLocationInBoxLocal;
+		const FVector BoxAxes[3] = { FVector::ForwardVector, FVector::RightVector, FVector::UpVector };
+		const FVector CandidateAxes[6] = { BoxAxes[0], BoxAxes[1], BoxAxes[2],
+			SegmentDirectionInLocal.Cross(BoxAxes[0]),
+			SegmentDirectionInLocal.Cross(BoxAxes[1]),
+			SegmentDirectionInLocal.Cross(BoxAxes[2])
+		};
+
+		for (const FVector& CandidateAxis : CandidateAxes)
+		{
+			if (CandidateAxis.SizeSquared() <= KINDA_SMALL_NUMBER)
+				continue;
+
+			const FVector Axis = CandidateAxis.GetSafeNormal();
+			const float ParentProjection = ParentBoneLocationInBoxLocal.Dot(Axis);
+			const float CurProjection = CurBoneLocationInBoxLocal.Dot(Axis);
+			const float BoxProjection = FMath::Abs(Axis.X) * HalfExtents.X + FMath::Abs(Axis.Y) * HalfExtents.Y + FMath::Abs(Axis.Z) * HalfExtents.Z;
+			const float MinCapsuleProjection = FMath::Min(ParentProjection, CurProjection) - CurVerletBone.Thickness;
+			const float MaxCapsuleProjection = FMath::Max(ParentProjection, CurProjection) + CurVerletBone.Thickness;
+
+			const float PositivePenetrationDepth = BoxProjection - MinCapsuleProjection;
+			const float NegativePenetrationDepth = MaxCapsuleProjection + BoxProjection;
+
+			auto ConsiderMtd = [&](float CandidatePenetrationDepth, const FVector& CandidateNormal, bool bPinnedBonesAlreadySeparated) {
+				if (CandidatePenetrationDepth < BestPenetrationDepth)
+				{
+					BestPenetrationDepth = CandidatePenetrationDepth;
+					BestNormalInLocal = CandidateNormal;
+				}
+
+				if (bPinnedBonesAlreadySeparated && CandidatePenetrationDepth < BestMovablePenetrationDepth)
+				{
+					BestMovablePenetrationDepth = CandidatePenetrationDepth;
+					BestMovableNormalInLocal = CandidateNormal;
+				}
+			};
+
+			const bool bPinnedBonesSeparatedPositive = (ParentVerletBone.IsPinned() == false || ParentProjection - CurVerletBone.Thickness >= BoxProjection) 
+				&& (CurVerletBone.IsPinned() == false || CurProjection - CurVerletBone.Thickness >= BoxProjection);
+			const bool bPinnedBonesSeparatedNegative = (ParentVerletBone.IsPinned() == false || ParentProjection + CurVerletBone.Thickness <= -BoxProjection) 
+				&& (CurVerletBone.IsPinned() == false || CurProjection + CurVerletBone.Thickness <= -BoxProjection);
+
+			ConsiderMtd(PositivePenetrationDepth, Axis, bPinnedBonesSeparatedPositive);
+			ConsiderMtd(NegativePenetrationDepth, -Axis, bPinnedBonesSeparatedNegative);
+		}
+
+		if (BestMovablePenetrationDepth < TNumericLimits<float>::Max())
+		{
+			PenetrationDepth = BestMovablePenetrationDepth;
+			NormalInLocal = BestMovableNormalInLocal;
+		}
+		else
+		{
+			/// A pinned endpoint may make complete separation impossible; retain the geometric MTD for the movable endpoint.
+			PenetrationDepth = BestPenetrationDepth;
+			NormalInLocal = BestNormalInLocal;
+		}
+
+		/// A rigid translation is represented by equal endpoint corrections. Mass-proportional barycentric
+		/// weights produce equal PBD position deltas even when the endpoint masses differ.
+		if (ParentVerletBone.IsPinned() == false && CurVerletBone.IsPinned() == false)
+		{
+			const float ParentMass = ParentVerletBone.InvMass > KINDA_SMALL_NUMBER ? 1.0f / ParentVerletBone.InvMass : 0.0f;
+			const float CurMass = CurVerletBone.InvMass > KINDA_SMALL_NUMBER ? 1.0f / CurVerletBone.InvMass : 0.0f;
+			const float TotalMass = ParentMass + CurMass;
+			SegT = TotalMass > KINDA_SMALL_NUMBER ? CurMass / TotalMass : 0.5f;
+		}
+		else
+		{
+			SegT = FMath::Clamp((SegmentTMin + SegmentTMax) * 0.5f, 0.0f, 1.0f);
+		}
 	}
 	else
 	{
-		float DX = HalfExtents.X - FMath::Abs(SegPtL.X);
-		float DY = HalfExtents.Y - FMath::Abs(SegPtL.Y);
-		float DZ = HalfExtents.Z - FMath::Abs(SegPtL.Z);
+		LKAnimVerletUtil::ClosestPtSegmentAABB(OUT SegT, OUT SegPtL, OUT BoxPtL, ParentBoneLocationInBoxLocal, CurBoneLocationInBoxLocal, HalfExtents);
 
-		if (DX <= DY && DX <= DZ)
-			NormalInLocal = FVector((SegPtL.X >= 0.f) ? 1.f : -1.f, 0, 0);
-		else if (DY <= DX && DY <= DZ)
-			NormalInLocal = FVector(0, (SegPtL.Y >= 0.f) ? 1.f : -1.f, 0);
-		else
-			NormalInLocal = FVector(0, 0, (SegPtL.Z >= 0.f) ? 1.f : -1.f);
+		const FVector DeltaL = SegPtL - BoxPtL;
+		const float Dist = DeltaL.Size();
+		if (Dist > CurVerletBone.Thickness)
+			return false;
+		if (Dist <= KINDA_SMALL_NUMBER)
+			return false;
+
+		PenetrationDepth = CurVerletBone.Thickness - Dist;
+		NormalInLocal = DeltaL / Dist; /// box -> capsule
 	}
 
-	const FVector ContactPointOnBoxL = BoxPtL;
-	const FVector ContactPointOnCapsuleL = SegPtL - NormalInLocal * CurVerletBone.Thickness;
 	const FVector CollisionNormal = Rotation.RotateVector(NormalInLocal);
-
-	const FVector ClosestOnBox = Rotation.RotateVector(ContactPointOnBoxL) + Location;
-	const FVector ClosestOnBone = Rotation.RotateVector(ContactPointOnCapsuleL) + Location;
-
-	FVector DirFromParent = FVector::ZeroVector;
-	float DistFromParent = 0.0f;
-	(CurVerletBone.Location - ParentVerletBone.Location).ToDirectionAndLength(OUT DirFromParent, OUT DistFromParent);
 
 	if (bUseXPBDSolver && bFinalize == false)
 	{
 		if (FMath::IsNearlyZero(DeltaTime, KINDA_SMALL_NUMBER))
 			return false;
 
-		float T = FMath::IsNearlyZero(DistFromParent, KINDA_SMALL_NUMBER) ? 0.0f : (ClosestOnBone - ParentVerletBone.Location).Dot(DirFromParent) / DistFromParent;
-		T = FMath::Clamp(T, 0.0f, 1.0f);
+		float T = FMath::Clamp(SegT, 0.0f, 1.0f);
 
 		if (ParentVerletBone.IsPinned())
 			T = 1.0f;
@@ -1405,8 +1484,7 @@ bool FLKAnimVerletConstraint_Box::CheckBoxCapsule(IN OUT FLKAnimVerletBone& CurV
 	}
 	else
 	{
-		float T = FMath::IsNearlyZero(DistFromParent, KINDA_SMALL_NUMBER) ? 0.0f : (ClosestOnBone - ParentVerletBone.Location).Dot(DirFromParent) / DistFromParent;
-		T = FMath::Clamp(T, 0.0f, 1.0f);
+		float T = FMath::Clamp(SegT, 0.0f, 1.0f);
 
 		if (ParentVerletBone.IsPinned())
 			T = 1.0f;
@@ -1435,6 +1513,9 @@ bool FLKAnimVerletConstraint_Box::CheckBoxCapsule(IN OUT FLKAnimVerletBone& CurV
 
 bool FLKAnimVerletConstraint_Box::CheckBoxBox(IN OUT FLKAnimVerletBone& CurVerletBone, IN OUT FLKAnimVerletBone& ParentVerletBone, float DeltaTime, bool bInitialUpdate, bool bFinalize, const FQuat& InvRotation, int32 LambdaIndex)
 {
+	if (ParentVerletBone.IsPinned() && CurVerletBone.IsPinned())
+		return false;
+
 	/// Consider BoneLine to OBB
 	FVector DirFromParent = FVector::ZeroVector;
 	float DistFromParent = 0.0f;
@@ -1600,11 +1681,10 @@ void FLKAnimVerletConstraint_Box::CheckBoxCapsule(const T& CurPair, float DeltaT
 	verify(Bones->IsValidIndex(CurPair.BoneA.AnimVerletBoneIndex));
 	FLKAnimVerletBone& ParentVerletBone = (*Bones)[CurPair.BoneA.AnimVerletBoneIndex];
 
-	///CheckBoxCapsule(IN OUT CurVerletBone, IN OUT ParentVerletBone, DeltaTime, bInitialUpdate, bFinalize, InvRotation, LambdaIndex);
+	CheckBoxCapsule(IN OUT CurVerletBone, IN OUT ParentVerletBone, DeltaTime, bInitialUpdate, bFinalize, InvRotation, LambdaIndex);
 
-	/// OBB - OBB version
-	/// Consider BoneLine to OBB
-	CheckBoxBox(IN OUT CurVerletBone, IN OUT ParentVerletBone, DeltaTime, bInitialUpdate, bFinalize, InvRotation, LambdaIndex);
+	/// OBB - OBB fallback version (Consider BoneLine to OBB)
+	///CheckBoxBox(IN OUT CurVerletBone, IN OUT ParentVerletBone, DeltaTime, bInitialUpdate, bFinalize, InvRotation, LambdaIndex);
 }
 
 void FLKAnimVerletConstraint_Box::CheckBoxCapsule(float DeltaTime, bool bInitialUpdate, bool bFinalize)
@@ -1646,6 +1726,9 @@ void FLKAnimVerletConstraint_Box::CheckBoxCapsule(float DeltaTime, bool bInitial
 
 bool FLKAnimVerletConstraint_Box::CheckBoxTriangle(IN OUT FLKAnimVerletBone& BoneA, IN OUT FLKAnimVerletBone& BoneB, IN OUT FLKAnimVerletBone& BoneC, float DeltaTime, bool bInitialUpdate, bool bFinalize, const FQuat& InvRotation, int32 LambdaIndex)
 {
+	if (BoneA.IsPinned() && BoneB.IsPinned() && BoneC.IsPinned())
+		return false;
+
 	/// SAT
 	/// Transform triangle vertices into box-local (AABB space)
 	const FVector AInLocal = InvRotation.RotateVector(BoneA.Location - Location);
