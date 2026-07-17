@@ -285,6 +285,9 @@ public:
 	/** The virtual thickness of the bone to be used in calculating various collisions and constraints.(radius) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Collision", meta = (ClampMin = "0.0", ForceUnits = "cm"))
 	float Thickness = 0.3f;
+	/** Coulomb friction coefficient used by the PBD collision projection. This PBD-style friction is also used with the XPBD solver. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Collision", meta = (ClampMin = "0.0"))
+	float FrictionCoefficient = 0.0f;
 	/** 
 		* Single chain: The capsule shape between the 2 bones is used to calculate various collision constraints
 		* Multiple chain: The triangle shape between the 3 bones is used to calculate various collision constraints

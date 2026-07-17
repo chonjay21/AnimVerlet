@@ -19,4 +19,5 @@ public:
 
 	bool bUseXPBDSolver = false;
 	double Compliance = 0.0;
+	float FrictionCoefficient = 0.0f;
 };

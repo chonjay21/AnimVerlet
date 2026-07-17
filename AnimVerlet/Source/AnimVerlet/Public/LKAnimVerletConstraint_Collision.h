@@ -28,6 +28,7 @@ public:
 
 	bool bUseXPBDSolver = false;
 	double Compliance = 0.0;								///for XPBD
+	float FrictionCoefficient = 0.0f;						///PBD friction (also used on the XPBD path)
 	TArray<double, TInlineAllocator<64>> Lambdas;			///for XPBD
 
 public:
@@ -79,6 +80,7 @@ public:
 
 	bool bUseXPBDSolver = false;
 	double Compliance = 0.0;								///for XPBD
+	float FrictionCoefficient = 0.0f;						///PBD friction (also used on the XPBD path)
 	TArray<double, TInlineAllocator<64>> Lambdas;			///for XPBD
 
 public:
@@ -130,6 +132,7 @@ public:
 
 	bool bUseXPBDSolver = false;
 	double Compliance = 0.0;								///for XPBD
+	float FrictionCoefficient = 0.0f;						///PBD friction (also used on the XPBD path)
 	TArray<double, TInlineAllocator<64>> Lambdas;			///for XPBD
 
 public:

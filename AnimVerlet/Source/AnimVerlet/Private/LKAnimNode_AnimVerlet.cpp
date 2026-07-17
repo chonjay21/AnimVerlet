@@ -1115,6 +1115,7 @@ void FLKAnimNode_AnimVerlet::PrepareLocalCollisionConstraints(FComponentSpacePos
 		CollisionConstraintInput.BroadphaseContainer = &BroadphaseContainer;
 		CollisionConstraintInput.bUseXPBDSolver = bUseXPBDSolver;
 		CollisionConstraintInput.Compliance = Compliance;
+		CollisionConstraintInput.FrictionCoefficient = FrictionCoefficient;
 	}
 
 	///----------------------------------------------------------------------------------------------------------------------------
@@ -2260,6 +2261,7 @@ void FLKAnimNode_AnimVerlet::SyncFromOtherAnimVerletNode(const FLKAnimNode_AnimV
 	ConeAngle = Other.ConeAngle;
 	bUseBroadphase = Other.bUseBroadphase;
 	Thickness = Other.Thickness;
+	FrictionCoefficient = Other.FrictionCoefficient;
 	bUseCapsuleCollisionForChain = Other.bUseCapsuleCollisionForChain;
 
 	bUseSelfCollision = Other.bUseSelfCollision;
