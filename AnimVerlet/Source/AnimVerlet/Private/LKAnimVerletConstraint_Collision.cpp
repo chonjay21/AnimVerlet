@@ -8,7 +8,7 @@ namespace LkAnimVerletCollision
 {
 	const FLKAnimVerletBone* FindPinnedAncestor(const TArray<FLKAnimVerletBone>& Bones, const FLKAnimVerletBone& Bone)
 	{
-		const FLKAnimVerletBone* Ancestor = &Bone;
+		/*const FLKAnimVerletBone* Ancestor = &Bone;
 		for (int32 SearchCount = 0; SearchCount < Bones.Num(); ++SearchCount)
 		{
 			if (Ancestor->IsPinned())
@@ -17,7 +17,7 @@ namespace LkAnimVerletCollision
 				break;
 
 			Ancestor = &Bones[Ancestor->ParentVerletBoneIndex];
-		}
+		}*/
 		return nullptr;
 	}
 
@@ -1481,10 +1481,8 @@ bool FLKAnimVerletConstraint_Box::CheckBoxCapsule(IN OUT FLKAnimVerletBone& CurV
 			const bool bPinnedBonesSeparatedNegative = (ParentVerletBone.IsPinned() == false || ParentProjection + CurVerletBone.Thickness <= -BoxProjection)
 				&& (CurVerletBone.IsPinned() == false || CurProjection + CurVerletBone.Thickness <= -BoxProjection);
 			const float PinnedAncestorProjection = PinnedAncestorLocationInLocal.Dot(Axis);
-			const bool bPinnedAncestorSeparatedPositive = PinnedAncestor == nullptr
-				|| PinnedAncestorProjection - PinnedAncestor->Thickness >= BoxProjection;
-			const bool bPinnedAncestorSeparatedNegative = PinnedAncestor == nullptr
-				|| PinnedAncestorProjection + PinnedAncestor->Thickness <= -BoxProjection;
+			const bool bPinnedAncestorSeparatedPositive = (PinnedAncestor == nullptr || PinnedAncestorProjection - PinnedAncestor->Thickness >= BoxProjection);
+			const bool bPinnedAncestorSeparatedNegative = (PinnedAncestor == nullptr || PinnedAncestorProjection + PinnedAncestor->Thickness <= -BoxProjection);
 
 			ConsiderMtd(PositivePenetrationDepth, Axis, bPinnedBonesSeparatedPositive && bPinnedAncestorSeparatedPositive);
 			ConsiderMtd(NegativePenetrationDepth, -Axis, bPinnedBonesSeparatedNegative && bPinnedAncestorSeparatedNegative);
