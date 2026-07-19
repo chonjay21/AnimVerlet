@@ -6,6 +6,68 @@
 
 namespace LkAnimVerletCollision
 {
+	const FLKAnimVerletBone* FindPinnedAncestor(const TArray<FLKAnimVerletBone>& Bones, const FLKAnimVerletBone& Bone)
+	{
+		const FLKAnimVerletBone* Ancestor = &Bone;
+		for (int32 SearchCount = 0; SearchCount < Bones.Num(); ++SearchCount)
+		{
+			if (Ancestor->IsPinned())
+				return Ancestor;
+			if (Bones.IsValidIndex(Ancestor->ParentVerletBoneIndex) == false)
+				break;
+
+			Ancestor = &Bones[Ancestor->ParentVerletBoneIndex];
+		}
+		return nullptr;
+	}
+
+	bool FindPinnedAncestorSideSphereMtd(OUT FVector& OutNormalInLocal, OUT float& OutPenetrationDepth, const FVector& SphereLocationInLocal, float SphereThickness, 
+										 const FVector& PinnedAncestorLocationInLocal, float PinnedAncestorThickness, const FVector& BoxHalfExtents)
+	{
+		if (FMath::Abs(SphereLocationInLocal.X) > BoxHalfExtents.X 
+			|| FMath::Abs(SphereLocationInLocal.Y) > BoxHalfExtents.Y 
+			|| FMath::Abs(SphereLocationInLocal.Z) > BoxHalfExtents.Z)
+			return false;
+
+		float BestPenetrationDepth = TNumericLimits<float>::Max();
+		FVector BestNormalInLocal = FVector::ZeroVector;
+		const FVector BoxAxes[3] = { FVector::ForwardVector, FVector::RightVector, FVector::UpVector };
+		const float SphereProjections[3] = { SphereLocationInLocal.X, SphereLocationInLocal.Y, SphereLocationInLocal.Z };
+		const float PinnedAncestorProjections[3] = { PinnedAncestorLocationInLocal.X, PinnedAncestorLocationInLocal.Y, PinnedAncestorLocationInLocal.Z };
+		const float BoxProjections[3] = { BoxHalfExtents.X, BoxHalfExtents.Y, BoxHalfExtents.Z };
+
+		for (int32 AxisIndex = 0; AxisIndex < 3; ++AxisIndex)
+		{
+			const float BoxProjection = BoxProjections[AxisIndex];
+			const float PinnedAncestorProjection = PinnedAncestorProjections[AxisIndex];
+			if (PinnedAncestorProjection - PinnedAncestorThickness >= BoxProjection)
+			{
+				const float PenetrationDepth = BoxProjection - SphereProjections[AxisIndex] + SphereThickness;
+				if (PenetrationDepth < BestPenetrationDepth)
+				{
+					BestPenetrationDepth = PenetrationDepth;
+					BestNormalInLocal = BoxAxes[AxisIndex];
+				}
+			}
+			if (PinnedAncestorProjection + PinnedAncestorThickness <= -BoxProjection)
+			{
+				const float PenetrationDepth = SphereProjections[AxisIndex] + BoxProjection + SphereThickness;
+				if (PenetrationDepth < BestPenetrationDepth)
+				{
+					BestPenetrationDepth = PenetrationDepth;
+					BestNormalInLocal = -BoxAxes[AxisIndex];
+				}
+			}
+		}
+
+		if (BestPenetrationDepth == TNumericLimits<float>::Max())
+			return false;
+
+		OutNormalInLocal = BestNormalInLocal;
+		OutPenetrationDepth = BestPenetrationDepth;
+		return true;
+	}
+
 	FVector MakePBDCollisionFrictionDelta(const FVector& ContactDisplacement, const FVector& CollisionNormal, float NormalCorrectionMagnitude, float FrictionCoefficient)
 	{
 		if (FrictionCoefficient <= 0.0f || NormalCorrectionMagnitude <= KINDA_SMALL_NUMBER)
@@ -1253,6 +1315,23 @@ bool FLKAnimVerletConstraint_Box::CheckBoxSphere(IN OUT FLKAnimVerletBone& CurVe
 	FVector CollisionNormal = FVector::ZeroVector;
 	if (IntersectObbSphere(OUT CollisionNormal, OUT PenetrationDepth, CurVerletBone, SphereLocation, InvRotation))
 	{
+		/// When the sphere center is inside the box, the closest face can be on the opposite side of the pinned chain root. 
+		/// Prefer a face on the pinned ancestor's already-separated side.
+		const FLKAnimVerletBone* PinnedAncestor = bSingleChain ? LkAnimVerletCollision::FindPinnedAncestor(*Bones, CurVerletBone) : nullptr;
+		if (PinnedAncestor != nullptr)
+		{
+			const FVector SphereLocationInLocal = InvRotation.RotateVector(SphereLocation - Location);
+			const FVector PinnedAncestorLocationInLocal = InvRotation.RotateVector(PinnedAncestor->Location - Location);
+			FVector PreferredNormalInLocal = FVector::ZeroVector;
+			float PreferredPenetrationDepth = 0.0f;
+			if (LkAnimVerletCollision::FindPinnedAncestorSideSphereMtd(OUT PreferredNormalInLocal, OUT PreferredPenetrationDepth, SphereLocationInLocal, 
+																	   CurVerletBone.Thickness, PinnedAncestorLocationInLocal, PinnedAncestor->Thickness, HalfExtents))
+			{
+				CollisionNormal = Rotation.RotateVector(PreferredNormalInLocal);
+				PenetrationDepth = PreferredPenetrationDepth;
+			}
+		}
+
 		if (bUseXPBDSolver && bFinalize == false)
 		{
 			if (FMath::IsNearlyZero(DeltaTime, KINDA_SMALL_NUMBER))
@@ -1355,9 +1434,11 @@ bool FLKAnimVerletConstraint_Box::CheckBoxCapsule(IN OUT FLKAnimVerletBone& CurV
 		/// Find the shortest SAT-axis translation that separates the entire capsule projection from the AABB.
 		float BestPenetrationDepth = TNumericLimits<float>::Max();
 		FVector BestNormalInLocal = FVector::ZeroVector;
-		float BestMovablePenetrationDepth = TNumericLimits<float>::Max();
-		FVector BestMovableNormalInLocal = FVector::ZeroVector;
+		float BestCompatiblePenetrationDepth = TNumericLimits<float>::Max();
+		FVector BestCompatibleNormalInLocal = FVector::ZeroVector;
 
+		const FLKAnimVerletBone* PinnedAncestor = (bSingleChain ? LkAnimVerletCollision::FindPinnedAncestor(*Bones, ParentVerletBone) : nullptr);
+		const FVector PinnedAncestorLocationInLocal = (PinnedAncestor != nullptr ? InvRotation.RotateVector(PinnedAncestor->Location - Location) : FVector::ZeroVector);
 		const FVector SegmentDirectionInLocal = CurBoneLocationInBoxLocal - ParentBoneLocationInBoxLocal;
 		const FVector BoxAxes[3] = { FVector::ForwardVector, FVector::RightVector, FVector::UpVector };
 		const FVector CandidateAxes[6] = { BoxAxes[0], BoxAxes[1], BoxAxes[2],
@@ -1381,37 +1462,42 @@ bool FLKAnimVerletConstraint_Box::CheckBoxCapsule(IN OUT FLKAnimVerletBone& CurV
 			const float PositivePenetrationDepth = BoxProjection - MinCapsuleProjection;
 			const float NegativePenetrationDepth = MaxCapsuleProjection + BoxProjection;
 
-			auto ConsiderMtd = [&](float CandidatePenetrationDepth, const FVector& CandidateNormal, bool bPinnedBonesAlreadySeparated) {
+			auto ConsiderMtd = [&](float CandidatePenetrationDepth, const FVector& CandidateNormal, bool bPinnedChainAlreadySeparated) {
 				if (CandidatePenetrationDepth < BestPenetrationDepth)
 				{
 					BestPenetrationDepth = CandidatePenetrationDepth;
 					BestNormalInLocal = CandidateNormal;
 				}
 
-				if (bPinnedBonesAlreadySeparated && CandidatePenetrationDepth < BestMovablePenetrationDepth)
+				if (bPinnedChainAlreadySeparated && CandidatePenetrationDepth < BestCompatiblePenetrationDepth)
 				{
-					BestMovablePenetrationDepth = CandidatePenetrationDepth;
-					BestMovableNormalInLocal = CandidateNormal;
+					BestCompatiblePenetrationDepth = CandidatePenetrationDepth;
+					BestCompatibleNormalInLocal = CandidateNormal;
 				}
 			};
 
-			const bool bPinnedBonesSeparatedPositive = (ParentVerletBone.IsPinned() == false || ParentProjection - CurVerletBone.Thickness >= BoxProjection) 
+			const bool bPinnedBonesSeparatedPositive = (ParentVerletBone.IsPinned() == false || ParentProjection - CurVerletBone.Thickness >= BoxProjection)
 				&& (CurVerletBone.IsPinned() == false || CurProjection - CurVerletBone.Thickness >= BoxProjection);
-			const bool bPinnedBonesSeparatedNegative = (ParentVerletBone.IsPinned() == false || ParentProjection + CurVerletBone.Thickness <= -BoxProjection) 
+			const bool bPinnedBonesSeparatedNegative = (ParentVerletBone.IsPinned() == false || ParentProjection + CurVerletBone.Thickness <= -BoxProjection)
 				&& (CurVerletBone.IsPinned() == false || CurProjection + CurVerletBone.Thickness <= -BoxProjection);
+			const float PinnedAncestorProjection = PinnedAncestorLocationInLocal.Dot(Axis);
+			const bool bPinnedAncestorSeparatedPositive = PinnedAncestor == nullptr
+				|| PinnedAncestorProjection - PinnedAncestor->Thickness >= BoxProjection;
+			const bool bPinnedAncestorSeparatedNegative = PinnedAncestor == nullptr
+				|| PinnedAncestorProjection + PinnedAncestor->Thickness <= -BoxProjection;
 
-			ConsiderMtd(PositivePenetrationDepth, Axis, bPinnedBonesSeparatedPositive);
-			ConsiderMtd(NegativePenetrationDepth, -Axis, bPinnedBonesSeparatedNegative);
+			ConsiderMtd(PositivePenetrationDepth, Axis, bPinnedBonesSeparatedPositive && bPinnedAncestorSeparatedPositive);
+			ConsiderMtd(NegativePenetrationDepth, -Axis, bPinnedBonesSeparatedNegative && bPinnedAncestorSeparatedNegative);
 		}
 
-		if (BestMovablePenetrationDepth < TNumericLimits<float>::Max())
+		if (BestCompatiblePenetrationDepth < TNumericLimits<float>::Max())
 		{
-			PenetrationDepth = BestMovablePenetrationDepth;
-			NormalInLocal = BestMovableNormalInLocal;
+			PenetrationDepth = BestCompatiblePenetrationDepth;
+			NormalInLocal = BestCompatibleNormalInLocal;
 		}
 		else
 		{
-			/// A pinned endpoint may make complete separation impossible; retain the geometric MTD for the movable endpoint.
+			/// If the pinned chain has no already-separated side, fall back to the shortest geometric MTD.
 			PenetrationDepth = BestPenetrationDepth;
 			NormalInLocal = BestNormalInLocal;
 		}
