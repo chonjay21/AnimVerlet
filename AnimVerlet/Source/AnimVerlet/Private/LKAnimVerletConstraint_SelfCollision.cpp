@@ -2,6 +2,7 @@
 
 #include "LKAnimVerletBone.h"
 #include "LKAnimVerletBroadphaseContainer.h"
+#include "LKAnimVerletCollisionRigidUtil.h"
 #include "LKAnimVerletConstraintUtil.h"
 
 
@@ -434,6 +435,9 @@ void FLKAnimVerletConstraint_Self::CheckSphereCapsule(float DeltaTime, bool bIni
 
 bool FLKAnimVerletConstraint_Self::CheckCapsuleCapsule(IN OUT FLKAnimVerletBone& BoneP1, IN OUT FLKAnimVerletBone& BoneP2, IN OUT FLKAnimVerletBone& BoneA1, IN OUT FLKAnimVerletBone& BoneA2, float DeltaTime, bool bInitialUpdate, bool bFinalize, int32 LambdaIndex)
 {
+	if (&BoneP1 == &BoneA1 || &BoneP1 == &BoneA2 || &BoneP2 == &BoneA1 || &BoneP2 == &BoneA2)
+		return false;
+
 	float S = 0.0f;
 	float T = 0.0f;
 	FVector ClosestOnP = FVector::ZeroVector;
@@ -463,68 +467,61 @@ bool FLKAnimVerletConstraint_Self::CheckCapsuleCapsule(IN OUT FLKAnimVerletBone&
 	}
 
 	const float C = Target - Dist;
+	const float ContactS = FMath::Clamp(S, 0.0f, 1.0f);
+	const float ContactT = FMath::Clamp(T, 0.0f, 1.0f);
+	float ParticleS = ContactS;
+	float ParticleT = ContactT;
+	if (BoneP1.IsPinned())
+		ParticleS = 1.0f;
+	if (BoneP2.IsPinned())
+		ParticleS = 0.0f;
+	if (BoneA1.IsPinned())
+		ParticleT = 1.0f;
+	if (BoneA2.IsPinned())
+		ParticleT = 0.0f;
+
+	const float WP1 = 1.0f - ParticleS;
+	const float WP2 = ParticleS;
+	const float WA1 = 1.0f - ParticleT;
+	const float WA2 = ParticleT;
+	const float ParticleInverseMassP = (BoneP1.IsPinned() ? 0.0f : BoneP1.InvMass * WP1 * WP1) + (BoneP2.IsPinned() ? 0.0f : BoneP2.InvMass * WP2 * WP2);
+	const float ParticleInverseMassA = (BoneA1.IsPinned() ? 0.0f : BoneA1.InvMass * WA1 * WA1) + (BoneA2.IsPinned() ? 0.0f : BoneA2.InvMass * WA2 * WA2);
+
+	LkAnimVerletCollision::FLkRigidCapsuleContact RigidContactP;
+	LkAnimVerletCollision::FLkRigidCapsuleContact RigidContactA;
+	const bool bApplyRigidResponseP = LkAnimVerletCollision::MakeRigidCapsuleContact(OUT RigidContactP, BoneP1, BoneP2, ContactS, N);
+	const bool bApplyRigidResponseA = LkAnimVerletCollision::MakeRigidCapsuleContact(OUT RigidContactA, BoneA1, BoneA2, ContactT, -N);
+	const float GeneralizedInverseMassP = bApplyRigidResponseP ? RigidContactP.GeneralizedInverseMass : ParticleInverseMassP;
+	const float GeneralizedInverseMassA = bApplyRigidResponseA ? RigidContactA.GeneralizedInverseMass : ParticleInverseMassA;
+	const float GeneralizedInverseMass = GeneralizedInverseMassP + GeneralizedInverseMassA;
+	if (GeneralizedInverseMass <= KINDA_SMALL_NUMBER)
+		return false;
 
 	if (bUseXPBDSolver && bFinalize == false)
 	{
 		if (FMath::IsNearlyZero(DeltaTime, KINDA_SMALL_NUMBER))
 			return false;
 
-		const float wP1 = (1.0f - S);
-		const float wP2 = S;
-		const float wA1 = (1.0f - T);
-		const float wA2 = T;
-
-		const FVector GradP1 = -wP1 * N;
-		const FVector GradP2 = -wP2 * N;
-		const FVector GradA1 = +wA1 * N;
-		const FVector GradA2 = +wA2 * N;
-
 		double& CurLambda = Lambdas[LambdaIndex];
+		const float ConstraintC = -C;
 		const double Alpha = Compliance / (DeltaTime * DeltaTime);
-		const double Denom = (BoneP1.InvMass * GradP1.SizeSquared() + BoneP2.InvMass * GradP2.SizeSquared()) + (BoneA1.InvMass * GradA1.SizeSquared() + BoneA2.InvMass * GradA2.SizeSquared()) + Alpha;
+		const double Denom = GeneralizedInverseMass + Alpha;
 		if (FMath::IsNearlyZero(Denom, KINDA_SMALL_NUMBER))
 			return false;
 
-		const double DeltaLambda = -(C + Alpha * CurLambda) / Denom;
-		CurLambda += DeltaLambda;
+		const double OldLambda = CurLambda;
+		const double RawDeltaLambda = -(ConstraintC + Alpha * OldLambda) / Denom;
+		CurLambda = FMath::Max(OldLambda + RawDeltaLambda, 0.0);
 
-		if (BoneP1.IsPinned() == false)
-			BoneP1.Location = BoneP1.Location + (DeltaLambda * GradP1 * BoneP1.InvMass);
-		if (BoneP2.IsPinned() == false)
-			BoneP2.Location = BoneP2.Location + (DeltaLambda * GradP2 * BoneP2.InvMass);
-
-		if (BoneA1.IsPinned() == false)
-			BoneA1.Location = BoneA1.Location + (DeltaLambda * GradA1 * BoneA1.InvMass);
-		if (BoneA2.IsPinned() == false)
-			BoneA2.Location = BoneA2.Location + (DeltaLambda * GradA2 * BoneA2.InvMass);
+		const float DeltaLambda = static_cast<float>(CurLambda - OldLambda);
+		LkAnimVerletCollision::ApplyNormalCorrectionTwoBone(IN OUT BoneP1, IN OUT BoneP2, RigidContactP, N, bApplyRigidResponseP, DeltaLambda, WP1, WP2);
+		LkAnimVerletCollision::ApplyNormalCorrectionTwoBone(IN OUT BoneA1, IN OUT BoneA2, RigidContactA, -N, bApplyRigidResponseA, DeltaLambda, WA1, WA2);
 	}
 	else
 	{
-		const float wP1 = (1.0f - S);
-		const float wP2 = S;
-		const float wA1 = (1.0f - T);
-		const float wA2 = T;
-
-		const FVector GradP1 = -wP1 * N;
-		const FVector GradP2 = -wP2 * N;
-		const FVector GradA1 = +wA1 * N;
-		const FVector GradA2 = +wA2 * N;
-
-		const float Denom = (BoneP1.InvMass * GradP1.SizeSquared() + BoneP2.InvMass * GradP2.SizeSquared()) + (BoneA1.InvMass * GradA1.SizeSquared() + BoneA2.InvMass * GradA2.SizeSquared());
-		if (FMath::IsNearlyZero(Denom, KINDA_SMALL_NUMBER))
-			return false;
-
-		const float DeltaLambda = -C / Denom;
-
-		if (BoneP1.IsPinned() == false)
-			BoneP1.Location = BoneP1.Location + (DeltaLambda * GradP1 * BoneP1.InvMass);
-		if (BoneP2.IsPinned() == false)
-			BoneP2.Location = BoneP2.Location + (DeltaLambda * GradP2 * BoneP2.InvMass);
-
-		if (BoneA1.IsPinned() == false)
-			BoneA1.Location = BoneA1.Location + (DeltaLambda * GradA1 * BoneA1.InvMass);
-		if (BoneA2.IsPinned() == false)
-			BoneA2.Location = BoneA2.Location + (DeltaLambda * GradA2 * BoneA2.InvMass);
+		const float DeltaLambda = (C / GeneralizedInverseMass);
+		LkAnimVerletCollision::ApplyNormalCorrectionTwoBone(IN OUT BoneP1, IN OUT BoneP2, RigidContactP, N, bApplyRigidResponseP, DeltaLambda, WP1, WP2);
+		LkAnimVerletCollision::ApplyNormalCorrectionTwoBone(IN OUT BoneA1, IN OUT BoneA2, RigidContactA, -N, bApplyRigidResponseA, DeltaLambda, WA1, WA2);
 	}
 	return true;
 }

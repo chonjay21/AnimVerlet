@@ -722,6 +722,7 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 					CollisionConstraintInput.BroadphaseContainer = &BroadphaseContainer;
 					CollisionConstraintInput.bUseXPBDSolver = bUseXPBDSolver;
 					CollisionConstraintInput.Compliance = Compliance;
+					CollisionConstraintInput.FrictionCoefficient = FrictionCoefficient;
 
 					CollisionConstraintInput.ExcludeBones.Init(false, SimulateBones.Num());
 					for (int32 i = 0; i < WorldCollisionExcludeBones.Num(); ++i)

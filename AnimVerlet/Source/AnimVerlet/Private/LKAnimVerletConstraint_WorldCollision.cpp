@@ -2,6 +2,7 @@
 
 #include "LKAnimVerletBone.h"
 #include "LKAnimVerletBroadphaseContainer.h"
+#include "LKAnimVerletCollisionRigidUtil.h"
 #include "LKAnimVerletConstraintUtil.h"
 
 
@@ -14,6 +15,9 @@ FLKAnimVerletConstraint_World::FLKAnimVerletConstraint_World(const UWorld* InWor
 	, WorldCollisionProfileName(InCollisionProfileName)
 	, Bones(InCollisionInput.Bones)
 	, ExcludeBones(InCollisionInput.ExcludeBones)
+	, bUseCapsuleCollisionForChain(InCollisionInput.bUseCapsuleCollisionForChain)
+	, BonePairs(InCollisionInput.SimulateBonePairIndicators)
+	, FrictionCoefficient(InCollisionInput.FrictionCoefficient)
 {
 	verify(WorldPtr.IsValid());
 	verify(SelfComponentPtr.IsValid());
@@ -49,6 +53,8 @@ bool FLKAnimVerletConstraint_World::CheckWorldSphere(IN OUT FLKAnimVerletBone& C
 	const bool bHit = World->SweepSingleByProfile(OUT HitResult, PrevWorldLoc, CurWorldLoc, FQuat::Identity, WorldCollisionProfileName, FCollisionShape::MakeSphere(CurVerletBone.Thickness), CollisionQueryParams);
 	if (bHit)
 	{
+		const FVector LocationBeforeCorrection = CurVerletBone.Location;
+		const FVector CollisionNormal = ComponentTransform.InverseTransformVectorNoScale(HitResult.Normal).GetSafeNormal();
 		if (HitResult.bStartPenetrating && HitResult.PenetrationDepth > 0.0f)
 		{
 			const FVector ResolvedLocationInWorld = HitResult.Location + (HitResult.Normal * HitResult.PenetrationDepth);
@@ -59,6 +65,9 @@ bool FLKAnimVerletConstraint_World::CheckWorldSphere(IN OUT FLKAnimVerletBone& C
 			const FVector ResolvedLocationInWorld = HitResult.Location;
 			CurVerletBone.Location = ComponentTransform.InverseTransformPosition(ResolvedLocationInWorld);
 		}
+
+		const float NormalCorrectionMagnitude = FMath::Abs((CurVerletBone.Location - LocationBeforeCorrection).Dot(CollisionNormal));
+		LkAnimVerletCollision::ApplyPBDCollisionFriction(IN OUT CurVerletBone, CollisionNormal, NormalCorrectionMagnitude, FrictionCoefficient);
 		return true;
 	}
 	return false;
@@ -88,6 +97,9 @@ void FLKAnimVerletConstraint_World::CheckWorldSphere(float DeltaTime, bool bInit
 bool FLKAnimVerletConstraint_World::CheckWorldCapsule(IN OUT FLKAnimVerletBone& CurVerletBone, IN OUT FLKAnimVerletBone& ParentVerletBone, float DeltaTime, bool bInitialUpdate, bool bFinalize, 
 													  const UWorld* World, const FCollisionQueryParams& CollisionQueryParams, const FTransform& ComponentTransform, int32 LambdaIndex)
 {
+	if (ParentVerletBone.IsPinned() && CurVerletBone.IsPinned())
+		return false;
+
 	FVector DirFromParent = FVector::ZeroVector;
 	float DistFromParent = 0.0f;
 	(CurVerletBone.Location - ParentVerletBone.Location).ToDirectionAndLength(OUT DirFromParent, OUT DistFromParent);
@@ -100,44 +112,55 @@ bool FLKAnimVerletConstraint_World::CheckWorldCapsule(IN OUT FLKAnimVerletBone& 
 	const FVector CurWorldLoc = ComponentTransform.TransformPosition(VerletBoneCenter);
 
 	FHitResult HitResult;
-	const bool bHit = World->SweepSingleByProfile(OUT HitResult, PrevWorldLoc, CurWorldLoc, FRotationMatrix::MakeFromZ(-DirFromParent).ToQuat(), WorldCollisionProfileName, FCollisionShape::MakeCapsule(CurVerletBone.Thickness, CapsuleHalfHeight), CollisionQueryParams);
+	const FVector LocalCapsuleDirection = DirFromParent.IsNearlyZero(KINDA_SMALL_NUMBER) ? FVector::UpVector : DirFromParent;
+	const FVector WorldCapsuleDirection = ComponentTransform.TransformVectorNoScale(LocalCapsuleDirection).GetSafeNormal();
+	const bool bHit = World->SweepSingleByProfile(OUT HitResult, PrevWorldLoc, CurWorldLoc, FRotationMatrix::MakeFromZ(-WorldCapsuleDirection).ToQuat(), WorldCollisionProfileName, FCollisionShape::MakeCapsule(CurVerletBone.Thickness, CapsuleHalfHeight), CollisionQueryParams);
 	if (bHit)
 	{
-		float T = FMath::IsNearlyZero(DistFromParent, KINDA_SMALL_NUMBER) ? 0.0f : (HitResult.Location - ParentVerletBone.Location).Dot(DirFromParent) / DistFromParent;
-		T = FMath::Clamp(T, 0.0f, 1.0f);
-
+		const FVector CollisionNormal = ComponentTransform.InverseTransformVectorNoScale(HitResult.Normal).GetSafeNormal();
+		const FVector ContactPoint = ComponentTransform.InverseTransformPosition(HitResult.ImpactPoint);
+		const float ContactT = FMath::Clamp(FMath::IsNearlyZero(DistFromParent, KINDA_SMALL_NUMBER) ? 0.0f : (ContactPoint - ParentVerletBone.Location).Dot(DirFromParent) / DistFromParent, 0.0f, 1.0f);
+		float ParticleT = ContactT;
 		if (ParentVerletBone.IsPinned())
-			T = 1.0f;
+			ParticleT = 1.0f;
 		if (CurVerletBone.IsPinned())
-			T = 0.0f;
+			ParticleT = 0.0f;
 
-		/// Barycentric Weights
-		const float B0 = 1.0f - T;
-		const float B1 = T;
+		const float B0 = 1.0f - ParticleT;
+		const float B1 = ParticleT;
 		const float W0 = ParentVerletBone.InvMass * B0 * B0;
 		const float W1 = CurVerletBone.InvMass * B1 * B1;
-		const double Denom = (W0 + W1);
-		if (FMath::IsNearlyZero(Denom, KINDA_SMALL_NUMBER))
-			return false;
 
+		FVector Correction = FVector::ZeroVector;
 		if (HitResult.bStartPenetrating && HitResult.PenetrationDepth > 0.0f)
 		{
-			const float DeltaLambda = HitResult.PenetrationDepth / Denom;
-			if (ParentVerletBone.IsPinned() == false)
-				ParentVerletBone.Location = ParentVerletBone.Location + (HitResult.Normal * DeltaLambda * B0 * ParentVerletBone.InvMass);
-			if (CurVerletBone.IsPinned() == false)
-				CurVerletBone.Location = CurVerletBone.Location + (HitResult.Normal * DeltaLambda * B1 * CurVerletBone.InvMass);
+			Correction = CollisionNormal * HitResult.PenetrationDepth;
 		}
 		else
 		{
-			const FVector ResolvedLocationInWorld = HitResult.Location;
-			const FVector NewLocation = ComponentTransform.InverseTransformPosition(ResolvedLocationInWorld);
-
-			if (ParentVerletBone.IsPinned() == false)
-				ParentVerletBone.Location = ParentVerletBone.Location + (NewLocation - VerletBoneCenter) * B0 * ParentVerletBone.InvMass;
-			if (CurVerletBone.IsPinned() == false)
-				CurVerletBone.Location = CurVerletBone.Location + (NewLocation - VerletBoneCenter) * B1 * CurVerletBone.InvMass;
+			const FVector ResolvedCenter = ComponentTransform.InverseTransformPosition(HitResult.Location);
+			Correction = ResolvedCenter - VerletBoneCenter;
 		}
+
+		float CorrectionDistance = 0.0f;
+		FVector CorrectionNormal = FVector::ZeroVector;
+		Correction.ToDirectionAndLength(OUT CorrectionNormal, OUT CorrectionDistance);
+		if (CorrectionDistance <= KINDA_SMALL_NUMBER)
+			return true;
+
+		LkAnimVerletCollision::FLkRigidCapsuleContact RigidContact;
+		const bool bApplyRigidResponse = LkAnimVerletCollision::MakeRigidCapsuleContact(OUT RigidContact, ParentVerletBone, CurVerletBone, ContactT, CorrectionNormal);
+		const float GeneralizedInverseMass = bApplyRigidResponse ? RigidContact.GeneralizedInverseMass : W0 + W1;
+		if (GeneralizedInverseMass <= KINDA_SMALL_NUMBER)
+			return false;
+		const float FrictionB0 = bApplyRigidResponse ? 1.0f - ContactT : B0;
+		const float FrictionB1 = bApplyRigidResponse ? ContactT : B1;
+
+		const float DeltaLambda = CorrectionDistance / GeneralizedInverseMass;
+		LkAnimVerletCollision::ApplyNormalCorrectionTwoBone(IN OUT ParentVerletBone, IN OUT CurVerletBone, RigidContact, CorrectionNormal, bApplyRigidResponse, DeltaLambda, B0, B1);
+
+		const float NormalCorrectionMagnitude = FMath::Abs(Correction.Dot(CollisionNormal));
+		LkAnimVerletCollision::ApplyPBDCollisionFriction(IN OUT ParentVerletBone, IN OUT CurVerletBone, FrictionB0, FrictionB1, CollisionNormal, NormalCorrectionMagnitude, FrictionCoefficient);
 		return true;
 	}
 	return false;

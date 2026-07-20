@@ -185,6 +185,7 @@ public:
 
 	bool bUseXPBDSolver = false;
 	double Compliance = 0.0;								///for XPBD
+	float FrictionCoefficient = 0.0f;						///PBD friction (also used on the XPBD path)
 	TArray<double, TInlineAllocator<64>> Lambdas;			///for XPBD
 
 public:
@@ -277,6 +278,7 @@ public:
 
 	bool bUseCapsuleCollisionForChain = false;
 	TArray<FLKAnimVerletBoneIndicatorPair>* BonePairs = nullptr;
+	float FrictionCoefficient = 0.0f;						///PBD friction
 
 public:
 	FLKAnimVerletConstraint_World(const class UWorld* InWorld, class UPrimitiveComponent* InSelfComponent, const FName& InCollisionProfileName, const FLKAnimVerletCollisionConstraintInput& InCollisionInput);

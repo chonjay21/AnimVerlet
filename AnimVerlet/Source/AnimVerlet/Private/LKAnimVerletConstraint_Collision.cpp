@@ -2,72 +2,11 @@
 
 #include "LKAnimVerletBone.h"
 #include "LKAnimVerletBroadphaseContainer.h"
+#include "LKAnimVerletCollisionRigidUtil.h"
 #include "LKAnimVerletConstraintUtil.h"
 
 namespace LkAnimVerletCollision
 {
-	const FLKAnimVerletBone* FindPinnedAncestor(const TArray<FLKAnimVerletBone>& Bones, const FLKAnimVerletBone& Bone)
-	{
-		/*const FLKAnimVerletBone* Ancestor = &Bone;
-		for (int32 SearchCount = 0; SearchCount < Bones.Num(); ++SearchCount)
-		{
-			if (Ancestor->IsPinned())
-				return Ancestor;
-			if (Bones.IsValidIndex(Ancestor->ParentVerletBoneIndex) == false)
-				break;
-
-			Ancestor = &Bones[Ancestor->ParentVerletBoneIndex];
-		}*/
-		return nullptr;
-	}
-
-	bool FindPinnedAncestorSideSphereMtd(OUT FVector& OutNormalInLocal, OUT float& OutPenetrationDepth, const FVector& SphereLocationInLocal, float SphereThickness, 
-										 const FVector& PinnedAncestorLocationInLocal, float PinnedAncestorThickness, const FVector& BoxHalfExtents)
-	{
-		if (FMath::Abs(SphereLocationInLocal.X) > BoxHalfExtents.X 
-			|| FMath::Abs(SphereLocationInLocal.Y) > BoxHalfExtents.Y 
-			|| FMath::Abs(SphereLocationInLocal.Z) > BoxHalfExtents.Z)
-			return false;
-
-		float BestPenetrationDepth = TNumericLimits<float>::Max();
-		FVector BestNormalInLocal = FVector::ZeroVector;
-		const FVector BoxAxes[3] = { FVector::ForwardVector, FVector::RightVector, FVector::UpVector };
-		const float SphereProjections[3] = { SphereLocationInLocal.X, SphereLocationInLocal.Y, SphereLocationInLocal.Z };
-		const float PinnedAncestorProjections[3] = { PinnedAncestorLocationInLocal.X, PinnedAncestorLocationInLocal.Y, PinnedAncestorLocationInLocal.Z };
-		const float BoxProjections[3] = { BoxHalfExtents.X, BoxHalfExtents.Y, BoxHalfExtents.Z };
-
-		for (int32 AxisIndex = 0; AxisIndex < 3; ++AxisIndex)
-		{
-			const float BoxProjection = BoxProjections[AxisIndex];
-			const float PinnedAncestorProjection = PinnedAncestorProjections[AxisIndex];
-			if (PinnedAncestorProjection - PinnedAncestorThickness >= BoxProjection)
-			{
-				const float PenetrationDepth = BoxProjection - SphereProjections[AxisIndex] + SphereThickness;
-				if (PenetrationDepth < BestPenetrationDepth)
-				{
-					BestPenetrationDepth = PenetrationDepth;
-					BestNormalInLocal = BoxAxes[AxisIndex];
-				}
-			}
-			if (PinnedAncestorProjection + PinnedAncestorThickness <= -BoxProjection)
-			{
-				const float PenetrationDepth = SphereProjections[AxisIndex] + BoxProjection + SphereThickness;
-				if (PenetrationDepth < BestPenetrationDepth)
-				{
-					BestPenetrationDepth = PenetrationDepth;
-					BestNormalInLocal = -BoxAxes[AxisIndex];
-				}
-			}
-		}
-
-		if (BestPenetrationDepth == TNumericLimits<float>::Max())
-			return false;
-
-		OutNormalInLocal = BestNormalInLocal;
-		OutPenetrationDepth = BestPenetrationDepth;
-		return true;
-	}
-
 	FVector MakePBDCollisionFrictionDelta(const FVector& ContactDisplacement, const FVector& CollisionNormal, float NormalCorrectionMagnitude, float FrictionCoefficient)
 	{
 		if (FrictionCoefficient <= 0.0f || NormalCorrectionMagnitude <= KINDA_SMALL_NUMBER)
@@ -337,68 +276,53 @@ bool FLKAnimVerletConstraint_Sphere::CheckSphereCapsule(IN OUT FLKAnimVerletBone
 		const float SphereToBoneDist = FMath::Sqrt(SphereToBoneSQ);
 		const FVector SphereToBoneDir = SphereToBoneDist > KINDA_SMALL_NUMBER ? (SphereToBoneVec / SphereToBoneDist) : FVector::ZeroVector;
 		const float PenetrationDepth = ConstraintDistance - SphereToBoneDist;
+		const float ContactT = FMath::Clamp(FMath::IsNearlyZero(DistFromParent, KINDA_SMALL_NUMBER) ? 0.0f : (ClosestOnBone - ParentVerletBone.Location).Dot(DirFromParent) / DistFromParent, 0.0f, 1.0f);
+		float ParticleT = ContactT;
+		if (ParentVerletBone.IsPinned())
+			ParticleT = 1.0f;
+		if (CurVerletBone.IsPinned())
+			ParticleT = 0.0f;
+
+		const float B0 = 1.0f - ParticleT;
+		const float B1 = ParticleT;
+		const float W0 = ParentVerletBone.InvMass * B0 * B0;
+		const float W1 = CurVerletBone.InvMass * B1 * B1;
+
+		LkAnimVerletCollision::FLkRigidCapsuleContact RigidContact;
+		const bool bApplyRigidResponse = LkAnimVerletCollision::MakeRigidCapsuleContact(OUT RigidContact, ParentVerletBone, CurVerletBone, ContactT, SphereToBoneDir);
+		const float GeneralizedInverseMass = bApplyRigidResponse ? RigidContact.GeneralizedInverseMass : W0 + W1;
+		if (GeneralizedInverseMass <= KINDA_SMALL_NUMBER)
+			return false;
+
+		const float FrictionB0 = bApplyRigidResponse ? 1.0f - ContactT : B0;
+		const float FrictionB1 = bApplyRigidResponse ? ContactT : B1;
+
 		if (bUseXPBDSolver && bFinalize == false)
 		{
 			if (FMath::IsNearlyZero(DeltaTime, KINDA_SMALL_NUMBER))
 				return false;
 
-			float T = FMath::IsNearlyZero(DistFromParent, KINDA_SMALL_NUMBER) ? 0.0f : (ClosestOnBone - ParentVerletBone.Location).Dot(DirFromParent) / DistFromParent;
-			T = FMath::Clamp(T, 0.0f, 1.0f);
-
-			if (ParentVerletBone.IsPinned())
-				T = 1.0f;
-			if (CurVerletBone.IsPinned())
-				T = 0.0f;
-
-			/// Barycentric Weights
-			const float B0 = 1.0f - T;
-			const float B1 = T;
-			const float W0 = ParentVerletBone.InvMass * B0 * B0;
-			const float W1 = CurVerletBone.InvMass * B1 * B1;
-
 			double& CurLambda = Lambdas[LambdaIndex];
 			const float C = -PenetrationDepth;
 			const double Alpha = Compliance / (DeltaTime * DeltaTime);
-			const double Denom = (W0 + W1 + Alpha);
+			const double Denom = GeneralizedInverseMass + Alpha;
 			if (FMath::IsNearlyZero(Denom, KINDA_SMALL_NUMBER))
 				return false;
 
-			const double DeltaLambda = -(C + Alpha * CurLambda) / Denom;
-			CurLambda = FMath::Max(CurLambda + DeltaLambda, 0.0f);
-
-			if (ParentVerletBone.IsPinned() == false)
-				ParentVerletBone.Location = ParentVerletBone.Location + (SphereToBoneDir * DeltaLambda * B0 * ParentVerletBone.InvMass);
-			if (CurVerletBone.IsPinned() == false)
-				CurVerletBone.Location = CurVerletBone.Location + (SphereToBoneDir * DeltaLambda * B1 * CurVerletBone.InvMass);
+			const double OldLambda = CurLambda;
+			const double RawDeltaLambda = -(C + Alpha * OldLambda) / Denom;
+			CurLambda = FMath::Max(OldLambda + RawDeltaLambda, 0.0);
+			const float AppliedDeltaLambda = static_cast<float>(CurLambda - OldLambda);
+			LkAnimVerletCollision::ApplyNormalCorrectionTwoBone(IN OUT ParentVerletBone, IN OUT CurVerletBone, RigidContact, SphereToBoneDir, bApplyRigidResponse, AppliedDeltaLambda, B0, B1);
 			
-			LkAnimVerletCollision::ApplyPBDCollisionFriction(IN OUT ParentVerletBone, IN OUT CurVerletBone, B0, B1, SphereToBoneDir, static_cast<float>(FMath::Abs(DeltaLambda) * (W0 + W1)), FrictionCoefficient);
+			LkAnimVerletCollision::ApplyPBDCollisionFriction(IN OUT ParentVerletBone, IN OUT CurVerletBone, FrictionB0, FrictionB1, SphereToBoneDir, FMath::Abs(AppliedDeltaLambda) * GeneralizedInverseMass, FrictionCoefficient);
 		}
 		else
 		{
-			float T = FMath::IsNearlyZero(DistFromParent, KINDA_SMALL_NUMBER) ? 0.0f : (ClosestOnBone - ParentVerletBone.Location).Dot(DirFromParent) / DistFromParent;
-			T = FMath::Clamp(T, 0.0f, 1.0f);
+			const float DeltaLambda = PenetrationDepth / GeneralizedInverseMass;
+			LkAnimVerletCollision::ApplyNormalCorrectionTwoBone(IN OUT ParentVerletBone, IN OUT CurVerletBone, RigidContact, SphereToBoneDir, bApplyRigidResponse, DeltaLambda, B0, B1);
 
-			if (ParentVerletBone.IsPinned())
-				T = 1.0f;
-			if (CurVerletBone.IsPinned())
-				T = 0.0f;
-
-			/// Barycentric Weights
-			const float B0 = 1.0f - T;
-			const float B1 = T;
-			const float W0 = ParentVerletBone.InvMass * B0 * B0;
-			const float W1 = CurVerletBone.InvMass * B1 * B1;
-			const double Denom = (W0 + W1);
-			if (FMath::IsNearlyZero(Denom, KINDA_SMALL_NUMBER))
-				return false;
-
-			const float DeltaLambda = PenetrationDepth / Denom;
-			if (ParentVerletBone.IsPinned() == false)
-				ParentVerletBone.Location = ParentVerletBone.Location + (SphereToBoneDir * DeltaLambda * B0 * ParentVerletBone.InvMass);
-			if (CurVerletBone.IsPinned() == false)
-				CurVerletBone.Location = CurVerletBone.Location + (SphereToBoneDir * DeltaLambda * B1 * CurVerletBone.InvMass);
-
-			LkAnimVerletCollision::ApplyPBDCollisionFriction(IN OUT ParentVerletBone, IN OUT CurVerletBone, B0, B1, SphereToBoneDir, FMath::Abs(DeltaLambda) * (W0 + W1), FrictionCoefficient);
+			LkAnimVerletCollision::ApplyPBDCollisionFriction(IN OUT ParentVerletBone, IN OUT CurVerletBone, FrictionB0, FrictionB1, SphereToBoneDir, FMath::Abs(DeltaLambda) * GeneralizedInverseMass, FrictionCoefficient);
 		}
 		return true;
 	}
@@ -845,68 +769,53 @@ bool FLKAnimVerletConstraint_Capsule::CheckCapsuleCapsule(IN OUT FLKAnimVerletBo
 		(ClosestOnBone - ClosestOnCapsule).ToDirectionAndLength(OUT CapsuleToBoneDir, OUT CapsuleToBoneDist);
 
 		const float PenetrationDepth = ConstraintDistance - CapsuleToBoneDist;
+		const float ContactT = FMath::Clamp(FMath::IsNearlyZero(DistFromParent, KINDA_SMALL_NUMBER) ? 0.0f : (ClosestOnBone - ParentVerletBone.Location).Dot(DirFromParent) / DistFromParent, 0.0f, 1.0f);
+		float ParticleT = ContactT;
+		if (ParentVerletBone.IsPinned())
+			ParticleT = 1.0f;
+		if (CurVerletBone.IsPinned())
+			ParticleT = 0.0f;
+
+		const float B0 = 1.0f - ParticleT;
+		const float B1 = ParticleT;
+		const float W0 = ParentVerletBone.InvMass * B0 * B0;
+		const float W1 = CurVerletBone.InvMass * B1 * B1;
+
+		LkAnimVerletCollision::FLkRigidCapsuleContact RigidContact;
+		const bool bApplyRigidResponse = LkAnimVerletCollision::MakeRigidCapsuleContact(OUT RigidContact, ParentVerletBone, CurVerletBone, ContactT, CapsuleToBoneDir);
+		const float GeneralizedInverseMass = bApplyRigidResponse ? RigidContact.GeneralizedInverseMass : W0 + W1;
+		if (GeneralizedInverseMass <= KINDA_SMALL_NUMBER)
+			return false;
+
+		const float FrictionB0 = bApplyRigidResponse ? 1.0f - ContactT : B0;
+		const float FrictionB1 = bApplyRigidResponse ? ContactT : B1;
+
 		if (bUseXPBDSolver && bFinalize == false)
 		{
 			if (FMath::IsNearlyZero(DeltaTime, KINDA_SMALL_NUMBER))
 				return false;
 
-			float T = FMath::IsNearlyZero(DistFromParent, KINDA_SMALL_NUMBER) ? 0.0f : (ClosestOnBone - ParentVerletBone.Location).Dot(DirFromParent) / DistFromParent;
-			T = FMath::Clamp(T, 0.0f, 1.0f);
-
-			if (ParentVerletBone.IsPinned())
-				T = 1.0f;
-			if (CurVerletBone.IsPinned())
-				T = 0.0f;
-
-			/// Barycentric Weights
-			const float B0 = 1.0f - T;
-			const float B1 = T;
-			const float W0 = ParentVerletBone.InvMass * B0 * B0;
-			const float W1 = CurVerletBone.InvMass * B1 * B1;
-
 			double& CurLambda = Lambdas[LambdaIndex];
 			const float C = -PenetrationDepth;
 			const double Alpha = Compliance / (DeltaTime * DeltaTime);
-			const double Denom = (W0 + W1 + Alpha);
+			const double Denom = GeneralizedInverseMass + Alpha;
 			if (FMath::IsNearlyZero(Denom, KINDA_SMALL_NUMBER))
 				return false;
 
-			const double DeltaLambda = -(C + Alpha * CurLambda) / Denom;
-			CurLambda = FMath::Max(CurLambda + DeltaLambda, 0.0f);
+			const double OldLambda = CurLambda;
+			const double RawDeltaLambda = -(C + Alpha * OldLambda) / Denom;
+			CurLambda = FMath::Max(OldLambda + RawDeltaLambda, 0.0);
+			const float AppliedDeltaLambda = static_cast<float>(CurLambda - OldLambda);
+			LkAnimVerletCollision::ApplyNormalCorrectionTwoBone(IN OUT ParentVerletBone, IN OUT CurVerletBone, RigidContact, CapsuleToBoneDir, bApplyRigidResponse, AppliedDeltaLambda, B0, B1);
 
-			if (ParentVerletBone.IsPinned() == false)
-				ParentVerletBone.Location = ParentVerletBone.Location + (CapsuleToBoneDir * DeltaLambda * B0 * ParentVerletBone.InvMass);
-			if (CurVerletBone.IsPinned() == false)
-				CurVerletBone.Location = CurVerletBone.Location + (CapsuleToBoneDir * DeltaLambda * B1 * CurVerletBone.InvMass);
-
-			LkAnimVerletCollision::ApplyPBDCollisionFriction(IN OUT ParentVerletBone, IN OUT CurVerletBone, B0, B1, CapsuleToBoneDir, static_cast<float>(FMath::Abs(DeltaLambda) * (W0 + W1)), FrictionCoefficient);
+			LkAnimVerletCollision::ApplyPBDCollisionFriction(IN OUT ParentVerletBone, IN OUT CurVerletBone, FrictionB0, FrictionB1, CapsuleToBoneDir, FMath::Abs(AppliedDeltaLambda) * GeneralizedInverseMass, FrictionCoefficient);
 		}
 		else
 		{
-			float T = FMath::IsNearlyZero(DistFromParent, KINDA_SMALL_NUMBER) ? 0.0f : (ClosestOnBone - ParentVerletBone.Location).Dot(DirFromParent) / DistFromParent;
-			T = FMath::Clamp(T, 0.0f, 1.0f);
+			const float DeltaLambda = PenetrationDepth / GeneralizedInverseMass;
+			LkAnimVerletCollision::ApplyNormalCorrectionTwoBone(IN OUT ParentVerletBone, IN OUT CurVerletBone, RigidContact, CapsuleToBoneDir, bApplyRigidResponse, DeltaLambda, B0, B1);
 
-			if (ParentVerletBone.IsPinned())
-				T = 1.0f;
-			if (CurVerletBone.IsPinned())
-				T = 0.0f;
-
-			/// Barycentric Weights
-			const float B0 = 1.0f - T;
-			const float B1 = T;
-			const float W0 = ParentVerletBone.InvMass * B0 * B0;
-			const float W1 = CurVerletBone.InvMass * B1 * B1;
-			const double Denom = (W0 + W1);
-			if (FMath::IsNearlyZero(Denom, KINDA_SMALL_NUMBER))
-				return false;
-
-			const float DeltaLambda = PenetrationDepth / Denom;
-			if (ParentVerletBone.IsPinned() == false)
-				ParentVerletBone.Location = ParentVerletBone.Location + (CapsuleToBoneDir * DeltaLambda * B0 * ParentVerletBone.InvMass);
-			if (CurVerletBone.IsPinned() == false)
-				CurVerletBone.Location = CurVerletBone.Location + (CapsuleToBoneDir * DeltaLambda * B1 * CurVerletBone.InvMass);
-
-			LkAnimVerletCollision::ApplyPBDCollisionFriction(IN OUT ParentVerletBone, IN OUT CurVerletBone, B0, B1, CapsuleToBoneDir, FMath::Abs(DeltaLambda) * (W0 + W1), FrictionCoefficient);
+			LkAnimVerletCollision::ApplyPBDCollisionFriction(IN OUT ParentVerletBone, IN OUT CurVerletBone, FrictionB0, FrictionB1, CapsuleToBoneDir, FMath::Abs(DeltaLambda) * GeneralizedInverseMass, FrictionCoefficient);
 		}
 		return true;
 	}
@@ -1315,23 +1224,6 @@ bool FLKAnimVerletConstraint_Box::CheckBoxSphere(IN OUT FLKAnimVerletBone& CurVe
 	FVector CollisionNormal = FVector::ZeroVector;
 	if (IntersectObbSphere(OUT CollisionNormal, OUT PenetrationDepth, CurVerletBone, SphereLocation, InvRotation))
 	{
-		/// When the sphere center is inside the box, the closest face can be on the opposite side of the pinned chain root. 
-		/// Prefer a face on the pinned ancestor's already-separated side.
-		const FLKAnimVerletBone* PinnedAncestor = bSingleChain ? LkAnimVerletCollision::FindPinnedAncestor(*Bones, CurVerletBone) : nullptr;
-		if (PinnedAncestor != nullptr)
-		{
-			const FVector SphereLocationInLocal = InvRotation.RotateVector(SphereLocation - Location);
-			const FVector PinnedAncestorLocationInLocal = InvRotation.RotateVector(PinnedAncestor->Location - Location);
-			FVector PreferredNormalInLocal = FVector::ZeroVector;
-			float PreferredPenetrationDepth = 0.0f;
-			if (LkAnimVerletCollision::FindPinnedAncestorSideSphereMtd(OUT PreferredNormalInLocal, OUT PreferredPenetrationDepth, SphereLocationInLocal, 
-																	   CurVerletBone.Thickness, PinnedAncestorLocationInLocal, PinnedAncestor->Thickness, HalfExtents))
-			{
-				CollisionNormal = Rotation.RotateVector(PreferredNormalInLocal);
-				PenetrationDepth = PreferredPenetrationDepth;
-			}
-		}
-
 		if (bUseXPBDSolver && bFinalize == false)
 		{
 			if (FMath::IsNearlyZero(DeltaTime, KINDA_SMALL_NUMBER))
@@ -1434,11 +1326,9 @@ bool FLKAnimVerletConstraint_Box::CheckBoxCapsule(IN OUT FLKAnimVerletBone& CurV
 		/// Find the shortest SAT-axis translation that separates the entire capsule projection from the AABB.
 		float BestPenetrationDepth = TNumericLimits<float>::Max();
 		FVector BestNormalInLocal = FVector::ZeroVector;
-		float BestCompatiblePenetrationDepth = TNumericLimits<float>::Max();
-		FVector BestCompatibleNormalInLocal = FVector::ZeroVector;
+		float BestMovablePenetrationDepth = TNumericLimits<float>::Max();
+		FVector BestMovableNormalInLocal = FVector::ZeroVector;
 
-		const FLKAnimVerletBone* PinnedAncestor = (bSingleChain ? LkAnimVerletCollision::FindPinnedAncestor(*Bones, ParentVerletBone) : nullptr);
-		const FVector PinnedAncestorLocationInLocal = (PinnedAncestor != nullptr ? InvRotation.RotateVector(PinnedAncestor->Location - Location) : FVector::ZeroVector);
 		const FVector SegmentDirectionInLocal = CurBoneLocationInBoxLocal - ParentBoneLocationInBoxLocal;
 		const FVector BoxAxes[3] = { FVector::ForwardVector, FVector::RightVector, FVector::UpVector };
 		const FVector CandidateAxes[6] = { BoxAxes[0], BoxAxes[1], BoxAxes[2],
@@ -1469,10 +1359,10 @@ bool FLKAnimVerletConstraint_Box::CheckBoxCapsule(IN OUT FLKAnimVerletBone& CurV
 					BestNormalInLocal = CandidateNormal;
 				}
 
-				if (bPinnedChainAlreadySeparated && CandidatePenetrationDepth < BestCompatiblePenetrationDepth)
+				if (bPinnedChainAlreadySeparated && CandidatePenetrationDepth < BestMovablePenetrationDepth)
 				{
-					BestCompatiblePenetrationDepth = CandidatePenetrationDepth;
-					BestCompatibleNormalInLocal = CandidateNormal;
+					BestMovablePenetrationDepth = CandidatePenetrationDepth;
+					BestMovableNormalInLocal = CandidateNormal;
 				}
 			};
 
@@ -1480,18 +1370,15 @@ bool FLKAnimVerletConstraint_Box::CheckBoxCapsule(IN OUT FLKAnimVerletBone& CurV
 				&& (CurVerletBone.IsPinned() == false || CurProjection - CurVerletBone.Thickness >= BoxProjection);
 			const bool bPinnedBonesSeparatedNegative = (ParentVerletBone.IsPinned() == false || ParentProjection + CurVerletBone.Thickness <= -BoxProjection)
 				&& (CurVerletBone.IsPinned() == false || CurProjection + CurVerletBone.Thickness <= -BoxProjection);
-			const float PinnedAncestorProjection = PinnedAncestorLocationInLocal.Dot(Axis);
-			const bool bPinnedAncestorSeparatedPositive = (PinnedAncestor == nullptr || PinnedAncestorProjection - PinnedAncestor->Thickness >= BoxProjection);
-			const bool bPinnedAncestorSeparatedNegative = (PinnedAncestor == nullptr || PinnedAncestorProjection + PinnedAncestor->Thickness <= -BoxProjection);
 
-			ConsiderMtd(PositivePenetrationDepth, Axis, bPinnedBonesSeparatedPositive && bPinnedAncestorSeparatedPositive);
-			ConsiderMtd(NegativePenetrationDepth, -Axis, bPinnedBonesSeparatedNegative && bPinnedAncestorSeparatedNegative);
+			ConsiderMtd(PositivePenetrationDepth, Axis, bPinnedBonesSeparatedPositive);
+			ConsiderMtd(NegativePenetrationDepth, -Axis, bPinnedBonesSeparatedNegative);
 		}
 
-		if (BestCompatiblePenetrationDepth < TNumericLimits<float>::Max())
+		if (BestMovablePenetrationDepth < TNumericLimits<float>::Max())
 		{
-			PenetrationDepth = BestCompatiblePenetrationDepth;
-			NormalInLocal = BestCompatibleNormalInLocal;
+			PenetrationDepth = BestMovablePenetrationDepth;
+			NormalInLocal = BestMovableNormalInLocal;
 		}
 		else
 		{
@@ -1500,19 +1387,11 @@ bool FLKAnimVerletConstraint_Box::CheckBoxCapsule(IN OUT FLKAnimVerletBone& CurV
 			NormalInLocal = BestNormalInLocal;
 		}
 
-		/// A rigid translation is represented by equal endpoint corrections. Mass-proportional barycentric
-		/// weights produce equal PBD position deltas even when the endpoint masses differ.
-		if (ParentVerletBone.IsPinned() == false && CurVerletBone.IsPinned() == false)
-		{
-			const float ParentMass = ParentVerletBone.InvMass > KINDA_SMALL_NUMBER ? 1.0f / ParentVerletBone.InvMass : 0.0f;
-			const float CurMass = CurVerletBone.InvMass > KINDA_SMALL_NUMBER ? 1.0f / CurVerletBone.InvMass : 0.0f;
-			const float TotalMass = ParentMass + CurMass;
-			SegT = TotalMass > KINDA_SMALL_NUMBER ? CurMass / TotalMass : 0.5f;
-		}
-		else
-		{
-			SegT = FMath::Clamp((SegmentTMin + SegmentTMax) * 0.5f, 0.0f, 1.0f);
-		}
+		/// The support point opposite the correction direction is the contact point.
+		/// Applying the positional impulse there gives the rigid capsule an angular response instead of pure translation.
+		const float ParentSupportProjection = ParentBoneLocationInBoxLocal.Dot(NormalInLocal);
+		const float CurSupportProjection = CurBoneLocationInBoxLocal.Dot(NormalInLocal);
+		SegT = FMath::IsNearlyEqual(ParentSupportProjection, CurSupportProjection, KINDA_SMALL_NUMBER) ? 0.5f : (CurSupportProjection < ParentSupportProjection ? 1.0f : 0.0f);
 	}
 	else
 	{
@@ -1530,67 +1409,54 @@ bool FLKAnimVerletConstraint_Box::CheckBoxCapsule(IN OUT FLKAnimVerletBone& CurV
 	}
 
 	const FVector CollisionNormal = Rotation.RotateVector(NormalInLocal);
+	const float ContactT = FMath::Clamp(SegT, 0.0f, 1.0f);
+	float ParticleT = ContactT;
+	if (ParentVerletBone.IsPinned())
+		ParticleT = 1.0f;
+	if (CurVerletBone.IsPinned())
+		ParticleT = 0.0f;
+
+	/// Barycentric contact weights for the particle fallback and friction.
+	const float B0 = 1.0f - ParticleT;
+	const float B1 = ParticleT;
+	const float W0 = ParentVerletBone.InvMass * B0 * B0;
+	const float W1 = CurVerletBone.InvMass * B1 * B1;
+
+	LkAnimVerletCollision::FLkRigidCapsuleContact RigidContact;
+	const bool bApplyRigidResponse = LkAnimVerletCollision::MakeRigidCapsuleContact(OUT RigidContact, ParentVerletBone, CurVerletBone, ContactT, CollisionNormal);
+	const float GeneralizedInverseMass = bApplyRigidResponse ? RigidContact.GeneralizedInverseMass : W0 + W1;
+	if (GeneralizedInverseMass <= KINDA_SMALL_NUMBER)
+		return false;
+
+	const float FrictionB0 = bApplyRigidResponse ? 1.0f - ContactT : B0;
+	const float FrictionB1 = bApplyRigidResponse ? ContactT : B1;
 
 	if (bUseXPBDSolver && bFinalize == false)
 	{
 		if (FMath::IsNearlyZero(DeltaTime, KINDA_SMALL_NUMBER))
 			return false;
 
-		float T = FMath::Clamp(SegT, 0.0f, 1.0f);
-
-		if (ParentVerletBone.IsPinned())
-			T = 1.0f;
-		if (CurVerletBone.IsPinned())
-			T = 0.0f;
-
-		/// Barycentric Weights
-		const float B0 = 1.0f - T;
-		const float B1 = T;
-		const float W0 = ParentVerletBone.InvMass * B0 * B0;
-		const float W1 = CurVerletBone.InvMass * B1 * B1;
-
 		double& CurLambda = Lambdas[LambdaIndex];
 		const float C = -PenetrationDepth;
 		const double Alpha = Compliance / (DeltaTime * DeltaTime);
-		const double Denom = (W0 + W1 + Alpha);
+		const double Denom = GeneralizedInverseMass + Alpha;
 		if (FMath::IsNearlyZero(Denom, KINDA_SMALL_NUMBER))
 			return false;
 
-		const double DeltaLambda = -(C + Alpha * CurLambda) / Denom;
-		CurLambda = FMath::Max(CurLambda + DeltaLambda, 0.0f);
-
-		if (ParentVerletBone.IsPinned() == false)
-			ParentVerletBone.Location = ParentVerletBone.Location + (CollisionNormal * DeltaLambda * B0 * ParentVerletBone.InvMass);
-		if (CurVerletBone.IsPinned() == false)
-			CurVerletBone.Location = CurVerletBone.Location + (CollisionNormal * DeltaLambda * B1 * CurVerletBone.InvMass);
+		const double OldLambda = CurLambda;
+		const double RawDeltaLambda = -(C + Alpha * OldLambda) / Denom;
+		CurLambda = FMath::Max(OldLambda + RawDeltaLambda, 0.0);
+		const float AppliedDeltaLambda = static_cast<float>(CurLambda - OldLambda);
+		LkAnimVerletCollision::ApplyNormalCorrectionTwoBone(IN OUT ParentVerletBone, IN OUT CurVerletBone, RigidContact, CollisionNormal, bApplyRigidResponse, AppliedDeltaLambda, B0, B1);
 		
-		LkAnimVerletCollision::ApplyPBDCollisionFriction(IN OUT ParentVerletBone, IN OUT CurVerletBone, B0, B1, CollisionNormal, static_cast<float>(FMath::Abs(DeltaLambda) * (W0 + W1)), FrictionCoefficient);
+		LkAnimVerletCollision::ApplyPBDCollisionFriction(IN OUT ParentVerletBone, IN OUT CurVerletBone, FrictionB0, FrictionB1, CollisionNormal, FMath::Abs(AppliedDeltaLambda) * GeneralizedInverseMass, FrictionCoefficient);
 	}
 	else
 	{
-		float T = FMath::Clamp(SegT, 0.0f, 1.0f);
-
-		if (ParentVerletBone.IsPinned())
-			T = 1.0f;
-		if (CurVerletBone.IsPinned())
-			T = 0.0f;
-
-		/// Barycentric Weights
-		const float B0 = 1.0f - T;
-		const float B1 = T;
-		const float W0 = ParentVerletBone.InvMass * B0 * B0;
-		const float W1 = CurVerletBone.InvMass * B1 * B1;
-		const double Denom = (W0 + W1);
-		if (FMath::IsNearlyZero(Denom, KINDA_SMALL_NUMBER))
-			return false;
-
-		const float DeltaLambda = PenetrationDepth / Denom;
-		if (ParentVerletBone.IsPinned() == false)
-			ParentVerletBone.Location = ParentVerletBone.Location + (CollisionNormal * DeltaLambda * B0 * ParentVerletBone.InvMass);
-		if (CurVerletBone.IsPinned() == false)
-			CurVerletBone.Location = CurVerletBone.Location + (CollisionNormal * DeltaLambda * B1 * CurVerletBone.InvMass);
+		const float DeltaLambda = PenetrationDepth / GeneralizedInverseMass;
+		LkAnimVerletCollision::ApplyNormalCorrectionTwoBone(IN OUT ParentVerletBone, IN OUT CurVerletBone, RigidContact, CollisionNormal, bApplyRigidResponse, DeltaLambda, B0, B1);
 		
-		LkAnimVerletCollision::ApplyPBDCollisionFriction(IN OUT ParentVerletBone, IN OUT  CurVerletBone, B0, B1, CollisionNormal, FMath::Abs(DeltaLambda) * (W0 + W1), FrictionCoefficient);
+		LkAnimVerletCollision::ApplyPBDCollisionFriction(IN OUT ParentVerletBone, IN OUT CurVerletBone, FrictionB0, FrictionB1, CollisionNormal, FMath::Abs(DeltaLambda) * GeneralizedInverseMass, FrictionCoefficient);
 	}
 	return true;
 }

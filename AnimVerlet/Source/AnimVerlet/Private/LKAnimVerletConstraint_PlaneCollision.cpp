@@ -2,6 +2,7 @@
 
 #include "LKAnimVerletBone.h"
 #include "LKAnimVerletBroadphaseContainer.h"
+#include "LKAnimVerletCollisionRigidUtil.h"
 #include "LKAnimVerletConstraintUtil.h"
 
 
@@ -22,6 +23,7 @@ FLKAnimVerletConstraint_Plane::FLKAnimVerletConstraint_Plane(const FVector& InPl
 	, BoneTriangles(InCollisionInput.SimulateBoneTriangleIndicators)
 	, bUseXPBDSolver(InCollisionInput.bUseXPBDSolver)
 	, Compliance(InCollisionInput.Compliance)
+	, FrictionCoefficient(InCollisionInput.FrictionCoefficient)
 {
 	verify(Bones != nullptr);
 
@@ -141,11 +143,15 @@ bool FLKAnimVerletConstraint_Plane::CheckPlaneSphere(IN OUT FLKAnimVerletBone& C
 
 			if (CurVerletBone.IsPinned() == false)
 				CurVerletBone.Location += (PlaneNormal * DeltaLambda);
+
+			LkAnimVerletCollision::ApplyPBDCollisionFriction(IN OUT CurVerletBone, PlaneNormal, static_cast<float>(FMath::Abs(DeltaLambda)), FrictionCoefficient);
 		}
 		else
 		{
 			if (CurVerletBone.IsPinned() == false)
 				CurVerletBone.Location += (PlaneNormal * PenetrationDepth);
+
+			LkAnimVerletCollision::ApplyPBDCollisionFriction(IN OUT CurVerletBone, PlaneNormal, PenetrationDepth, FrictionCoefficient);
 		}
 		return true;
 	}
@@ -195,64 +201,50 @@ bool FLKAnimVerletConstraint_Plane::CheckPlaneCapsule(IN OUT FLKAnimVerletBone& 
 		}
 
 		const float PenetrationDepth = (CurVerletBone.Thickness - DistToPlane);
+		const float ContactT = FMath::Clamp(FMath::IsNearlyZero(DistFromParent, KINDA_SMALL_NUMBER) ? 0.0f : (ClosestOnBone - ParentVerletBone.Location).Dot(DirFromParent) / DistFromParent, 0.0f, 1.0f);
+		float ParticleT = ContactT;
+		if (ParentVerletBone.IsPinned())
+			ParticleT = 1.0f;
+		if (CurVerletBone.IsPinned())
+			ParticleT = 0.0f;
+
+		const float B0 = 1.0f - ParticleT;
+		const float B1 = ParticleT;
+		const float W0 = ParentVerletBone.InvMass * B0 * B0;
+		const float W1 = CurVerletBone.InvMass * B1 * B1;
+
+		LkAnimVerletCollision::FLkRigidCapsuleContact RigidContact;
+		const bool bApplyRigidResponse = LkAnimVerletCollision::MakeRigidCapsuleContact(OUT RigidContact, ParentVerletBone, CurVerletBone, ContactT, PlaneNormal);
+		const float GeneralizedInverseMass = bApplyRigidResponse ? RigidContact.GeneralizedInverseMass : W0 + W1;
+		if (GeneralizedInverseMass <= KINDA_SMALL_NUMBER)
+			return false;
+		const float FrictionB0 = bApplyRigidResponse ? 1.0f - ContactT : B0;
+		const float FrictionB1 = bApplyRigidResponse ? ContactT : B1;
+
 		if (bUseXPBDSolver && bFinalize == false)
 		{
 			if (FMath::IsNearlyZero(DeltaTime, KINDA_SMALL_NUMBER))
 				return false;
 
-			float T = FMath::IsNearlyZero(DistFromParent, KINDA_SMALL_NUMBER) ? 0.0f : (ClosestOnBone - ParentVerletBone.Location).Dot(DirFromParent) / DistFromParent;
-			T = FMath::Clamp(T, 0.0f, 1.0f);
-
-			if (ParentVerletBone.IsPinned())
-				T = 1.0f;
-			if (CurVerletBone.IsPinned())
-				T = 0.0f;
-
-			/// Barycentric Weights
-			const float B0 = 1.0f - T;
-			const float B1 = T;
-			const float W0 = ParentVerletBone.InvMass * B0 * B0;
-			const float W1 = CurVerletBone.InvMass * B1 * B1;
-
 			double& CurLambda = Lambdas[LambdaIndex];
 			const float C = -PenetrationDepth;
 			const double Alpha = Compliance / (DeltaTime * DeltaTime);
-			const double Denom = (W0 + W1 + Alpha);
+			const double Denom = GeneralizedInverseMass + Alpha;
 			if (FMath::IsNearlyZero(Denom, KINDA_SMALL_NUMBER))
 				return false;
 
-			const double DeltaLambda = -(C + Alpha * CurLambda) / Denom;
-			CurLambda += DeltaLambda;
-
-			if (ParentVerletBone.IsPinned() == false)
-				ParentVerletBone.Location = ParentVerletBone.Location + (PlaneNormal * DeltaLambda * B0 * ParentVerletBone.InvMass);
-			if (CurVerletBone.IsPinned() == false)
-				CurVerletBone.Location = CurVerletBone.Location + (PlaneNormal * DeltaLambda * B1 * CurVerletBone.InvMass);
+			const double OldLambda = CurLambda;
+			const double RawDeltaLambda = -(C + Alpha * OldLambda) / Denom;
+			CurLambda = FMath::Max(OldLambda + RawDeltaLambda, 0.0);
+			const float AppliedDeltaLambda = static_cast<float>(CurLambda - OldLambda);
+			LkAnimVerletCollision::ApplyNormalCorrectionTwoBone(IN OUT ParentVerletBone, IN OUT CurVerletBone, RigidContact, PlaneNormal, bApplyRigidResponse, AppliedDeltaLambda, B0, B1);
+			LkAnimVerletCollision::ApplyPBDCollisionFriction(IN OUT ParentVerletBone, IN OUT CurVerletBone, FrictionB0, FrictionB1, PlaneNormal, FMath::Abs(AppliedDeltaLambda) * GeneralizedInverseMass, FrictionCoefficient);
 		}
 		else
 		{
-			float T = FMath::IsNearlyZero(DistFromParent, KINDA_SMALL_NUMBER) ? 0.0f : (ClosestOnBone - ParentVerletBone.Location).Dot(DirFromParent) / DistFromParent;
-			T = FMath::Clamp(T, 0.0f, 1.0f);
-
-			if (ParentVerletBone.IsPinned())
-				T = 1.0f;
-			if (CurVerletBone.IsPinned())
-				T = 0.0f;
-
-			/// Barycentric Weights
-			const float B0 = 1.0f - T;
-			const float B1 = T;
-			const float W0 = ParentVerletBone.InvMass * B0 * B0;
-			const float W1 = CurVerletBone.InvMass * B1 * B1;
-			const double Denom = (W0 + W1);
-			if (FMath::IsNearlyZero(Denom, KINDA_SMALL_NUMBER))
-				return false;
-
-			const float DeltaLambda = PenetrationDepth / Denom;
-			if (ParentVerletBone.IsPinned() == false)
-				ParentVerletBone.Location = ParentVerletBone.Location + (PlaneNormal * DeltaLambda * B0 * ParentVerletBone.InvMass);
-			if (CurVerletBone.IsPinned() == false)
-				CurVerletBone.Location = CurVerletBone.Location + (PlaneNormal * DeltaLambda * B1 * CurVerletBone.InvMass);
+			const float DeltaLambda = PenetrationDepth / GeneralizedInverseMass;
+			LkAnimVerletCollision::ApplyNormalCorrectionTwoBone(IN OUT ParentVerletBone, IN OUT CurVerletBone, RigidContact, PlaneNormal, bApplyRigidResponse, DeltaLambda, B0, B1);
+			LkAnimVerletCollision::ApplyPBDCollisionFriction(IN OUT ParentVerletBone, IN OUT CurVerletBone, FrictionB0, FrictionB1, PlaneNormal, FMath::Abs(DeltaLambda) * GeneralizedInverseMass, FrictionCoefficient);
 		}
 		return true;
 	}
@@ -380,6 +372,8 @@ bool FLKAnimVerletConstraint_Plane::CheckPlaneTriangle(IN OUT FLKAnimVerletBone&
 			BoneB.Location = BoneB.Location + (BoneB.InvMass * DeltaLambda) * (WB * N);
 		if (BoneC.IsPinned() == false)
 			BoneC.Location = BoneC.Location + (BoneC.InvMass * DeltaLambda) * (WC * N);
+
+		LkAnimVerletCollision::ApplyPBDCollisionFriction(IN OUT BoneA, IN OUT BoneB, IN OUT BoneC, WA, WB, WC, N, static_cast<float>(FMath::Abs(DeltaLambda) * SumGrad), FrictionCoefficient);
 	}
 	else
 	{
@@ -398,6 +392,8 @@ bool FLKAnimVerletConstraint_Plane::CheckPlaneTriangle(IN OUT FLKAnimVerletBone&
 			BoneB.Location = BoneB.Location + (BoneB.InvMass * DeltaLambda) * (WB * N);
 		if (BoneC.IsPinned() == false)
 			BoneC.Location = BoneC.Location + (BoneC.InvMass * DeltaLambda) * (WC * N);
+
+		LkAnimVerletCollision::ApplyPBDCollisionFriction(IN OUT BoneA, IN OUT BoneB, IN OUT BoneC, WA, WB, WC, N, FMath::Abs(DeltaLambda) * (W0 + W1 + W2), FrictionCoefficient);
 	}
 	return true;
 }
