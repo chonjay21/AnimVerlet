@@ -2,6 +2,7 @@
 #include <CoreMinimal.h>
 #include <UObject/WeakObjectPtrTemplates.h>
 #include "LKAnimVerletBound.h"
+#include "LKAnimVerletBroadphaseType.h"
 #include "LKAnimVerletConstraint.h"
 #include "LKAnimVerletConstraintType.h"
 
