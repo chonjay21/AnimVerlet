@@ -42,6 +42,8 @@ protected:
 
 private:
 	void InitializeSimulateBones(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer);
+	void InitializeCustomDistanceConstraints(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer);
+	struct FLKAnimVerletBone* FindOrAddCustomDistanceConstraintBone(const FBoneReference& BoneReference, FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer);
 	void InitializeBroadphase();
 	void InitializeLocalCollisionConstraints(const FBoneContainer& BoneContainer);
 	void InitializeAttachedShape(struct FLKAnimVerletCollisionShape& InShape, const FBoneContainer& BoneContainer);
@@ -312,6 +314,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Constraint", meta = (PinHiddenByDefault, ClampMin = "0.0", ClampMax = "90.0", ForceUnits = "deg"))
 	float ConeAngle = 0.0f;
 
+	/** Additional distance constraints created from explicitly selected bone pairs.(Bones outside VerletBones follow their animation pose as pinned anchors.) */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Constraint")
+	TArray<FLKAnimVerletCustomDistanceConstraintSetting> CustomDistanceConstraints;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Collision")
 	bool bUseBroadphase = true;
 
@@ -466,7 +472,8 @@ private:
 	TArray<FLKAnimVerletConstraint_Plane> PlaneCollisionConstraints;
 	TArray<FLKAnimVerletConstraint_World> WorldCollisionConstraints;
 	TArray<FLKAnimVerletConstraint_Self> SelfCollisionConstraints;
-	TArray<TArray<int32>> BoneChainIndexes;								///Simulating bone`s index list per single chain
+	TArray<FLKAnimVerletBone> CustomDistanceConstraintBones;				///Pinned pose anchors for manually constrained bones outside SimulateBones
+	TArray<TArray<int32>> BoneChainIndexes;									///Simulating bone`s index list per single chain
 	int32 MaxBoneChainLength = 0;
 	float MaxThickness = 0.0f;
 

@@ -52,12 +52,20 @@ public:
 	float StretchStrength = 0.0f;
 	float Stiffness = 0.0f;
 	float Length = 0.0f;
-	double Lambda = 0.0;		///for XPBD
-	double Compliance = 0.0;	///for XPBD
+	float MinDistance = 0.0f;
+	float MaxDistance = 0.0f;
+	double Lambda = 0.0;						///for XPBD
+	double Compliance = 0.0;					///for XPBD
+	bool bUseDistanceRange = false;
+	bool bUsePoseDistanceAsRange = false;
+	int8 ActiveDistanceRange = 0;				///-1: minimum, 0: inactive, 1: maximum
 
 public:
 	FLKAnimVerletConstraint_Distance(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, bool bInUseXPBDSolver, 
 									 double InStiffness, bool bInStretchEachBone, float InStretchStrength);
+	FLKAnimVerletConstraint_Distance(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, bool bInUseXPBDSolver,
+									 double InStiffness, bool bInStretchEachBone, float InStretchStrength,
+									 float InMinDistance, float InMaxDistance);
 	virtual void Update(float DeltaTime, bool bInitialUpdate, bool bFinalize) override;
 	virtual void PostUpdate(float DeltaTime) override;
 	virtual void ResetSimulation() override;

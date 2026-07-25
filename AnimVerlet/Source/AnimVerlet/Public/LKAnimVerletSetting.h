@@ -80,6 +80,36 @@ public:
 	float Mass = 1.0f;
 };
 
+/**
+ * Manually adds a distance constraint between two skeletal bones.
+ * - Bones already managed by AnimVerlet use their simulated particles.
+ * - A bone outside the configured Verlet bone chains is treated as a pinned animation pose anchor, so it can safely constrain a simulated bone without being overwritten by the simulation.
+ */
+USTRUCT(BlueprintInternalUseOnly)
+struct FLKAnimVerletCustomDistanceConstraintSetting
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, Category = "Constraint")
+	FBoneReference BoneA;
+
+	UPROPERTY(EditAnywhere, Category = "Constraint")
+	FBoneReference BoneB;
+
+	/** Minimum allowed distance between BoneA and BoneB. */
+	UPROPERTY(EditAnywhere, Category = "Constraint", meta = (ClampMin = "0.0", ForceUnits = "cm"))
+	float MinDistance = 0.0f;
+
+	/**
+	 * Maximum allowed distance between BoneA and BoneB.
+	 * When both values are zero, the animation pose distance is used for both
+	 * values to preserve the previous exact-distance behavior.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Constraint", meta = (ClampMin = "0.0", ForceUnits = "cm"))
+	float MaxDistance = 0.0f;
+};
+
 USTRUCT(BlueprintInternalUseOnly)
 struct FLKAnimVerletRandomForceSetting
 {

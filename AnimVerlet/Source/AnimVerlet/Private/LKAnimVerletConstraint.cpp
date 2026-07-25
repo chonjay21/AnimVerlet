@@ -87,6 +87,29 @@ FLKAnimVerletConstraint_Distance::FLKAnimVerletConstraint_Distance(FLKAnimVerlet
 		Stiffness = static_cast<float>(InStiffness);
 }
 
+FLKAnimVerletConstraint_Distance::FLKAnimVerletConstraint_Distance(FLKAnimVerletBone* InBoneA, FLKAnimVerletBone* InBoneB, bool bInUseXPBDSolver,
+																   double InStiffness, bool bInStretchEachBone, float InStretchStrength,
+																   float InMinDistance, float InMaxDistance)
+	: FLKAnimVerletConstraint_Distance(InBoneA, InBoneB, bInUseXPBDSolver, InStiffness, bInStretchEachBone, InStretchStrength)
+{
+	bUseDistanceRange = true;
+
+	const float ClampedMinDistance = FMath::Max(InMinDistance, 0.0f);
+	const float ClampedMaxDistance = FMath::Max(InMaxDistance, 0.0f);
+	if (FMath::IsNearlyZero(ClampedMinDistance) && FMath::IsNearlyZero(ClampedMaxDistance))
+	{
+		/// Preserve custom constraints serialized before distance ranges were added.
+		bUsePoseDistanceAsRange = true;
+		MinDistance = Length;
+		MaxDistance = Length;
+	}
+	else
+	{
+		MinDistance = ClampedMinDistance;
+		MaxDistance = FMath::Max(ClampedMaxDistance, MinDistance);
+	}
+}
+
 void FLKAnimVerletConstraint_Distance::Update(float DeltaTime, bool bInitialUpdate, bool bFinalize)
 {
 	verify(BoneA != nullptr);
@@ -94,12 +117,50 @@ void FLKAnimVerletConstraint_Distance::Update(float DeltaTime, bool bInitialUpda
 
 	/// Update length
 	FVector PoseDirection = FVector::ZeroVector;
-	(BoneB->PoseLocation - BoneA->PoseLocation).ToDirectionAndLength(OUT PoseDirection, OUT Length);
+	float PoseLength = 0.0f;
+	(BoneB->PoseLocation - BoneA->PoseLocation).ToDirectionAndLength(OUT PoseDirection, OUT PoseLength);
+	if (bUseDistanceRange == false)
+	{
+		Length = PoseLength;
+	}
+	else if (bUsePoseDistanceAsRange)
+	{
+		MinDistance = PoseLength;
+		MaxDistance = PoseLength;
+	}
 
 	/// Calculate the distance
 	FVector Direction = FVector::ZeroVector;
 	float Distance = 0.0f;
 	(BoneB->Location - BoneA->Location).ToDirectionAndLength(OUT Direction, OUT Distance);
+
+	if (bUseDistanceRange)
+	{
+		int8 NewActiveDistanceRange = 0;
+		if (Distance < MinDistance)
+		{
+			Length = MinDistance;
+			NewActiveDistanceRange = -1;
+		}
+		else if (Distance > MaxDistance)
+		{
+			Length = MaxDistance;
+			NewActiveDistanceRange = 1;
+		}
+		else
+		{
+			Lambda = 0.0;
+			ActiveDistanceRange = 0;
+			return;
+		}
+
+		if (ActiveDistanceRange != 0 && ActiveDistanceRange != NewActiveDistanceRange)
+			Lambda = 0.0;
+
+		ActiveDistanceRange = NewActiveDistanceRange;
+		if (Direction.IsNearlyZero(KINDA_SMALL_NUMBER))
+			Direction = PoseDirection.IsNearlyZero(KINDA_SMALL_NUMBER) ? FVector::ForwardVector : PoseDirection;
+	}
 
 	/// XPBD
 	if (bUseXPBDSolver)
@@ -109,26 +170,49 @@ void FLKAnimVerletConstraint_Distance::Update(float DeltaTime, bool bInitialUpda
 
 		const float C = Distance - Length;
 		const double Alpha = Compliance / (DeltaTime * DeltaTime);
-		const double Denom = (BoneA->InvMass + BoneB->InvMass + Alpha);
+		const float InvMassA = bUseDistanceRange && BoneA->IsPinned() ? 0.0f : BoneA->InvMass;
+		const float InvMassB = bUseDistanceRange && BoneB->IsPinned() ? 0.0f : BoneB->InvMass;
+		if (bUseDistanceRange && FMath::IsNearlyZero(InvMassA + InvMassB, KINDA_SMALL_NUMBER))
+			return;
+
+		const double Denom = (InvMassA + InvMassB + Alpha);
 		if (FMath::IsNearlyZero(Denom, KINDA_SMALL_NUMBER))
 			return;
 
 		const double DeltaLambda = -(C + Alpha * Lambda) / Denom;
 		Lambda += DeltaLambda;
 
-		if (bStretchEachBone)
+		if (bStretchEachBone && bUseDistanceRange == false)
 			Direction = (Direction + PoseDirection * StretchStrength).GetSafeNormal();
 
 		/// Adjust distance constraint
 		const FVector DiffDir = (Direction * DeltaLambda);
 		if (BoneA->IsPinned() == false)
-			BoneA->Location -= (DiffDir * BoneA->InvMass);
+			BoneA->Location -= (DiffDir * InvMassA);
 		if (BoneB->IsPinned() == false)
-			BoneB->Location += (DiffDir * BoneB->InvMass);
+			BoneB->Location += (DiffDir * InvMassB);
 	}
 	/// PBD
 	else
 	{
+		if (bUseDistanceRange)
+		{
+			const float InvMassA = BoneA->IsPinned() ? 0.0f : BoneA->InvMass;
+			const float InvMassB = BoneB->IsPinned() ? 0.0f : BoneB->InvMass;
+			const float InvMassSum = InvMassA + InvMassB;
+			if (FMath::IsNearlyZero(InvMassSum, KINDA_SMALL_NUMBER))
+				return;
+
+			const float C = Distance - Length;
+			const float DeltaLambda = -(C * Stiffness) / InvMassSum;
+			const FVector DiffDir = Direction * DeltaLambda;
+			if (BoneA->IsPinned() == false)
+				BoneA->Location -= (DiffDir * InvMassA);
+			if (BoneB->IsPinned() == false)
+				BoneB->Location += (DiffDir * InvMassB);
+			return;
+		}
+
 		if (FMath::IsNearlyZero(Distance, KINDA_SMALL_NUMBER))
 			return;
 
@@ -150,11 +234,13 @@ void FLKAnimVerletConstraint_Distance::Update(float DeltaTime, bool bInitialUpda
 void FLKAnimVerletConstraint_Distance::PostUpdate(float DeltaTime)
 {
 	Lambda = 0.0f;
+	ActiveDistanceRange = 0;
 }
 
 void FLKAnimVerletConstraint_Distance::ResetSimulation()
 {
 	Lambda = 0.0f;
+	ActiveDistanceRange = 0;
 }
 ///=========================================================================================================================================
 

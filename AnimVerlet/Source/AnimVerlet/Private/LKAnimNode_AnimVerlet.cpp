@@ -139,6 +139,12 @@ void FLKAnimNode_AnimVerlet::InitializeBoneReferences(const FBoneContainer& Requ
 		}
 	}
 
+	for (FLKAnimVerletCustomDistanceConstraintSetting& CurConstraintSetting : CustomDistanceConstraints)
+	{
+		CurConstraintSetting.BoneA.Initialize(RequiredBones);
+		CurConstraintSetting.BoneB.Initialize(RequiredBones);
+	}
+
 	for (int32 i = 0; i < SimulateBones.Num(); ++i)
 	{
 		SimulateBones[i].BoneReference.Initialize(RequiredBones);
@@ -720,6 +726,8 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 		}
 	}
 
+	InitializeCustomDistanceConstraints(PoseContext, BoneContainer);
+
 	if (bUseBroadphase)
 	{
 		InitializeBroadphase();
@@ -785,6 +793,62 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 
 	/// LocalCollision(Contact) constraints
 	InitializeLocalCollisionConstraints(BoneContainer);
+}
+
+void FLKAnimNode_AnimVerlet::InitializeCustomDistanceConstraints(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer)
+{
+	if (CustomDistanceConstraints.IsEmpty())
+		return;
+
+	/// Constraint endpoints store raw pointers. Reserving the maximum possible number of anchors keeps those pointers stable while the list is built.
+	CustomDistanceConstraintBones.Reserve(CustomDistanceConstraints.Num() * 2);
+
+	const double Compliance = static_cast<double>(1.0 / InvCompliance);
+	const double SolverStiffness = bUseXPBDSolver ? Compliance : static_cast<double>(Stiffness);
+	for (const FLKAnimVerletCustomDistanceConstraintSetting& CurConstraintSetting : CustomDistanceConstraints)
+	{
+		FLKAnimVerletBone* BoneA = FindOrAddCustomDistanceConstraintBone(CurConstraintSetting.BoneA, PoseContext, BoneContainer);
+		FLKAnimVerletBone* BoneB = FindOrAddCustomDistanceConstraintBone(CurConstraintSetting.BoneB, PoseContext, BoneContainer);
+		if (BoneA == nullptr || BoneB == nullptr || BoneA == BoneB)
+			continue;
+
+		const FLKAnimVerletConstraint_Distance NewDistanceConstraint(BoneA, BoneB, bUseXPBDSolver, SolverStiffness, bStretchEachBone, StretchStrength,
+																	 CurConstraintSetting.MinDistance, CurConstraintSetting.MaxDistance);
+		DistanceConstraints.Emplace(NewDistanceConstraint);
+	}
+}
+
+FLKAnimVerletBone* FLKAnimNode_AnimVerlet::FindOrAddCustomDistanceConstraintBone(const FBoneReference& BoneReference, FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer)
+{
+	/// Subdivided particles inherit the real bone reference, so prefer the real skeletal particle when both share the same FBoneReference.
+	int32 SimulateBoneIndex = SimulateBones.IndexOfByPredicate([&BoneReference] (const FLKAnimVerletBone& SimulateBone) {
+		return SimulateBone.bFakeBone == false && SimulateBone.BoneReference == BoneReference;
+	});
+
+	if (SimulateBoneIndex == INDEX_NONE)
+		SimulateBoneIndex = SimulateBones.IndexOfByKey(FLKAnimVerletBoneKey(BoneReference));
+	if (SimulateBoneIndex != INDEX_NONE)
+		return &SimulateBones[SimulateBoneIndex];
+
+	const int32 ExistingAnchorIndex = CustomDistanceConstraintBones.IndexOfByKey(FLKAnimVerletBoneKey(BoneReference));
+	if (ExistingAnchorIndex != INDEX_NONE)
+		return &CustomDistanceConstraintBones[ExistingAnchorIndex];
+
+	FBoneReference InitializedBoneReference = BoneReference;
+	InitializedBoneReference.Initialize(BoneContainer);
+	const FCompactPoseBoneIndex PoseBoneIndex = InitializedBoneReference.GetCompactPoseIndex(BoneContainer);
+	if (PoseBoneIndex == INDEX_NONE)
+		return nullptr;
+
+	FLKAnimVerletBone NewAnchorBone;
+	{
+		NewAnchorBone.BoneReference = InitializedBoneReference;
+		NewAnchorBone.bPinned = true;
+		NewAnchorBone.InvMass = 0.0f;
+		NewAnchorBone.bUseXPBDSolver = bUseXPBDSolver;
+		NewAnchorBone.InitializeTransform(PoseContext.Pose.GetComponentSpaceTransform(PoseBoneIndex));
+	}
+	return &CustomDistanceConstraintBones.Emplace_GetRef(MoveTemp(NewAnchorBone));
 }
 
 void FLKAnimNode_AnimVerlet::InitializeBroadphase()
@@ -1127,6 +1191,20 @@ void FLKAnimNode_AnimVerlet::PrepareSimulation(FComponentSpacePoseContext& PoseC
 		/// LOD case?
 		const FTransform CurBonePoseT = PoseBoneIndex != INDEX_NONE ? PoseContext.Pose.GetComponentSpaceTransform(PoseBoneIndex) : FTransform::Identity;
 		CurExcludedBone.PrepareSimulation(CurBonePoseT);
+	}
+
+	for (FLKAnimVerletBone& CurAnchorBone : CustomDistanceConstraintBones)
+	{
+		const FCompactPoseBoneIndex PoseBoneIndex = CurAnchorBone.BoneReference.GetCompactPoseIndex(BoneContainer);
+		if (PoseBoneIndex == INDEX_NONE)
+			continue;
+
+		const FTransform CurBonePoseT = PoseContext.Pose.GetComponentSpaceTransform(PoseBoneIndex);
+		CurAnchorBone.PrepareSimulation(CurBonePoseT, FVector::ZeroVector);
+		CurAnchorBone.Location = CurAnchorBone.PoseLocation;
+		CurAnchorBone.PrevLocation = CurAnchorBone.PoseLocation;
+		CurAnchorBone.Rotation = CurAnchorBone.PoseRotation;
+		CurAnchorBone.PrevRotation = CurAnchorBone.PoseRotation;
 	}
 
 	PrepareLocalCollisionConstraints(PoseContext, BoneContainer, ComponentTransform);
@@ -2120,6 +2198,7 @@ void FLKAnimNode_AnimVerlet::ClearSimulateBones()
 	PlaneCollisionConstraints.Reset();
 	WorldCollisionConstraints.Reset();
 	SelfCollisionConstraints.Reset();
+	CustomDistanceConstraintBones.Reset();
 
 	BroadphaseContainer.Destroy();
 	BoneChainIndexes.Reset();
@@ -2137,6 +2216,11 @@ void FLKAnimNode_AnimVerlet::ResetSimulation()
 	{
 		FLKAnimVerletBone& CurVerletBone = SimulateBones[i];
 		CurVerletBone.ResetSimulation();
+	}
+
+	for (FLKAnimVerletBone& CurAnchorBone : CustomDistanceConstraintBones)
+	{
+		CurAnchorBone.ResetSimulation();
 	}
 
 	ForEachConstraints([](FLKAnimVerletConstraint& CurConstraint) {
@@ -2323,6 +2407,7 @@ void FLKAnimNode_AnimVerlet::SyncFromOtherAnimVerletNode(const FLKAnimNode_AnimV
 	bUseXPBDSolver = Other.bUseXPBDSolver;
 	InvCompliance = Other.InvCompliance;
 	Stiffness = Other.Stiffness;
+	CustomDistanceConstraints = Other.CustomDistanceConstraints;
 
 	bUseSleep = Other.bUseSleep;
 	bIgnoreSleepWhenParentWakedUp = Other.bIgnoreSleepWhenParentWakedUp;
