@@ -77,7 +77,7 @@ public:
 
 	bool bUseXPBDSolver = false;
 	float Q[4][4] = {};
-	float RestAngle = 0.0f;
+	float RestEnergy = 0.0f;
 	float RestDihedralAngle = 0.0f;
 	float Stiffness = 0.0f;				/// Minimum stiffness, used at the rest angle (PBD).
 	float MaxStiffness = 0.0f;			/// Maximum stiffness, used when fully folded (PBD).
@@ -102,7 +102,7 @@ public:
 
 private:
 	void CalculateQMatrix(float Q[4][4], struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, struct FLKAnimVerletBone* InBoneC, struct FLKAnimVerletBone* InBoneD);
-	float CalculateRestAngle(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, struct FLKAnimVerletBone* InBoneC, struct FLKAnimVerletBone* InBoneD);
+	float CalculateRestEnergy(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, struct FLKAnimVerletBone* InBoneC, struct FLKAnimVerletBone* InBoneD);
 };
 ///=========================================================================================================================================
 

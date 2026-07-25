@@ -558,6 +558,16 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 
 						if (bUseIsometricBendingConstraint)
 						{
+							/// Hinge on the side edge shared by the triangles above and below this row.
+							if (i > 0 && i + 1 < CurBoneChain.Num())
+							{
+								const FLKAnimVerletConstraint_IsometricBending SideEdgeBendingConstraint(&SimulateBones[LeftBoneChain[i - 1]], &SimulateBones[CurBoneChain[i]], &SimulateBones[LeftBoneChain[i]], &SimulateBones[CurBoneChain[i + 1]],
+																										bUseXPBDSolver, (bUseXPBDSolver ? BendingComplianceAtRest : BendingStiffnessAtRest),
+																										BendingComplianceWhenFolded, BendingStiffnessWhenFolded, BendingMaxAngleRadians);
+								BendingConstraints.Emplace(SideEdgeBendingConstraint);
+							}
+
+							/// Hinge on the diagonal edge shared by the two triangles in this quad.
 							if (i + 1 < LeftBoneChain.Num() && i + 1 < CurBoneChain.Num())
 							{
 								const FLKAnimVerletConstraint_IsometricBending BendingConstraint(&SimulateBones[CurBoneChain[i]], &SimulateBones[LeftBoneChain[i]], &SimulateBones[CurBoneChain[i + 1]], &SimulateBones[LeftBoneChain[i + 1]],
@@ -673,6 +683,16 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 
 						if (bUseIsometricBendingConstraint)
 						{
+							/// Hinge on the side edge shared by the triangles above and below this row.
+							if (i > 0 && i + 1 < RightBoneChain.Num())
+							{
+								const FLKAnimVerletConstraint_IsometricBending SideEdgeBendingConstraint(&SimulateBones[CurBoneChain[i - 1]], &SimulateBones[RightBoneChain[i]], &SimulateBones[CurBoneChain[i]], &SimulateBones[RightBoneChain[i + 1]],
+																										bUseXPBDSolver, (bUseXPBDSolver ? BendingComplianceAtRest : BendingStiffnessAtRest),
+																										BendingComplianceWhenFolded, BendingStiffnessWhenFolded, BendingMaxAngleRadians);
+								BendingConstraints.Emplace(SideEdgeBendingConstraint);
+							}
+
+							/// Hinge on the diagonal edge shared by the two triangles in this quad.
 							if (i + 1 < RightBoneChain.Num() && i + 1 < CurBoneChain.Num())
 							{
 								const FLKAnimVerletConstraint_IsometricBending BendingConstraint(&SimulateBones[RightBoneChain[i]], &SimulateBones[CurBoneChain[i]], &SimulateBones[RightBoneChain[i + 1]], &SimulateBones[CurBoneChain[i + 1]],

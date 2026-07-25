@@ -193,21 +193,21 @@ public:
 	bool bConstrainRightDiagonalDistance = false;
 	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve")
 	bool bConstrainLeftDiagonalDistance = false;
-	/** Bending constraint for inextensible surfaces(for more realistic looking when bending and realistic stretch effect. but may cause performance impact) - BETA */
+	/** Bending constraint for inextensible surfaces(for more realistic looking when bending and realistic stretch effect. but may cause performance impact) */
 	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve")
 	bool bUseIsometricBendingConstraint = false;
 	/** Stiffness for Isometric Bending Constraint(XPBD) */
 	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve", meta = (EditCondition = "bUseIsometricBendingConstraint && bUseXPBDSolver && bUseBendingComplianceRange == false", EditConditionHides, ClampMin = "0.0"))
-	float InvBendingCompliance = 100000.0f;
+	float InvBendingCompliance = 10000.0;
 	/** Varies inverse compliance by the angle folded away from the initial pose. Higher inverse compliance means a stronger constraint. */
 	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve", meta = (EditCondition = "bUseIsometricBendingConstraint && bUseXPBDSolver"))
 	bool bUseBendingComplianceRange = false;
 	/** Inverse compliance near the initial angle. */
 	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve", meta = (EditCondition = "bUseIsometricBendingConstraint && bUseXPBDSolver && bUseBendingComplianceRange", EditConditionHides, ClampMin = "0.0"))
-	float InvBendingComplianceMin = 100000.0f;
+	float InvBendingComplianceMin = 10000.0f;
 	/** Inverse compliance when BendingComplianceMaxAngle is reached. */
 	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve", meta = (EditCondition = "bUseIsometricBendingConstraint && bUseXPBDSolver && bUseBendingComplianceRange", EditConditionHides, ClampMin = "0.0"))
-	float InvBendingComplianceMax = 1000000.0f;
+	float InvBendingComplianceMax = 80000.0f;
 	/** Fold angle at which InvBendingComplianceMax is fully applied. */
 	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve", meta = (EditCondition = "bUseIsometricBendingConstraint && bUseXPBDSolver && bUseBendingComplianceRange", EditConditionHides, ClampMin = "0.0", ClampMax = "180.0", ForceUnits = "deg"))
 	float BendingComplianceMaxAngle = 120.0f;

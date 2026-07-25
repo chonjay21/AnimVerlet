@@ -188,7 +188,7 @@ FLKAnimVerletConstraint_IsometricBending::FLKAnimVerletConstraint_IsometricBendi
 	}
 
 	CalculateQMatrix(Q, BoneA, BoneB, BoneC, BoneD);
-	RestAngle = CalculateRestAngle(BoneA, BoneB, BoneC, BoneD);
+	RestEnergy = CalculateRestEnergy(BoneA, BoneB, BoneC, BoneD);
 	RestDihedralAngle = LkAnimVerlet::ComputeSignedDihedralAngle(BoneA->Location, BoneB->Location, BoneC->Location, BoneD->Location);
 }
 
@@ -227,11 +227,11 @@ void FLKAnimVerletConstraint_IsometricBending::CalculateQMatrix(float InQ[4][4],
 	/// Opposite vertices (A,D): negative sums per triangle
 	float K[4];
 	K[0] = -(CotB0 + CotC0);		/// A
-	K[1] = (CotB0 + CotB1);			/// B
-	K[2] = (CotC0 + CotC1);			/// C
+	K[1] = (CotC0 + CotC1);			/// B
+	K[2] = (CotB0 + CotB1);			/// C
 	K[3] = -(CotB1 + CotC1);		/// D
 
-	const float Scale = 1.0f / (2.0f * TotalArea);
+	const float Scale = 3.0f / TotalArea;
 
 	/// Q = scale * K * K^T
 	for (int32 i = 0; i < 4; ++i)
@@ -243,7 +243,7 @@ void FLKAnimVerletConstraint_IsometricBending::CalculateQMatrix(float InQ[4][4],
 	}
 }
 
-float FLKAnimVerletConstraint_IsometricBending::CalculateRestAngle(FLKAnimVerletBone* InBoneA, FLKAnimVerletBone* InBoneB, FLKAnimVerletBone* InBoneC, FLKAnimVerletBone* InBoneD)
+float FLKAnimVerletConstraint_IsometricBending::CalculateRestEnergy(FLKAnimVerletBone* InBoneA, FLKAnimVerletBone* InBoneB, FLKAnimVerletBone* InBoneC, FLKAnimVerletBone* InBoneD)
 {
 	verify(InBoneA != nullptr);
 	verify(InBoneB != nullptr);
@@ -251,15 +251,15 @@ float FLKAnimVerletConstraint_IsometricBending::CalculateRestAngle(FLKAnimVerlet
 	verify(InBoneD != nullptr);
 
 	FLKAnimVerletBone* X[4] = { InBoneA, InBoneB, InBoneC, InBoneD };
-	float ResultAngle = 0.0f;
+	float ResultEnergy = 0.0f;
 	for (int32 i = 0; i < 4; ++i)
 	{
 		for (int32 j = 0; j < 4; ++j)
 		{
-			ResultAngle += X[i]->Location.Dot(X[j]->Location) * Q[i][j];
+			ResultEnergy += X[i]->Location.Dot(X[j]->Location) * Q[i][j];
 		}
 	}
-	return ResultAngle;
+	return 0.5f * ResultEnergy;
 
 
 	/*const FVector& A = InBoneA->Location;
@@ -311,7 +311,7 @@ void FLKAnimVerletConstraint_IsometricBending::Update(float DeltaTime, bool bIni
 			C += Bones[i]->Location.Dot(Bones[j]->Location) * Q[i][j];
 		}
 	}
-	C -= RestAngle;
+	C = 0.5f * C - RestEnergy;
 
 	FVector Grad[4];
 	for (int32 i = 0; i < 4; ++i)
@@ -319,14 +319,15 @@ void FLKAnimVerletConstraint_IsometricBending::Update(float DeltaTime, bool bIni
 		Grad[i] = FVector::ZeroVector;
 		for (int32 j = 0; j < 4; ++j)
 		{
-			Grad[i] = Grad[i] + Bones[j]->Location * (2.0f * Q[i][j]);
+			Grad[i] = Grad[i] + Bones[j]->Location * Q[i][j];
 		}
 	}
 
 	float Sum = 0.0f;
 	for (int32 i = 0; i < 4; ++i)
 	{
-		Sum += Bones[i]->InvMass * Grad[i].Dot(Grad[i]);
+		const float EffectiveInvMass = Bones[i]->IsPinned() ? 0.0f : Bones[i]->InvMass;
+		Sum += EffectiveInvMass * Grad[i].Dot(Grad[i]);
 	}
 
 	const float CurrentDihedralAngle = LkAnimVerlet::ComputeSignedDihedralAngle(BoneA->Location, BoneB->Location, BoneC->Location, BoneD->Location);
