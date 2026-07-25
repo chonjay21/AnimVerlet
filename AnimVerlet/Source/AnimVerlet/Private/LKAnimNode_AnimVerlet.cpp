@@ -1579,7 +1579,7 @@ bool FLKAnimNode_AnimVerlet::PreUpdateBones(const UWorld* World, float InDeltaTi
 			World->Scene->GetWindParameters_GameThread(ComponentTransform.TransformPosition(CurVerletBone.PoseLocation), WindDirection, WindSpeed, WindMinGust, WindMaxGust);
 			WindDirection = ComponentTransform.Inverse().TransformVector(WindDirection);
 			const FVector WindVelocity = WindDirection * WindSpeed * FMath::FRandRange(0.0f, 2.0f);
-			CurVerletBone.Location += WindVelocity * InDeltaTime;
+			CurVerletBone.Location += WindVelocity * (InDeltaTime * CurVerletBone.InvMass);
 		}
 
 		/// Adjust animation pose transform

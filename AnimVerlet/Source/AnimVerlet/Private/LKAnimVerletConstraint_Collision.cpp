@@ -198,9 +198,9 @@ bool FLKAnimVerletConstraint_Sphere::CheckSphereSphere(IN OUT FLKAnimVerletBone&
 			CurLambda = FMath::Max(CurLambda + DeltaLambda, 0.0f);
 
 			if (CurVerletBone.IsPinned() == false)
-				CurVerletBone.Location = CurVerletBone.Location + (SphereToBoneDir * DeltaLambda);
+				CurVerletBone.Location = CurVerletBone.Location + (SphereToBoneDir * DeltaLambda * CurVerletBone.InvMass);
 
-			LkAnimVerletCollision::ApplyPBDCollisionFriction(IN OUT CurVerletBone, SphereToBoneDir, static_cast<float>(FMath::Abs(DeltaLambda)), FrictionCoefficient);
+			LkAnimVerletCollision::ApplyPBDCollisionFriction(IN OUT CurVerletBone, SphereToBoneDir, static_cast<float>(FMath::Abs(DeltaLambda) * CurVerletBone.InvMass), FrictionCoefficient);
 		}
 		else
 		{
@@ -683,9 +683,9 @@ bool FLKAnimVerletConstraint_Capsule::CheckCapsuleSphere(IN OUT FLKAnimVerletBon
 			CurLambda = FMath::Max(CurLambda + DeltaLambda, 0.0f);
 
 			if (CurVerletBone.IsPinned() == false)
-				CurVerletBone.Location = CurVerletBone.Location + (CapsuleToBoneDir * DeltaLambda);
+				CurVerletBone.Location = CurVerletBone.Location + (CapsuleToBoneDir * DeltaLambda * CurVerletBone.InvMass);
 
-			LkAnimVerletCollision::ApplyPBDCollisionFriction(IN OUT CurVerletBone, CapsuleToBoneDir, static_cast<float>(FMath::Abs(DeltaLambda)), FrictionCoefficient);
+			LkAnimVerletCollision::ApplyPBDCollisionFriction(IN OUT CurVerletBone, CapsuleToBoneDir, static_cast<float>(FMath::Abs(DeltaLambda) * CurVerletBone.InvMass), FrictionCoefficient);
 		}
 		else
 		{
@@ -1241,10 +1241,10 @@ bool FLKAnimVerletConstraint_Box::CheckBoxSphere(IN OUT FLKAnimVerletBone& CurVe
 
 			if (CurVerletBone.IsPinned() == false)
 			{
-				const FVector NewLocation = CurVerletBone.Location + CollisionNormal * DeltaLambda;
+				const FVector NewLocation = CurVerletBone.Location + CollisionNormal * DeltaLambda * CurVerletBone.InvMass;
 				CurVerletBone.Location = NewLocation;
 			}
-			LkAnimVerletCollision::ApplyPBDCollisionFriction(IN OUT CurVerletBone, CollisionNormal, static_cast<float>(FMath::Abs(DeltaLambda)), FrictionCoefficient);
+			LkAnimVerletCollision::ApplyPBDCollisionFriction(IN OUT CurVerletBone, CollisionNormal, static_cast<float>(FMath::Abs(DeltaLambda) * CurVerletBone.InvMass), FrictionCoefficient);
 		}
 		else
 		{

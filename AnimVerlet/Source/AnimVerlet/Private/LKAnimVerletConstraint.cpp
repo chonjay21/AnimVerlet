@@ -919,11 +919,15 @@ void FLKAnimVerletConstraint_FixedDistance::Update(float DeltaTime, bool bInitia
 		const float LengthWithMargin = Length + LengthMargin;
 		if (bAwayFromEachOther)
 		{
-			const FVector Center = BoneA->Location + Direction * Distance * 0.5f;
-			if (BoneB->IsPinned() == false)
-				BoneB->Location = Center + Direction * LengthWithMargin * 0.5f;
-			if (BoneA->IsPinned() == false)
-				BoneA->Location = Center - Direction * LengthWithMargin * 0.5f;
+			const float InvMassSum = BoneA->InvMass + BoneB->InvMass;
+			if (InvMassSum > KINDA_SMALL_NUMBER)
+			{
+				const float DistanceCorrection = Distance - LengthWithMargin;
+				if (BoneA->IsPinned() == false)
+					BoneA->Location += Direction * DistanceCorrection * (BoneA->InvMass / InvMassSum);
+				if (BoneB->IsPinned() == false)
+					BoneB->Location -= Direction * DistanceCorrection * (BoneB->InvMass / InvMassSum);
+			}
 		}
 		else
 		{
@@ -936,11 +940,15 @@ void FLKAnimVerletConstraint_FixedDistance::Update(float DeltaTime, bool bInitia
 		const float LengthWithMargin = Length - LengthMargin;
 		if (bAwayFromEachOther)
 		{
-			const FVector Center = BoneA->Location + Direction * Distance * 0.5f;
-			if (BoneB->IsPinned() == false)
-				BoneB->Location = Center + Direction * LengthWithMargin * 0.5f;
-			if (BoneA->IsPinned() == false)
-				BoneA->Location = Center - Direction * LengthWithMargin * 0.5f;
+			const float InvMassSum = BoneA->InvMass + BoneB->InvMass;
+			if (InvMassSum > KINDA_SMALL_NUMBER)
+			{
+				const float DistanceCorrection = Distance - LengthWithMargin;
+				if (BoneA->IsPinned() == false)
+					BoneA->Location += Direction * DistanceCorrection * (BoneA->InvMass / InvMassSum);
+				if (BoneB->IsPinned() == false)
+					BoneB->Location -= Direction * DistanceCorrection * (BoneB->InvMass / InvMassSum);
+			}
 		}
 		else
 		{
@@ -974,11 +982,15 @@ void FLKAnimVerletConstraint_FixedDistance::BackwardUpdate(float DeltaTime, bool
 		const float LengthWithMargin = Length + LengthMargin;
 		if (bAwayFromEachOther)
 		{
-			const FVector Center = BoneB->Location + Direction * Distance * 0.5f;
-			if (BoneA->IsPinned() == false)
-				BoneA->Location = Center + Direction * LengthWithMargin * 0.5f;
-			if (BoneB->IsPinned() == false)
-				BoneB->Location = Center - Direction * LengthWithMargin * 0.5f;
+			const float InvMassSum = BoneA->InvMass + BoneB->InvMass;
+			if (InvMassSum > KINDA_SMALL_NUMBER)
+			{
+				const float DistanceCorrection = Distance - LengthWithMargin;
+				if (BoneB->IsPinned() == false)
+					BoneB->Location += Direction * DistanceCorrection * (BoneB->InvMass / InvMassSum);
+				if (BoneA->IsPinned() == false)
+					BoneA->Location -= Direction * DistanceCorrection * (BoneA->InvMass / InvMassSum);
+			}
 		}
 		else
 		{
@@ -991,11 +1003,15 @@ void FLKAnimVerletConstraint_FixedDistance::BackwardUpdate(float DeltaTime, bool
 		const float LengthWithMargin = Length - LengthMargin;
 		if (bAwayFromEachOther)
 		{
-			const FVector Center = BoneB->Location + Direction * Distance * 0.5f;
-			if (BoneA->IsPinned() == false)
-				BoneA->Location = Center + Direction * LengthWithMargin * 0.5f;
-			if (BoneB->IsPinned() == false)
-				BoneB->Location = Center - Direction * LengthWithMargin * 0.5f;
+			const float InvMassSum = BoneA->InvMass + BoneB->InvMass;
+			if (InvMassSum > KINDA_SMALL_NUMBER)
+			{
+				const float DistanceCorrection = Distance - LengthWithMargin;
+				if (BoneB->IsPinned() == false)
+					BoneB->Location += Direction * DistanceCorrection * (BoneB->InvMass / InvMassSum);
+				if (BoneA->IsPinned() == false)
+					BoneA->Location -= Direction * DistanceCorrection * (BoneA->InvMass / InvMassSum);
+			}
 		}
 		else
 		{
@@ -1065,7 +1081,7 @@ void FLKAnimVerletConstraint_BallSocket::Update(float DeltaTime, bool bInitialUp
 
 			if (BoneB->IsPinned() == false)
 			{
-				const FVector ConstraintDir = BoneAToBoneB.RotateAngleAxis(-DeltaLambda, RotationAxis);
+				const FVector ConstraintDir = BoneAToBoneB.RotateAngleAxis(-DeltaLambda * BoneB->InvMass, RotationAxis);
 				BoneB->Location = BoneA->Location + (ConstraintDir * BoneAToBoneBSize);
 			}
 		}

@@ -142,9 +142,9 @@ bool FLKAnimVerletConstraint_Plane::CheckPlaneSphere(IN OUT FLKAnimVerletBone& C
 			CurLambda += DeltaLambda;
 
 			if (CurVerletBone.IsPinned() == false)
-				CurVerletBone.Location += (PlaneNormal * DeltaLambda);
+				CurVerletBone.Location += (PlaneNormal * DeltaLambda * CurVerletBone.InvMass);
 
-			LkAnimVerletCollision::ApplyPBDCollisionFriction(IN OUT CurVerletBone, PlaneNormal, static_cast<float>(FMath::Abs(DeltaLambda)), FrictionCoefficient);
+			LkAnimVerletCollision::ApplyPBDCollisionFriction(IN OUT CurVerletBone, PlaneNormal, static_cast<float>(FMath::Abs(DeltaLambda) * CurVerletBone.InvMass), FrictionCoefficient);
 		}
 		else
 		{
