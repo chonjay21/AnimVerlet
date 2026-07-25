@@ -197,11 +197,35 @@ public:
 	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve")
 	bool bUseIsometricBendingConstraint = false;
 	/** Stiffness for Isometric Bending Constraint(XPBD) */
-	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve", meta = (EditCondition = "bUseIsometricBendingConstraint && bUseXPBDSolver", ClampMin = "0.0"))
+	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve", meta = (EditCondition = "bUseIsometricBendingConstraint && bUseXPBDSolver && bUseBendingComplianceRange == false", EditConditionHides, ClampMin = "0.0"))
 	float InvBendingCompliance = 100000.0f;
+	/** Varies inverse compliance by the angle folded away from the initial pose. Higher inverse compliance means a stronger constraint. */
+	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve", meta = (EditCondition = "bUseIsometricBendingConstraint && bUseXPBDSolver"))
+	bool bUseBendingComplianceRange = false;
+	/** Inverse compliance near the initial angle. */
+	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve", meta = (EditCondition = "bUseIsometricBendingConstraint && bUseXPBDSolver && bUseBendingComplianceRange", EditConditionHides, ClampMin = "0.0"))
+	float InvBendingComplianceMin = 100000.0f;
+	/** Inverse compliance when BendingComplianceMaxAngle is reached. */
+	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve", meta = (EditCondition = "bUseIsometricBendingConstraint && bUseXPBDSolver && bUseBendingComplianceRange", EditConditionHides, ClampMin = "0.0"))
+	float InvBendingComplianceMax = 1000000.0f;
+	/** Fold angle at which InvBendingComplianceMax is fully applied. */
+	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve", meta = (EditCondition = "bUseIsometricBendingConstraint && bUseXPBDSolver && bUseBendingComplianceRange", EditConditionHides, ClampMin = "0.0", ClampMax = "180.0", ForceUnits = "deg"))
+	float BendingComplianceMaxAngle = 120.0f;
 	/** Stiffness for Isometric Bending Constraint(PBD). */
-	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve", meta = (EditCondition = "bUseIsometricBendingConstraint && bUseXPBDSolver == false", ClampMin = "0.0"))
+	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve", meta = (EditCondition = "bUseIsometricBendingConstraint && bUseXPBDSolver == false && bUseBendingStiffnessRange == false", EditConditionHides, ClampMin = "0.0"))
 	float BendingStiffness = 0.01f;
+	/** Varies PBD stiffness by the angle folded away from the initial pose. */
+	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve", meta = (EditCondition = "bUseIsometricBendingConstraint && bUseXPBDSolver == false"))
+	bool bUseBendingStiffnessRange = false;
+	/** PBD stiffness near the initial angle. */
+	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve", meta = (EditCondition = "bUseIsometricBendingConstraint && bUseXPBDSolver == false && bUseBendingStiffnessRange", EditConditionHides, ClampMin = "0.0"))
+	float BendingStiffnessMin = 0.01f;
+	/** PBD stiffness when BendingStiffnessMaxAngle is reached. */
+	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve", meta = (EditCondition = "bUseIsometricBendingConstraint && bUseXPBDSolver == false && bUseBendingStiffnessRange", EditConditionHides, ClampMin = "0.0"))
+	float BendingStiffnessMax = 0.1f;
+	/** Fold angle at which BendingStiffnessMax is fully applied. */
+	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve", meta = (EditCondition = "bUseIsometricBendingConstraint && bUseXPBDSolver == false && bUseBendingStiffnessRange", EditConditionHides, ClampMin = "0.0", ClampMax = "180.0", ForceUnits = "deg"))
+	float BendingStiffnessMaxAngle = 120.0f;
 
 	/** The option to keep the distance between parent and child bones in the bone chain helps to keep SolveIteration small. */
 	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve")
@@ -238,9 +262,17 @@ public:
 	/** Stiffness for Stretch Constraint(XPBD) */
 	///UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve", meta = (EditCondition = "bUseFlatBendingConstraint && bUseXPBDSolver", ClampMin = "0.0"))
 	float InvFlatBendingCompliance = 100000.0f;
+	bool bUseFlatBendingComplianceRange = false;
+	float InvFlatBendingComplianceMin = 100000.0f;
+	float InvFlatBendingComplianceMax = 1000000.0f;
+	float FlatBendingComplianceMaxAngle = 90.0f;
 	/** Stiffness for Stretch Constraint(PBD). */
 	///UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve", meta = (EditCondition = "bUseFlatBendingConstraint && bUseXPBDSolver == false", ClampMin = "0.0"))
 	float FlatBendingStiffness = 1.0f;
+	bool bUseFlatBendingStiffnessRange = false;
+	float FlatBendingStiffnessMin = 0.1f;
+	float FlatBendingStiffnessMax = 1.0f;
+	float FlatBendingStiffnessMaxAngle = 90.0f;
 	/** Stretch speed for Stretch Constraint(PBD). */
 	///UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Solve", meta = (EditCondition = "bUseFlatBendingConstraint", ClampMin = "0.0"))
 	float FlatBendingAlpha = 0.3f;

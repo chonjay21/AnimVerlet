@@ -78,9 +78,13 @@ public:
 	bool bUseXPBDSolver = false;
 	float Q[4][4] = {};
 	float RestAngle = 0.0f;
-	float Stiffness = 0.0f;
+	float RestDihedralAngle = 0.0f;
+	float Stiffness = 0.0f;				/// Minimum stiffness, used at the rest angle (PBD).
+	float MaxStiffness = 0.0f;			/// Maximum stiffness, used when fully folded (PBD).
 	double Lambda = 0.0f;		///for XPBD
-	double Compliance = 0.0;	///for XPBD
+	double Compliance = 0.0;	/// Maximum compliance, used at the rest angle (XPBD).
+	double MinCompliance = 0.0;	/// Minimum compliance, used when fully folded (XPBD).
+	float MaxAngleRadians = PI;
 
 public:
 	/// [Edge B-C is shared]
@@ -90,7 +94,8 @@ public:
 	///   \|   \
 	///	   C----D
 	FLKAnimVerletConstraint_IsometricBending(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, struct FLKAnimVerletBone* InBoneC, 
-											 struct FLKAnimVerletBone* InBoneD, bool bInUseXPBDSolver, double InStiffness);
+											 struct FLKAnimVerletBone* InBoneD, bool bInUseXPBDSolver, double InStiffness,
+											 double InMinCompliance = -1.0, float InMaxStiffness = -1.0f, float InMaxAngleRadians = PI);
 	virtual void Update(float DeltaTime, bool bInitialUpdate, bool bFinalize) override;
 	virtual void PostUpdate(float DeltaTime) override;
 	virtual void ResetSimulation() override;
@@ -113,12 +118,17 @@ public:
 
 	bool bUseXPBDSolver = false;
 	float RestAngle = 0.0f;
-	float Stiffness = 0.0f;
+	float Stiffness = 0.0f;				/// Minimum stiffness, used at the rest angle (PBD).
+	float MaxStiffness = 0.0f;			/// Maximum stiffness, used when fully folded (PBD).
 	double Lambda = 0.0f;		///for XPBD
-	double Compliance = 0.0;	///for XPBD
+	double Compliance = 0.0;	/// Maximum compliance, used at the rest angle (XPBD).
+	double MinCompliance = 0.0;	/// Minimum compliance, used when fully folded (XPBD).
+	float MaxAngleRadians = PI;
 
 public:
-	FLKAnimVerletConstraint_Bending_1D(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, struct FLKAnimVerletBone* InBoneC, bool bInUseXPBDSolver, double InStiffness);
+	FLKAnimVerletConstraint_Bending_1D(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, struct FLKAnimVerletBone* InBoneC,
+									  bool bInUseXPBDSolver, double InStiffness, double InMinCompliance = -1.0,
+									  float InMaxStiffness = -1.0f, float InMaxAngleRadians = PI);
 	virtual void Update(float DeltaTime, bool bInitialUpdate, bool bFinalize) override;
 	virtual void PostUpdate(float DeltaTime) override;
 	virtual void ResetSimulation() override;
@@ -140,9 +150,12 @@ public:
 	struct FLKAnimVerletBone* BoneD = nullptr;
 
 	bool bUseXPBDSolver = false;
-	float Stiffness = 0.0f;
+	float Stiffness = 0.0f;				/// Minimum stiffness, used at the target angle (PBD).
+	float MaxStiffness = 0.0f;			/// Maximum stiffness, used when fully folded (PBD).
 	double Lambda = 0.0f;			///for XPBD
-	double Compliance = 0.0;		///for XPBD
+	double Compliance = 0.0;		/// Maximum compliance, used at the target angle (XPBD).
+	double MinCompliance = 0.0;		/// Minimum compliance, used when fully folded (XPBD).
+	float MaxAngleRadians = PI;
 
 	float RestAngle = 0.0f;
 	float TargetAngle = 0.0f;
@@ -156,7 +169,8 @@ public:
 	///   \|   \
 	///	   C----D
 	FLKAnimVerletConstraint_FlatBending(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, struct FLKAnimVerletBone* InBoneC, 
-										struct FLKAnimVerletBone* InBoneD, bool bInUseXPBDSolver, double InStiffness, float InFlatAlpha);
+										struct FLKAnimVerletBone* InBoneD, bool bInUseXPBDSolver, double InStiffness, float InFlatAlpha,
+										double InMinCompliance = -1.0, float InMaxStiffness = -1.0f, float InMaxAngleRadians = PI);
 	virtual void Update(float DeltaTime, bool bInitialUpdate, bool bFinalize) override;
 	virtual void PostUpdate(float DeltaTime) override;
 	virtual void ResetSimulation() override;

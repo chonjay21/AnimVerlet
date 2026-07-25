@@ -233,6 +233,22 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 	/// Create constraints
 	const bool bSingleChain = IsSingleChain();
 	const double Compliance = static_cast<double>(1.0 / InvCompliance);
+	const float BendingInvComplianceAtRest = bUseBendingComplianceRange ? FMath::Min(InvBendingComplianceMin, InvBendingComplianceMax) : InvBendingCompliance;
+	const float BendingInvComplianceWhenFolded = bUseBendingComplianceRange ? FMath::Max(InvBendingComplianceMin, InvBendingComplianceMax) : InvBendingCompliance;
+	const double BendingComplianceAtRest = 1.0 / static_cast<double>(FMath::Max(BendingInvComplianceAtRest, UE_SMALL_NUMBER));
+	const double BendingComplianceWhenFolded = 1.0 / static_cast<double>(FMath::Max(BendingInvComplianceWhenFolded, UE_SMALL_NUMBER));
+	const float BendingStiffnessAtRest = bUseBendingStiffnessRange ? FMath::Min(BendingStiffnessMin, BendingStiffnessMax) : BendingStiffness;
+	const float BendingStiffnessWhenFolded = bUseBendingStiffnessRange ? FMath::Max(BendingStiffnessMin, BendingStiffnessMax) : BendingStiffness;
+	const float BendingMaxAngle = bUseXPBDSolver ? BendingComplianceMaxAngle : BendingStiffnessMaxAngle;
+	const float BendingMaxAngleRadians = FMath::DegreesToRadians(FMath::Max(BendingMaxAngle, 0.0f));
+	const float FlatBendingInvComplianceAtRest = bUseFlatBendingComplianceRange ? FMath::Min(InvFlatBendingComplianceMin, InvFlatBendingComplianceMax) : InvFlatBendingCompliance;
+	const float FlatBendingInvComplianceWhenFolded = bUseFlatBendingComplianceRange ? FMath::Max(InvFlatBendingComplianceMin, InvFlatBendingComplianceMax) : InvFlatBendingCompliance;
+	const double FlatBendingComplianceAtRest = 1.0 / static_cast<double>(FMath::Max(FlatBendingInvComplianceAtRest, UE_SMALL_NUMBER));
+	const double FlatBendingComplianceWhenFolded = 1.0 / static_cast<double>(FMath::Max(FlatBendingInvComplianceWhenFolded, UE_SMALL_NUMBER));
+	const float FlatBendingStiffnessAtRest = bUseFlatBendingStiffnessRange ? FMath::Min(FlatBendingStiffnessMin, FlatBendingStiffnessMax) : FlatBendingStiffness;
+	const float FlatBendingStiffnessWhenFolded = bUseFlatBendingStiffnessRange ? FMath::Max(FlatBendingStiffnessMin, FlatBendingStiffnessMax) : FlatBendingStiffness;
+	const float FlatBendingMaxAngle = bUseXPBDSolver ? FlatBendingComplianceMaxAngle : FlatBendingStiffnessMaxAngle;
+	const float FlatBendingMaxAngleRadians = FMath::DegreesToRadians(FMath::Max(FlatBendingMaxAngle, 0.0f));
 	for (int32 i = 0; i < SimulateBones.Num(); ++i)
 	{
 		FLKAnimVerletBone& CurSimulateBone = SimulateBones[i];
@@ -340,8 +356,9 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 
 				if (bSingleChain && bUseIsometricBendingConstraint)
 				{
-					const double BendingCompliance = static_cast<double>(1.0 / InvBendingCompliance);
-					const FLKAnimVerletConstraint_Bending_1D BendingConstraint(&GrandParentSimulateBone, &ParentSimulateBone, &CurSimulateBone, bUseXPBDSolver, (bUseXPBDSolver ? BendingCompliance : BendingStiffness));
+					const FLKAnimVerletConstraint_Bending_1D BendingConstraint(&GrandParentSimulateBone, &ParentSimulateBone, &CurSimulateBone, bUseXPBDSolver,
+																			  (bUseXPBDSolver ? BendingComplianceAtRest : BendingStiffnessAtRest),
+																			  BendingComplianceWhenFolded, BendingStiffnessWhenFolded, BendingMaxAngleRadians);
 					BendingConstraints_1D.Emplace(BendingConstraint);
 				}
 			}
@@ -385,21 +402,22 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 
 							if (bUseIsometricBendingConstraint)
 							{
-								const double BendingCompliance = static_cast<double>(1.0 / InvBendingCompliance);
 								if (i + 1 < RightBoneChain.Num() && i + 1 < CurBoneChain.Num())
 								{
-									const FLKAnimVerletConstraint_IsometricBending BendingConstraint(&SimulateBones[LeftBoneChain[i]], &SimulateBones[CurBoneChain[i]], &SimulateBones[CurBoneChain[i + 1]], &SimulateBones[RightBoneChain[i + 1]], bUseXPBDSolver, (bUseXPBDSolver ? BendingCompliance : BendingStiffness));
+									const FLKAnimVerletConstraint_IsometricBending BendingConstraint(&SimulateBones[LeftBoneChain[i]], &SimulateBones[CurBoneChain[i]], &SimulateBones[CurBoneChain[i + 1]], &SimulateBones[RightBoneChain[i + 1]],
+																									bUseXPBDSolver, (bUseXPBDSolver ? BendingComplianceAtRest : BendingStiffnessAtRest),
+																									BendingComplianceWhenFolded, BendingStiffnessWhenFolded, BendingMaxAngleRadians);
 									BendingConstraints.Emplace(BendingConstraint);
 								}
 							}
 
 							if (bUseFlatBendingConstraint)
 							{
-								const double FlatBendingCompliance = static_cast<double>(1.0 / InvFlatBendingCompliance);
 								if (i + 1 < RightBoneChain.Num() && i + 1 < CurBoneChain.Num())
 								{
 									const FLKAnimVerletConstraint_FlatBending FlatBendingConstraint(&SimulateBones[LeftBoneChain[i]], &SimulateBones[CurBoneChain[i]], &SimulateBones[CurBoneChain[i + 1]], &SimulateBones[RightBoneChain[i + 1]],
-																									bUseXPBDSolver, (bUseXPBDSolver ? FlatBendingCompliance : FlatBendingStiffness), FlatBendingAlpha);
+																									bUseXPBDSolver, (bUseXPBDSolver ? FlatBendingComplianceAtRest : FlatBendingStiffnessAtRest), FlatBendingAlpha,
+																									FlatBendingComplianceWhenFolded, FlatBendingStiffnessWhenFolded, FlatBendingMaxAngleRadians);
 									FlatBendingConstraints.Emplace(FlatBendingConstraint);
 								}
 							}
@@ -427,21 +445,22 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 
 						if (bUseIsometricBendingConstraint)
 						{
-							const double BendingCompliance = static_cast<double>(1.0 / InvBendingCompliance);
 							if (i + 1 < RightBoneChain.Num() && i + 1 < CurBoneChain.Num())
 							{
-								const FLKAnimVerletConstraint_IsometricBending BendingConstraint(&SimulateBones[LeftBoneChain[i]], &SimulateBones[CurBoneChain[i]], &SimulateBones[CurBoneChain[i + 1]], &SimulateBones[RightBoneChain[i + 1]], bUseXPBDSolver, (bUseXPBDSolver ? BendingCompliance : BendingStiffness));
+								const FLKAnimVerletConstraint_IsometricBending BendingConstraint(&SimulateBones[LeftBoneChain[i]], &SimulateBones[CurBoneChain[i]], &SimulateBones[CurBoneChain[i + 1]], &SimulateBones[RightBoneChain[i + 1]],
+																								bUseXPBDSolver, (bUseXPBDSolver ? BendingComplianceAtRest : BendingStiffnessAtRest),
+																								BendingComplianceWhenFolded, BendingStiffnessWhenFolded, BendingMaxAngleRadians);
 								BendingConstraints.Emplace(BendingConstraint);
 							}
 						}
 
 						if (bUseFlatBendingConstraint)
 						{
-							const double FlatBendingCompliance = static_cast<double>(1.0 / InvFlatBendingCompliance);
 							if (i + 1 < RightBoneChain.Num() && i + 1 < CurBoneChain.Num())
 							{
 								const FLKAnimVerletConstraint_FlatBending FlatBendingConstraint(&SimulateBones[LeftBoneChain[i]], &SimulateBones[CurBoneChain[i]], &SimulateBones[CurBoneChain[i + 1]], &SimulateBones[RightBoneChain[i + 1]],
-																								bUseXPBDSolver, (bUseXPBDSolver ? FlatBendingCompliance : FlatBendingStiffness), FlatBendingAlpha);
+																								bUseXPBDSolver, (bUseXPBDSolver ? FlatBendingComplianceAtRest : FlatBendingStiffnessAtRest), FlatBendingAlpha,
+																								FlatBendingComplianceWhenFolded, FlatBendingStiffnessWhenFolded, FlatBendingMaxAngleRadians);
 								FlatBendingConstraints.Emplace(FlatBendingConstraint);
 							}
 						}
@@ -541,8 +560,9 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 						{
 							if (i + 1 < LeftBoneChain.Num() && i + 1 < CurBoneChain.Num())
 							{
-								const double BendingCompliance = static_cast<double>(1.0 / InvBendingCompliance);
-								const FLKAnimVerletConstraint_IsometricBending BendingConstraint(&SimulateBones[CurBoneChain[i]], &SimulateBones[LeftBoneChain[i]], &SimulateBones[CurBoneChain[i + 1]], &SimulateBones[LeftBoneChain[i + 1]], bUseXPBDSolver, (bUseXPBDSolver ? BendingCompliance : BendingStiffness));
+								const FLKAnimVerletConstraint_IsometricBending BendingConstraint(&SimulateBones[CurBoneChain[i]], &SimulateBones[LeftBoneChain[i]], &SimulateBones[CurBoneChain[i + 1]], &SimulateBones[LeftBoneChain[i + 1]],
+																								bUseXPBDSolver, (bUseXPBDSolver ? BendingComplianceAtRest : BendingStiffnessAtRest),
+																								BendingComplianceWhenFolded, BendingStiffnessWhenFolded, BendingMaxAngleRadians);
 								BendingConstraints.Emplace(BendingConstraint);
 							}
 						}
@@ -551,9 +571,9 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 						{
 							if (i + 1 < LeftBoneChain.Num() && i + 1 < CurBoneChain.Num())
 							{
-								const double FlatBendingCompliance = static_cast<double>(1.0 / InvFlatBendingCompliance);
 								const FLKAnimVerletConstraint_FlatBending FlatBendingConstraint(&SimulateBones[CurBoneChain[i]], &SimulateBones[LeftBoneChain[i]], &SimulateBones[CurBoneChain[i + 1]], &SimulateBones[LeftBoneChain[i + 1]], 
-																								bUseXPBDSolver, (bUseXPBDSolver ? FlatBendingCompliance : FlatBendingStiffness), FlatBendingAlpha);
+																								bUseXPBDSolver, (bUseXPBDSolver ? FlatBendingComplianceAtRest : FlatBendingStiffnessAtRest), FlatBendingAlpha,
+																								FlatBendingComplianceWhenFolded, FlatBendingStiffnessWhenFolded, FlatBendingMaxAngleRadians);
 								FlatBendingConstraints.Emplace(FlatBendingConstraint);
 							}
 						}
@@ -655,8 +675,9 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 						{
 							if (i + 1 < RightBoneChain.Num() && i + 1 < CurBoneChain.Num())
 							{
-								const double BendingCompliance = static_cast<double>(1.0 / InvBendingCompliance);
-								const FLKAnimVerletConstraint_IsometricBending BendingConstraint(&SimulateBones[RightBoneChain[i]], &SimulateBones[CurBoneChain[i]], &SimulateBones[RightBoneChain[i + 1]], &SimulateBones[CurBoneChain[i + 1]], bUseXPBDSolver, (bUseXPBDSolver ? BendingCompliance : BendingStiffness));
+								const FLKAnimVerletConstraint_IsometricBending BendingConstraint(&SimulateBones[RightBoneChain[i]], &SimulateBones[CurBoneChain[i]], &SimulateBones[RightBoneChain[i + 1]], &SimulateBones[CurBoneChain[i + 1]],
+																								bUseXPBDSolver, (bUseXPBDSolver ? BendingComplianceAtRest : BendingStiffnessAtRest),
+																								BendingComplianceWhenFolded, BendingStiffnessWhenFolded, BendingMaxAngleRadians);
 								BendingConstraints.Emplace(BendingConstraint);
 							}
 						}
@@ -665,9 +686,9 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 						{
 							if (i + 1 < RightBoneChain.Num() && i + 1 < CurBoneChain.Num())
 							{
-								const double FlatBendingCompliance = static_cast<double>(1.0 / InvFlatBendingCompliance);
 								const FLKAnimVerletConstraint_FlatBending FlatBendingConstraint(&SimulateBones[RightBoneChain[i]], &SimulateBones[CurBoneChain[i]], &SimulateBones[RightBoneChain[i + 1]], &SimulateBones[CurBoneChain[i + 1]],
-																								bUseXPBDSolver, (bUseXPBDSolver ? FlatBendingCompliance : FlatBendingStiffness), FlatBendingAlpha);
+																								bUseXPBDSolver, (bUseXPBDSolver ? FlatBendingComplianceAtRest : FlatBendingStiffnessAtRest), FlatBendingAlpha,
+																								FlatBendingComplianceWhenFolded, FlatBendingStiffnessWhenFolded, FlatBendingMaxAngleRadians);
 								FlatBendingConstraints.Emplace(FlatBendingConstraint);
 							}
 						}
@@ -2293,7 +2314,15 @@ void FLKAnimNode_AnimVerlet::SyncFromOtherAnimVerletNode(const FLKAnimNode_AnimV
 	bConstrainLeftDiagonalDistance = Other.bConstrainLeftDiagonalDistance;
 	bUseIsometricBendingConstraint = Other.bUseIsometricBendingConstraint;
 	InvBendingCompliance = Other.InvBendingCompliance;
+	bUseBendingComplianceRange = Other.bUseBendingComplianceRange;
+	InvBendingComplianceMin = Other.InvBendingComplianceMin;
+	InvBendingComplianceMax = Other.InvBendingComplianceMax;
+	BendingComplianceMaxAngle = Other.BendingComplianceMaxAngle;
 	BendingStiffness = Other.BendingStiffness;
+	bUseBendingStiffnessRange = Other.bUseBendingStiffnessRange;
+	BendingStiffnessMin = Other.BendingStiffnessMin;
+	BendingStiffnessMax = Other.BendingStiffnessMax;
+	BendingStiffnessMaxAngle = Other.BendingStiffnessMaxAngle;
 
 	bPreserveLengthFromParent = Other.bPreserveLengthFromParent;
 	bPreserveLengthFromParentBetweenRealBones = Other.bPreserveLengthFromParentBetweenRealBones;
@@ -2310,7 +2339,15 @@ void FLKAnimNode_AnimVerlet::SyncFromOtherAnimVerletNode(const FLKAnimNode_AnimV
 
 	bUseFlatBendingConstraint = Other.bUseFlatBendingConstraint;
 	InvFlatBendingCompliance = Other.InvFlatBendingCompliance;
+	bUseFlatBendingComplianceRange = Other.bUseFlatBendingComplianceRange;
+	InvFlatBendingComplianceMin = Other.InvFlatBendingComplianceMin;
+	InvFlatBendingComplianceMax = Other.InvFlatBendingComplianceMax;
+	FlatBendingComplianceMaxAngle = Other.FlatBendingComplianceMaxAngle;
 	FlatBendingStiffness = Other.FlatBendingStiffness;
+	bUseFlatBendingStiffnessRange = Other.bUseFlatBendingStiffnessRange;
+	FlatBendingStiffnessMin = Other.FlatBendingStiffnessMin;
+	FlatBendingStiffnessMax = Other.FlatBendingStiffnessMax;
+	FlatBendingStiffnessMaxAngle = Other.FlatBendingStiffnessMaxAngle;
 	FlatBendingAlpha = Other.FlatBendingAlpha;
 
 	SolveIteration = Other.SolveIteration;
