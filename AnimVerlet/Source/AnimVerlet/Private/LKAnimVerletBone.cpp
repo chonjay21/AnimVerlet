@@ -72,86 +72,46 @@ void FLKAnimVerletBone::PrepareSimulation(const FTransform& PoseT, const FVector
 
 void FLKAnimVerletBone::Update(float DeltaTime, const FLKAnimVerletUpdateParam& InParam)
 {
-	/// XPBD
-	/*if (bUseXPBDSolver)
-	{
-		const float CurDeltaTime = DeltaTime;
+	const float CurDeltaTime = InParam.bUseSquaredDeltaTime ? DeltaTime * DeltaTime : DeltaTime;
 		
-		/// VerletIntegration and Damping
-		Velocity += MoveDelta * InParam.Damping * CurDeltaTime;
+	/// VerletIntegration and Damping
+	Location += MoveDelta * InParam.Damping;
 
-		/// Component movement
-		Velocity += InParam.ComponentMoveDiff * CurDeltaTime;
-		Velocity += (InParam.ComponentRotDiff.RotateVector(PrevLocation) - PrevLocation) * CurDeltaTime;
-
-		/// Gravity
-		Velocity += InParam.Gravity * CurDeltaTime;
-
-		/// StretchForce
-		Velocity += (PoseDirFromParent * InParam.StretchForce) * CurDeltaTime;
-
-		/// SideStraightenForce
-		Velocity += (Rotation.RotateVector(SideStraightenDirInLocal) * InParam.SideStraightenForce) * CurDeltaTime;
-
-		/// ExternalForce
-		Velocity += InParam.ExternalForce * CurDeltaTime;
-
-		/// RandomWind
-		{
-			if (InParam.RandomWind.RandomForceDirection.IsNearlyZero(KINDA_SMALL_NUMBER) == false)
-				Velocity += InParam.RandomWind.RandomForceDirection * FMath::RandRange(InParam.RandomWind.RandomForceSizeMin, InParam.RandomWind.RandomForceSizeMax) * CurDeltaTime;
-
-			for (const FLKAnimVerletRandomForceSetting& CurWind : InParam.AdditionalRandomWinds)
-			{
-				if (CurWind.RandomForceDirection.IsNearlyZero(KINDA_SMALL_NUMBER) == false)
-					Velocity += CurWind.RandomForceDirection * FMath::RandRange(CurWind.RandomForceSizeMin, CurWind.RandomForceSizeMax) * CurDeltaTime;
-			}
-		}
-
-		/// ShapeMemoryForce
-		Velocity += ((PoseLocation - Location).GetSafeNormal() * InParam.ShapeMemoryForce) * CurDeltaTime;
-
-		Location += Velocity * DeltaTime;
-	}
-	/// PBD
-	else*/
+	/// Rebase the complete Verlet state from the previous component frame into the current component frame.
+	if (InParam.ComponentMoveDiff.IsNearlyZero(KINDA_SMALL_NUMBER) == false || InParam.ComponentRotDiff.Equals(FQuat::Identity, KINDA_SMALL_NUMBER) == false)
 	{
-		const float CurDeltaTime = InParam.bUseSquaredDeltaTime ? DeltaTime * DeltaTime : DeltaTime;
-		
-		/// VerletIntegration and Damping
-		Location += MoveDelta * InParam.Damping;
-
-		/// Component movement
-		Location += InParam.ComponentMoveDiff * CurDeltaTime;
-		Location += (InParam.ComponentRotDiff.RotateVector(PrevLocation) - PrevLocation) * InParam.RotationInertiaScale * CurDeltaTime;
-
-		/// Gravity
-		Location += InParam.Gravity * CurDeltaTime;
-
-		/// StretchForce
-		Location += (PoseDirFromParent * InParam.StretchForce) * CurDeltaTime;
-
-		/// SideStraightenForce
-		Location += (Rotation.RotateVector(SideStraightenDirInLocal) * InParam.SideStraightenForce) * CurDeltaTime;
-
-		/// ExternalForce
-		Location += InParam.ExternalForce * CurDeltaTime;
-
-		/// RandomWind
-		{
-			if (InParam.RandomWind.RandomForceDirection.IsNearlyZero(KINDA_SMALL_NUMBER) == false)
-				Location += InParam.RandomWind.RandomForceDirection * FMath::RandRange(InParam.RandomWind.RandomForceSizeMin, InParam.RandomWind.RandomForceSizeMax) * CurDeltaTime;
-
-			for (const FLKAnimVerletRandomForceSetting& CurWind : InParam.AdditionalRandomWinds)
-			{
-				if (CurWind.RandomForceDirection.IsNearlyZero(KINDA_SMALL_NUMBER) == false)
-					Location += CurWind.RandomForceDirection * FMath::RandRange(CurWind.RandomForceSizeMin, CurWind.RandomForceSizeMax) * CurDeltaTime;
-			}
-		}
-
-		/// ShapeMemoryForce
-		Location += ((PoseLocation - Location).GetSafeNormal() * InParam.ShapeMemoryForce) * CurDeltaTime;
+		Location = InParam.ComponentRotDiff.RotateVector(Location) + InParam.ComponentMoveDiff;
+		PrevLocation = InParam.ComponentRotDiff.RotateVector(PrevLocation) + InParam.ComponentMoveDiff;
+		Rotation = (InParam.ComponentRotDiff * Rotation).GetNormalized();
+		PrevRotation = (InParam.ComponentRotDiff * PrevRotation).GetNormalized();
 	}
+
+	/// Gravity
+	Location += InParam.Gravity * CurDeltaTime;
+
+	/// StretchForce
+	Location += (PoseDirFromParent * InParam.StretchForce) * CurDeltaTime;
+
+	/// SideStraightenForce
+	Location += (Rotation.RotateVector(SideStraightenDirInLocal) * InParam.SideStraightenForce) * CurDeltaTime;
+
+	/// ExternalForce
+	Location += InParam.ExternalForce * CurDeltaTime;
+
+	/// RandomWind
+	{
+		if (InParam.RandomWind.RandomForceDirection.IsNearlyZero(KINDA_SMALL_NUMBER) == false)
+			Location += InParam.RandomWind.RandomForceDirection * FMath::RandRange(InParam.RandomWind.RandomForceSizeMin, InParam.RandomWind.RandomForceSizeMax) * CurDeltaTime;
+
+		for (const FLKAnimVerletRandomForceSetting& CurWind : InParam.AdditionalRandomWinds)
+		{
+			if (CurWind.RandomForceDirection.IsNearlyZero(KINDA_SMALL_NUMBER) == false)
+				Location += CurWind.RandomForceDirection * FMath::RandRange(CurWind.RandomForceSizeMin, CurWind.RandomForceSizeMax) * CurDeltaTime;
+		}
+	}
+
+	/// ShapeMemoryForce
+	Location += ((PoseLocation - Location).GetSafeNormal() * InParam.ShapeMemoryForce) * CurDeltaTime;
 }
 
 void FLKAnimVerletBone::PostUpdate(float DeltaTime)

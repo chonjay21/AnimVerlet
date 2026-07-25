@@ -836,7 +836,7 @@ bool FLKAnimNode_AnimVerlet::MakeSimulateBones(FComponentSpacePoseContext& PoseC
 		FTransform ReferenceBonePoseT = PoseContext.Pose.GetComponentSpaceTransform(NewSimulateBone.BoneReference.CachedCompactPoseIndex);
 		NewSimulateBone.bFakeBone = BoneSetting.bFakeBone;
 		NewSimulateBone.bUseXPBDSolver = bUseXPBDSolver;
-		NewSimulateBone.InvMass = FMath::IsNearlyZero(BoneSetting.Mass, KINDA_SMALL_NUMBER) ? 1.0f : 1.0f / BoneSetting.Mass;
+		NewSimulateBone.InvMass = 1.0f / FMath::Max(BoneSetting.Mass, 0.01f);
 		NewSimulateBone.Thickness = Thickness;
 		if (FoundBoneUnitSettingNullable != nullptr)
 		{
@@ -845,7 +845,7 @@ bool FLKAnimNode_AnimVerlet::MakeSimulateBones(FComponentSpacePoseContext& PoseC
 			if (FoundBoneUnitSettingNullable->bOverrideConeAngle)
 				NewSimulateBone.ConeAngleConstraint = FoundBoneUnitSettingNullable->ConeAngle;
 			if (FoundBoneUnitSettingNullable->bOverrideMass)
-				NewSimulateBone.InvMass = FMath::IsNearlyZero(FoundBoneUnitSettingNullable->Mass, KINDA_SMALL_NUMBER) ? 1.0f : 1.0f / FoundBoneUnitSettingNullable->Mass;
+				NewSimulateBone.InvMass = 1.0f / FMath::Max(FoundBoneUnitSettingNullable->Mass, 0.01f);
 			if (FoundBoneUnitSettingNullable->bOverrideThickness)
 				NewSimulateBone.Thickness = FoundBoneUnitSettingNullable->Thickness;
 			NewSimulateBone.bOverrideToUseSphereCollisionForChain = FoundBoneUnitSettingNullable->bOverrideToUseSphereCollisionForChain;
@@ -953,7 +953,7 @@ bool FLKAnimNode_AnimVerlet::MakeSimulateBones(FComponentSpacePoseContext& PoseC
 			FakeSimulateBone.bFakeBone = true;
 			FakeSimulateBone.bTipBone = true;
 			FakeSimulateBone.bUseXPBDSolver = bUseXPBDSolver;
-			FakeSimulateBone.InvMass = FMath::IsNearlyZero(BoneSetting.Mass, KINDA_SMALL_NUMBER) ? 1.0f : 1.0f / BoneSetting.Mass;
+			FakeSimulateBone.InvMass = 1.0f / FMath::Max(BoneSetting.Mass, 0.01f);
 			FakeSimulateBone.Thickness = Thickness;
 			if (FoundBoneUnitSettingNullable != nullptr)
 			{
@@ -962,7 +962,7 @@ bool FLKAnimNode_AnimVerlet::MakeSimulateBones(FComponentSpacePoseContext& PoseC
 				if (FoundBoneUnitSettingNullable->bOverrideConeAngle)
 					FakeSimulateBone.ConeAngleConstraint = FoundBoneUnitSettingNullable->ConeAngle;
 				if (FoundBoneUnitSettingNullable->bOverrideMass)
-					FakeSimulateBone.InvMass = FMath::IsNearlyZero(FoundBoneUnitSettingNullable->Mass, KINDA_SMALL_NUMBER) ? 1.0f : 1.0f / FoundBoneUnitSettingNullable->Mass;
+					FakeSimulateBone.InvMass = 1.0f / FMath::Max(FoundBoneUnitSettingNullable->Mass, 0.01f);
 				if (FoundBoneUnitSettingNullable->bOverrideThickness)
 					FakeSimulateBone.Thickness = FoundBoneUnitSettingNullable->Thickness;
 				FakeSimulateBone.bOverrideToUseSphereCollisionForChain = FoundBoneUnitSettingNullable->bOverrideToUseSphereCollisionForChain;
@@ -1440,13 +1440,16 @@ void FLKAnimNode_AnimVerlet::SimulateVerlet(const UWorld* World, float InDeltaTi
 
 	verify(World != nullptr);
 
-	PreUpdateBones(World, InDeltaTime, ComponentTransform, PrevComponentTransform);
+	const bool bComponentInertiaApplied = PreUpdateBones(World, InDeltaTime, ComponentTransform, PrevComponentTransform);
 
 	if (bUseBroadphase)
 		UpdateBroadphase(World, InDeltaTime, ComponentTransform);
 
 	/// Solve
 	SolveConstraints(InDeltaTime);
+
+	if (bComponentInertiaApplied)
+		ApplyComponentInertiaTangentialDamping(InDeltaTime);
 	
 	if (bUseSleep)
 		UpdateSleep(InDeltaTime);
@@ -1454,7 +1457,7 @@ void FLKAnimNode_AnimVerlet::SimulateVerlet(const UWorld* World, float InDeltaTi
 	PostUpdateBones(InDeltaTime);
 }
 
-void FLKAnimNode_AnimVerlet::PreUpdateBones(const UWorld* World, float InDeltaTime, const FTransform& ComponentTransform, const FTransform& PrevComponentTransform)
+bool FLKAnimNode_AnimVerlet::PreUpdateBones(const UWorld* World, float InDeltaTime, const FTransform& ComponentTransform, const FTransform& PrevComponentTransform)
 {
 #if LK_ENABLE_STAT
 	SCOPE_CYCLE_COUNTER(STAT_AnimVerlet_PreUpdateBones);
@@ -1473,10 +1476,16 @@ void FLKAnimNode_AnimVerlet::PreUpdateBones(const UWorld* World, float InDeltaTi
 			float MoveDiffDist = 0.0f;
 			VerletUpdateParam.ComponentMoveDiff.ToDirectionAndLength(OUT MoveDiffDir, OUT MoveDiffDist);
 
-			MoveDiffDist = bClampMoveInertia ? FMath::Clamp(MoveDiffDist, 0.0f, MoveInertiaClampMaxDistance) : MoveDiffDist;
-
-			const float TargetMoveInertiaScale = bApplyMoveInertiaScaleCorrection ? (MoveInertiaScale * ClampedAverageFPS / FMath::Max(LKG_MINFPS, MoveInertiaScaleTargetFrameRate)) : MoveInertiaScale;
-			VerletUpdateParam.ComponentMoveDiff = MoveDiffDir * MoveDiffDist * TargetMoveInertiaScale;
+			const bool bIgnoreMoveInertia = bIgnoreSuddenMoveInertia && MoveDiffDist > FMath::Max(MoveInertiaIgnoreThreshold, 0.0f);
+			if (bIgnoreMoveInertia)
+			{
+				VerletUpdateParam.ComponentMoveDiff = FVector::ZeroVector;
+			}
+			else
+			{
+				MoveDiffDist = bClampMoveInertia ? FMath::Clamp(MoveDiffDist, 0.0f, MoveInertiaClampMaxDistance) : MoveDiffDist;
+				VerletUpdateParam.ComponentMoveDiff = MoveDiffDir * MoveDiffDist * MoveInertiaScale;
+			}
 		}
 
 		/// Clamp Rotation Intertia
@@ -1488,12 +1497,18 @@ void FLKAnimNode_AnimVerlet::PreUpdateBones(const UWorld* World, float InDeltaTi
 			VerletUpdateParam.ComponentRotDiff.ToAxisAndAngle(OUT RotDiffAxis, OUT RotDiffAngle);
 
 			float DiffAngeDegrees = FMath::RadiansToDegrees(RotDiffAngle);
-			if (bClampRotationInertia && FMath::Abs(DiffAngeDegrees) > RotationInertiaClampDegrees)
-				DiffAngeDegrees = FMath::Sign(DiffAngeDegrees) * RotationInertiaClampDegrees;
+			const bool bIgnoreRotationInertia = bIgnoreSuddenRotationInertia && FMath::Abs(DiffAngeDegrees) > FMath::Max(RotationInertiaIgnoreDegrees, 0.0f);
+			if (bIgnoreRotationInertia)
+			{
+				VerletUpdateParam.ComponentRotDiff = FQuat::Identity;
+			}
+			else
+			{
+				if (bClampRotationInertia && FMath::Abs(DiffAngeDegrees) > RotationInertiaClampDegrees)
+					DiffAngeDegrees = FMath::Sign(DiffAngeDegrees) * RotationInertiaClampDegrees;
 
-			const float TargetRotationInertiaScale = bApplyRotationInertiaScaleCorrection ? (RotationInertiaScale * ClampedAverageFPS / FMath::Max(LKG_MINFPS, RotationInertiaScaleTargetFrameRate)) : RotationInertiaScale;
-			VerletUpdateParam.ComponentRotDiff = FQuat(RotDiffAxis, FMath::DegreesToRadians(DiffAngeDegrees));
-			VerletUpdateParam.RotationInertiaScale = TargetRotationInertiaScale;
+				VerletUpdateParam.ComponentRotDiff = FQuat(RotDiffAxis, FMath::DegreesToRadians(DiffAngeDegrees * RotationInertiaScale)).GetNormalized();
+			}
 		}
 
 		VerletUpdateParam.bUseSquaredDeltaTime = bUseSquaredDeltaTime;
@@ -1518,11 +1533,17 @@ void FLKAnimNode_AnimVerlet::PreUpdateBones(const UWorld* World, float InDeltaTi
 		}
 		VerletUpdateParam.Damping = bApplyDampingCorrection ? FMath::Clamp(FMath::Pow(Damping, (DampingCorrectionTargetFrameRate / ClampedAverageFPS)), 0.0f, 1.0f) : Damping;
 	}
+	const bool bComponentFrameMoved = VerletUpdateParam.ComponentMoveDiff.IsNearlyZero(KINDA_SMALL_NUMBER) == false || VerletUpdateParam.ComponentRotDiff.Equals(FQuat::Identity, KINDA_SMALL_NUMBER) == false;
 
 	/// Simulate each bones	
 	for (int32 i = 0; i < SimulateBones.Num(); ++i)
 	{
 		FLKAnimVerletBone& CurVerletBone = SimulateBones[i];
+		/// A moving component is an external kinematic input. Keeping a bone asleep here would
+		/// discard the rebased displacement in UpdateSleep and make slow component motion vanish.
+		if (bUseSleep && bComponentFrameMoved)
+			CurVerletBone.WakeUp();
+
 		CurVerletBone.Update(InDeltaTime, VerletUpdateParam);
 
 		/// UWindDirectionalSourceComponent
@@ -1553,6 +1574,8 @@ void FLKAnimNode_AnimVerlet::PreUpdateBones(const UWorld* World, float InDeltaTi
 			CurVerletBone.AdjustPoseTransform(InDeltaTime, ParentVerletBone.Location, ParentVerletBone.PoseLocation, TargetAnimationPoseInertia, AnimPoseDeltaInertiaScaled, bClampAnimationPoseDeltaInertia, AnimationPoseDeltaInertiaClampMax);
 		}
 	}
+
+	return bComponentFrameMoved;
 }
 
 void FLKAnimNode_AnimVerlet::UpdateBroadphase(const UWorld* World, float InDeltaTime, const FTransform& ComponentTransform)
@@ -1797,6 +1820,47 @@ void FLKAnimNode_AnimVerlet::SolveConstraints(float InDeltaTime)
 	ForEachConstraints([InDeltaTime](FLKAnimVerletConstraint& CurConstraint) {
 		CurConstraint.PostUpdate(InDeltaTime);
 	});
+}
+
+void FLKAnimNode_AnimVerlet::ApplyComponentInertiaTangentialDamping(float InDeltaTime)
+{
+	const float BaseRetention = FMath::Clamp(ComponentInertiaTangentialDamping, 0.0f, 1.0f);
+	if (BaseRetention >= 1.0f - KINDA_SMALL_NUMBER)
+		return;
+
+	/// Treat the setting as the retained fraction per 60 Hz step so the damping rate remains
+	/// approximately consistent when the simulation frame rate changes.
+	const float Retention = FMath::IsNearlyZero(BaseRetention)
+		? 0.0f
+		: FMath::Pow(BaseRetention, FMath::Max(InDeltaTime, 0.0f) * 60.0f);
+
+	for (FLKAnimVerletBone& ChildBone : SimulateBones)
+	{
+		if (ChildBone.HasParentBone() == false)
+			continue;
+
+		FLKAnimVerletBone& ParentBone = SimulateBones[ChildBone.ParentVerletBoneIndex];
+		const float ParentInvMass = ParentBone.IsPinned() ? 0.0f : ParentBone.InvMass;
+		const float ChildInvMass = ChildBone.IsPinned() ? 0.0f : ChildBone.InvMass;
+		const float InvMassSum = ParentInvMass + ChildInvMass;
+		if (InvMassSum <= KINDA_SMALL_NUMBER)
+			continue;
+
+		const FVector SegmentAxis = (ChildBone.Location - ParentBone.Location).GetSafeNormal();
+		if (SegmentAxis.IsNearlyZero(KINDA_SMALL_NUMBER))
+			continue;
+
+		const FVector ParentMoveDelta = ParentBone.Location - ParentBone.PrevLocation;
+		const FVector ChildMoveDelta = ChildBone.Location - ChildBone.PrevLocation;
+		const FVector RelativeMoveDelta = ChildMoveDelta - ParentMoveDelta;
+		const FVector TangentialMoveDelta = RelativeMoveDelta - SegmentAxis * FVector::DotProduct(RelativeMoveDelta, SegmentAxis);
+		const FVector DampingDelta = TangentialMoveDelta * (1.0f - Retention);
+
+		/// Adjust the Verlet history instead of the solved positions so distance and collision
+		/// constraints remain satisfied. The mass-weighted split preserves pair momentum.
+		ParentBone.PrevLocation -= DampingDelta * (ParentInvMass / InvMassSum);
+		ChildBone.PrevLocation += DampingDelta * (ChildInvMass / InvMassSum);
+	}
 }
 
 void FLKAnimNode_AnimVerlet::UpdateSleep(float InDeltaTime)
@@ -2299,16 +2363,17 @@ void FLKAnimNode_AnimVerlet::SyncFromOtherAnimVerletNode(const FLKAnimNode_AnimV
 	WindComponentScale = Other.WindComponentScale;
 
 	MoveInertiaScale = Other.MoveInertiaScale;
-	bApplyMoveInertiaScaleCorrection = Other.bApplyMoveInertiaScaleCorrection;
-	MoveInertiaScaleTargetFrameRate = Other.MoveInertiaScaleTargetFrameRate;
+	bIgnoreSuddenMoveInertia = Other.bIgnoreSuddenMoveInertia;
+	MoveInertiaIgnoreThreshold = Other.MoveInertiaIgnoreThreshold;
 	bClampMoveInertia = Other.bClampMoveInertia;
 	MoveInertiaClampMaxDistance = Other.MoveInertiaClampMaxDistance;
 
 	RotationInertiaScale = Other.RotationInertiaScale;
-	bApplyRotationInertiaScaleCorrection = Other.bApplyRotationInertiaScaleCorrection;
-	RotationInertiaScaleTargetFrameRate = Other.RotationInertiaScaleTargetFrameRate;
+	bIgnoreSuddenRotationInertia = Other.bIgnoreSuddenRotationInertia;
+	RotationInertiaIgnoreDegrees = Other.RotationInertiaIgnoreDegrees;
 	bClampRotationInertia = Other.bClampRotationInertia;
 	RotationInertiaClampDegrees = Other.RotationInertiaClampDegrees;
+	ComponentInertiaTangentialDamping = Other.ComponentInertiaTangentialDamping;
 }
 
 void FLKAnimNode_AnimVerlet::ApplyPresetType(ELKAnimVerletPreset InPresetType)

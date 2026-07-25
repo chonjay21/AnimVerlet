@@ -56,9 +56,10 @@ private:
 	void PrepareLocalCollisionConstraints(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer, const FTransform& ComponentTransform);
 	void ConvertPhysicsAssetToShape(OUT FLKAnimVerletCollisionShapeList& OutShapeList, const class UPhysicsAsset& InPhysicsAsset, const FBoneContainer* BoneContainerNullable) const;
 	void SimulateVerlet(const UWorld* World, float InDeltaTime, const FTransform& ComponentTransform, const FTransform& PrevComponentTransform);
-	void PreUpdateBones(const UWorld* World, float InDeltaTime, const FTransform& ComponentTransform, const FTransform& PrevComponentTransform);
+	bool PreUpdateBones(const UWorld* World, float InDeltaTime, const FTransform& ComponentTransform, const FTransform& PrevComponentTransform);
 	void UpdateBroadphase(const UWorld* World, float InDeltaTime, const FTransform& ComponentTransform);
 	void SolveConstraints(float InDeltaTime);
+	void ApplyComponentInertiaTangentialDamping(float InDeltaTime);
 	void UpdateSleep(float InDeltaTime);
 	void PostUpdateBones(float InDeltaTime);
 	void ApplyResult(OUT TArray<FBoneTransform>& OutBoneTransforms, const FBoneContainer& BoneContainer);
@@ -379,11 +380,11 @@ public:
 	/** The scale to be applied to the inertia caused by the component's positional movement in the world. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inertia", meta = (PinHiddenByDefault, ClampMin = "0.0"))
 	float MoveInertiaScale = 1.0f;
-	/** Based on MoveInertiaScaleTargetFrameRate, the MoveInertiaScale value at the current FrameRate is adjusted. (It can help to obtain a consistent result regardless of the frame rate.) */
+	/** Ignores move inertia for a frame when the component's positional movement exceeds MoveInertiaIgnoreThreshold. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inertia", meta = (PinHiddenByDefault))
-	bool bApplyMoveInertiaScaleCorrection = true;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inertia", meta = (PinHiddenByDefault, EditCondition = "bApplyMoveInertiaScaleCorrection", ClampMin = "0.0"))
-	float MoveInertiaScaleTargetFrameRate = 60.0f;
+	bool bIgnoreSuddenMoveInertia = false;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inertia", meta = (PinHiddenByDefault, EditCondition = "bIgnoreSuddenMoveInertia", EditConditionHides, ClampMin = "0.0", ForceUnits = "cm"))
+	float MoveInertiaIgnoreThreshold = 800.0f;
 	/** Limits the amount of inertia caused by the component's positional movement in the world. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inertia", meta = (PinHiddenByDefault))
 	bool bClampMoveInertia = true;
@@ -393,16 +394,20 @@ public:
 	/** The scale to be applied to the inertia caused by the component's rotational movement in the world. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inertia", meta = (PinHiddenByDefault, ClampMin = "0.0"))
 	float RotationInertiaScale = 1.0f;
-	/** Based on RotationInertiaScaleTargetFrameRate, the RotationInertiaScale value at the current FrameRate is adjusted. (It can help to obtain a consistent result regardless of the frame rate.) */
+	/** Ignores rotation inertia for a frame when the component's rotational movement exceeds RotationInertiaIgnoreDegrees. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inertia", meta = (PinHiddenByDefault))
-	bool bApplyRotationInertiaScaleCorrection = true;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inertia", meta = (PinHiddenByDefault, EditCondition = "bApplyRotationInertiaScaleCorrection", ClampMin = "0.0"))
-	float RotationInertiaScaleTargetFrameRate = 60.0f;
+	bool bIgnoreSuddenRotationInertia = false;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inertia", meta = (PinHiddenByDefault, EditCondition = "bIgnoreSuddenRotationInertia", EditConditionHides, ClampMin = "0.0", ForceUnits = "deg"))
+	float RotationInertiaIgnoreDegrees = 90.0f;
 	/** Limits the amount of inertia caused by the component's rotational movement in the world. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inertia", meta = (PinHiddenByDefault))
 	bool bClampRotationInertia = true;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inertia", meta = (PinHiddenByDefault, EditCondition = "bClampRotationInertia", EditConditionHides, ForceUnits = "deg"))
 	float RotationInertiaClampDegrees = 30.0f;
+
+	/** Fraction of parent-relative tangential velocity retained while component inertia is being applied. 1 keeps all velocity; 0 removes it. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inertia", meta = (PinHiddenByDefault, ClampMin = "0.0", ClampMax = "1.0"))
+	float ComponentInertiaTangentialDamping = 1.0f;
 
 private:
 	TArray<FLKAnimVerletBone> SimulateBones;										///Simulating bones(real bones + fake virtual bones)

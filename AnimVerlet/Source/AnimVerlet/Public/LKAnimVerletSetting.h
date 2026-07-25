@@ -102,7 +102,6 @@ struct FLKAnimVerletUpdateParam
 	float Damping = 0.0f;
 	FVector ComponentMoveDiff = FVector::ZeroVector;
 	FQuat ComponentRotDiff = FQuat::Identity;
-	float RotationInertiaScale = 0.0f;
 	float StretchForce = 0.0f;
 	float SideStraightenForce = 0.0f;
 	float ShapeMemoryForce = 0.0f;
