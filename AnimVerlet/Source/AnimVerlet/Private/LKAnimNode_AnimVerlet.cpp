@@ -320,7 +320,7 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 			{
 				FLKAnimVerletBone* GrandParentBoneNullable = nullptr;
 				FLKAnimVerletBone* ParentBoneNullable = nullptr;
-				if (bConstrainConeAngleFromParent && ParentSimulateBone.HasParentBone())
+				if (CurSimulateBone.bConstrainConeAngleFromParent && ParentSimulateBone.HasParentBone())
 				{
 					GrandParentBoneNullable = &SimulateBones[ParentSimulateBone.ParentVerletBoneIndex];
 					ParentBoneNullable = &ParentSimulateBone;
@@ -941,6 +941,7 @@ bool FLKAnimNode_AnimVerlet::MakeSimulateBones(FComponentSpacePoseContext& PoseC
 		FTransform ReferenceBonePoseT = PoseContext.Pose.GetComponentSpaceTransform(NewSimulateBone.BoneReference.CachedCompactPoseIndex);
 		NewSimulateBone.bFakeBone = BoneSetting.bFakeBone;
 		NewSimulateBone.bUseXPBDSolver = bUseXPBDSolver;
+		NewSimulateBone.bConstrainConeAngleFromParent = bConstrainConeAngleFromParent;
 		NewSimulateBone.InvMass = 1.0f / FMath::Max(BoneSetting.Mass, 0.01f);
 		NewSimulateBone.Thickness = Thickness;
 		if (FoundBoneUnitSettingNullable != nullptr)
@@ -1058,6 +1059,7 @@ bool FLKAnimNode_AnimVerlet::MakeSimulateBones(FComponentSpacePoseContext& PoseC
 			FakeSimulateBone.bFakeBone = true;
 			FakeSimulateBone.bTipBone = true;
 			FakeSimulateBone.bUseXPBDSolver = bUseXPBDSolver;
+			FakeSimulateBone.bConstrainConeAngleFromParent = bConstrainConeAngleFromParent;
 			FakeSimulateBone.InvMass = 1.0f / FMath::Max(BoneSetting.Mass, 0.01f);
 			FakeSimulateBone.Thickness = Thickness;
 			if (FoundBoneUnitSettingNullable != nullptr)
