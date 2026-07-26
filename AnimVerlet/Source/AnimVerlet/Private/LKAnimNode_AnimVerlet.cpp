@@ -815,7 +815,7 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 
 void FLKAnimNode_AnimVerlet::RebuildSimulationForLOD(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer)
 {
-	struct FLkPreservedBoneState
+	struct FLKPreservedBoneState
 	{
 		FName BoneName = NAME_None;
 		FName ParentBoneName = NAME_None;
@@ -832,7 +832,7 @@ void FLKAnimNode_AnimVerlet::RebuildSimulationForLOD(FComponentSpacePoseContext&
 		bool bUsed = false;
 	};
 
-	TArray<FLkPreservedBoneState, TInlineAllocator<64>> PreservedStates;
+	TArray<FLKPreservedBoneState, TInlineAllocator<64>> PreservedStates;
 	TMultiMap<FName, int32, TInlineSetAllocator<64>> PreservedStateIndexesByBoneName;
 	PreservedStates.Reserve(SimulateBones.Num());
 	for (const FLKAnimVerletBone& Bone : SimulateBones)
@@ -841,7 +841,7 @@ void FLKAnimNode_AnimVerlet::RebuildSimulationForLOD(FComponentSpacePoseContext&
 			continue;
 
 		const int32 StateIndex = PreservedStates.Emplace();
-		FLkPreservedBoneState& State = PreservedStates[StateIndex];
+		FLKPreservedBoneState& State = PreservedStates[StateIndex];
 		{
 			State.BoneName = Bone.BoneReference.BoneName;
 			State.ParentBoneName = (Bone.HasParentBone() && SimulateBones.IsValidIndex(Bone.ParentVerletBoneIndex) ? SimulateBones[Bone.ParentVerletBoneIndex].BoneReference.BoneName : NAME_None);
@@ -865,10 +865,10 @@ void FLKAnimNode_AnimVerlet::RebuildSimulationForLOD(FComponentSpacePoseContext&
 	for (FLKAnimVerletBone& Bone : SimulateBones)
 	{
 		const FName ParentBoneName = (Bone.HasParentBone() && SimulateBones.IsValidIndex(Bone.ParentVerletBoneIndex) ? SimulateBones[Bone.ParentVerletBoneIndex].BoneReference.BoneName : NAME_None);
-		FLkPreservedBoneState* MatchingState = nullptr;
+		FLKPreservedBoneState* MatchingState = nullptr;
 		for (auto StateIt = PreservedStateIndexesByBoneName.CreateKeyIterator(Bone.BoneReference.BoneName); StateIt; ++StateIt)
 		{
-			FLkPreservedBoneState& State = PreservedStates[StateIt.Value()];
+			FLKPreservedBoneState& State = PreservedStates[StateIt.Value()];
 			if (State.bUsed == false && State.ParentBoneName == ParentBoneName 
 				&& State.bFakeBone == Bone.bFakeBone && State.bTipBone == Bone.bTipBone)
 			{
