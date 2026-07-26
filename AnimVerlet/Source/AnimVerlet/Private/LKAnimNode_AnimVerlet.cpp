@@ -61,7 +61,10 @@ void FLKAnimNode_AnimVerlet::Initialize_AnyThread(const FAnimationInitializeCont
 	FAnimNode_SkeletalControlBase::Initialize_AnyThread(Context);
 
 	bPendingSimulationLODRebuild = false;
+	bPendingDynamicsReset = false;
+	bWarmupPending = false;
 	CachedSimulationLOD = INDEX_NONE;
+	ResetOutputBlend();
 
 	FBoneContainer& RequiredBones = Context.AnimInstanceProxy->GetRequiredBones();
 	InitializeBoneReferences(RequiredBones);
@@ -72,7 +75,10 @@ void FLKAnimNode_AnimVerlet::Initialize_AnyThread(const FAnimationInitializeCont
 void FLKAnimNode_AnimVerlet::ResetDynamics(ETeleportType InTeleportType)
 {
 	if (InTeleportType == ETeleportType::ResetPhysics)
-		ResetSimulation();
+	{
+		/// Defer the reset until Evaluate so the simulation is reset against the current animation pose and component transform rather than stale state.
+		bPendingDynamicsReset = true;
+	}
 }
 
 void FLKAnimNode_AnimVerlet::EvaluateSkeletalControl_AnyThread(FComponentSpacePoseContext& Output, TArray<FBoneTransform>& OutBoneTransforms)
@@ -95,6 +101,7 @@ void FLKAnimNode_AnimVerlet::EvaluateSkeletalControl_AnyThread(FComponentSpacePo
 
 	/// Initialize simulate bones
 	const FTransform CurComponentT = Output.AnimInstanceProxy->GetComponentTransform();
+	bool bInitializedThisFrame = false;
 	if (bPendingSimulationLODRebuild)
 	{
 		if (bRebuildSimulationOnLODChange && SimulateBones.Num() > 0)
@@ -109,18 +116,55 @@ void FLKAnimNode_AnimVerlet::EvaluateSkeletalControl_AnyThread(FComponentSpacePo
 	{
 		InitializeSimulateBones(Output, BoneContainer);
 		PrevComponentT = CurComponentT;
+		bInitializedThisFrame = true;
 	}
 
 	/// Prepare each SimulateBones
 	PrepareSimulation(Output, BoneContainer, CurComponentT);
 
-	/// Simulate verlet integration
-	if (DeltaTime > 0.0f && bPause == false)
+	const USkeletalMeshComponent* SkeletalMeshComponent = Output.AnimInstanceProxy->GetSkelMeshComponent();
+	const UWorld* World = SkeletalMeshComponent->GetWorld();
+	bool bAdvanceOutputBlend = false;
+	if (bUseWarmup == false)
+		bWarmupPending = false;
+
+	/// Initialization and ResetPhysics only synchronize state on this frame.
+	/// Warmup is intentionally deferred until the next evaluated frame.
+	if (bInitializedThisFrame || bPendingDynamicsReset)
 	{
-		const USkeletalMeshComponent* SkeletalMeshComponent = Output.AnimInstanceProxy->GetSkelMeshComponent();
-		const UWorld* World = SkeletalMeshComponent->GetWorld();
-		SimulateVerlet(World, DeltaTime, CurComponentT, PrevComponentT);
+		ResetSimulation();
+
+		PrevComponentT = CurComponentT;
+		bPendingDynamicsReset = false;
+		bWarmupPending = bUseWarmup;
+		ResetOutputBlend();
 	}
+	else if (bWarmupPending && bPause == false)
+	{
+		/// The animation pose may have changed during the deferred frame. Start warmup from the pose prepared on this frame, with no inherited velocity.
+		ResetSimulation();
+
+		const int32 ClampedWarmupStepCount = FMath::Max(WarmupStepCount, 0);
+		const float ClampedWarmupDeltaTime = FMath::Max(WarmupFixedDeltaTime, UE_SMALL_NUMBER);
+		for (int32 WarmupStep = 0; WarmupStep < ClampedWarmupStepCount; ++WarmupStep)
+		{
+			/// Using the current component transform for both frames prevents component movement/rotation inertia from entering the warmup.
+			SimulateVerlet(World, ClampedWarmupDeltaTime, CurComponentT, CurComponentT);
+		}
+
+		bWarmupPending = false;
+		PrevComponentT = CurComponentT;
+		bAdvanceOutputBlend = true;
+	}
+	/// Simulate verlet integration
+	else if (DeltaTime > 0.0f && bPause == false)
+	{
+		SimulateVerlet(World, DeltaTime, CurComponentT, PrevComponentT);
+		bAdvanceOutputBlend = true;
+	}
+
+	if (bAdvanceOutputBlend)
+		AdvanceOutputBlend(DeltaTime);
 
 	/// Apply simulation to bone
 	ApplyResult(OutBoneTransforms, BoneContainer);
@@ -2268,13 +2312,32 @@ void FLKAnimNode_AnimVerlet::ApplyResult(OUT TArray<FBoneTransform>& OutBoneTran
 		/// LOD case?
 		if (BonePoseIndex != INDEX_NONE)
 		{
-			const FTransform ResultBoneT(CurBone->Rotation, CurBone->Location, CurBone->PoseScale);
+			const FTransform PoseBoneT(CurBone->PoseRotation, CurBone->PoseLocation, CurBone->PoseScale);
+			const FTransform SimulatedBoneT(CurBone->Rotation, CurBone->Location, CurBone->PoseScale);
+			FTransform ResultBoneT;
+			ResultBoneT.Blend(PoseBoneT, SimulatedBoneT, FMath::Clamp(OutputBlendAlpha, 0.0f, 1.0f));
 			OutBoneTransforms.Emplace(FBoneTransform(BonePoseIndex, ResultBoneT));
 		}
 	}
 
 	/// Need to sort by UE4 rules (SimulateBones != OutBoneTransforms)
 	OutBoneTransforms.Sort(FCompareBoneTransformIndex());
+}
+
+void FLKAnimNode_AnimVerlet::ResetOutputBlend()
+{
+	OutputBlendAlpha = 0.0f;
+}
+
+void FLKAnimNode_AnimVerlet::AdvanceOutputBlend(float InDeltaTime)
+{
+	if (OutputBlendDuration <= UE_SMALL_NUMBER)
+	{
+		OutputBlendAlpha = 1.0f;
+		return;
+	}
+
+	OutputBlendAlpha = FMath::Clamp(OutputBlendAlpha + FMath::Max(InDeltaTime, 0.0f) / OutputBlendDuration, 0.0f, 1.0f);
 }
 
 void FLKAnimNode_AnimVerlet::ClearSimulateBones()
@@ -2483,6 +2546,10 @@ void FLKAnimNode_AnimVerlet::SyncFromOtherAnimVerletNode(const FLKAnimNode_AnimV
 	bSkipUpdateOnDedicatedServer = Other.bSkipUpdateOnDedicatedServer;
 	bPause = Other.bPause;
 	PlaySpeedRate = Other.PlaySpeedRate;
+	bUseWarmup = Other.bUseWarmup;
+	WarmupStepCount = Other.WarmupStepCount;
+	WarmupFixedDeltaTime = Other.WarmupFixedDeltaTime;
+	OutputBlendDuration = Other.OutputBlendDuration;
 
 	bMakeFakeTipBone = Other.bMakeFakeTipBone;
 	FakeTipBoneLength = Other.FakeTipBoneLength;

@@ -161,9 +161,11 @@ void FLKAnimVerletBone::ResetSimulation()
 {
 	MoveDelta = FVector::ZeroVector;
 
+	PrevPoseLocation = PoseLocation;
 	Location = PoseLocation;
 	PrevLocation = Location;
 
+	PrevPoseRotation = PoseRotation;
 	Rotation = PoseRotation;
 	PrevRotation = Rotation;
 

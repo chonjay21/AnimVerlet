@@ -66,6 +66,8 @@ private:
 	void UpdateSleep(float InDeltaTime);
 	void PostUpdateBones(float InDeltaTime);
 	void ApplyResult(OUT TArray<FBoneTransform>& OutBoneTransforms, const FBoneContainer& BoneContainer);
+	void ResetOutputBlend();
+	void AdvanceOutputBlend(float InDeltaTime);
 	void ClearSimulateBones();
 	void ResetSimulation();
 
@@ -126,6 +128,18 @@ public:
 	bool bPause = false;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Setup", meta = (PinShownByDefault, ClampMin = "0.0"))
 	float PlaySpeedRate = 1.0f;
+	/** Perform fixed simulation substeps before exposing simulation output after initialization or ResetPhysics. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = "Setup")
+	bool bUseWarmup = true;
+	/** Number of fixed simulation substeps performed on the frame after initialization or ResetPhysics. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = "Setup", meta = (EditCondition = "bUseWarmup", EditConditionHides, ClampMin = "0"))
+	int32 WarmupStepCount = 8;
+	/** Fixed delta time used by each warmup substep. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = "Setup", meta = (EditCondition = "bUseWarmup", EditConditionHides, ClampMin = "0.000001", ForceUnits = "s"))
+	float WarmupFixedDeltaTime = 0.016666667f;
+	/** Time used to blend from the animation pose to the warmed-up simulation result. Zero applies the result immediately after warmup. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = "Setup", meta = (ClampMin = "0.0", ForceUnits = "s"))
+	float OutputBlendDuration = 0.2f;
 
 	/** Adds an fake(virtual) bone to the end of the body.(may affect the rotation or collision of the end bone) */
 	UPROPERTY(EditAnywhere, Category = "Setup", meta = (EditCondition = "bLockTipBone == false"))
@@ -484,7 +498,10 @@ private:
 private:
 	bool bLocalColliderDirty = false;
 	bool bPendingSimulationLODRebuild = false;
+	bool bPendingDynamicsReset = false;
+	bool bWarmupPending = false;
 	int32 CachedSimulationLOD = INDEX_NONE;
 	float DeltaTime = 0.0f;
+	float OutputBlendAlpha = 0.0f;
 	FTransform PrevComponentT = FTransform::Identity;
 };
