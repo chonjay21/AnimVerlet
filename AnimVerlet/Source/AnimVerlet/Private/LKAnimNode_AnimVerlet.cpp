@@ -59,7 +59,10 @@ FLKAnimNode_AnimVerlet::FLKAnimNode_AnimVerlet()
 void FLKAnimNode_AnimVerlet::Initialize_AnyThread(const FAnimationInitializeContext& Context)
 {
 	FAnimNode_SkeletalControlBase::Initialize_AnyThread(Context);
-	
+
+	bPendingSimulationLODRebuild = false;
+	CachedSimulationLOD = INDEX_NONE;
+
 	FBoneContainer& RequiredBones = Context.AnimInstanceProxy->GetRequiredBones();
 	InitializeBoneReferences(RequiredBones);
 
@@ -92,6 +95,16 @@ void FLKAnimNode_AnimVerlet::EvaluateSkeletalControl_AnyThread(FComponentSpacePo
 
 	/// Initialize simulate bones
 	const FTransform CurComponentT = Output.AnimInstanceProxy->GetComponentTransform();
+	if (bPendingSimulationLODRebuild)
+	{
+		if (bRebuildSimulationOnLODChange && SimulateBones.Num() > 0)
+		{
+			RebuildSimulationForLOD(Output, BoneContainer);
+			PrevComponentT = CurComponentT;
+		}
+		bPendingSimulationLODRebuild = false;
+	}
+
 	if (SimulateBones.Num() == 0)
 	{
 		InitializeSimulateBones(Output, BoneContainer);
@@ -124,6 +137,11 @@ void FLKAnimNode_AnimVerlet::EvaluateSkeletalControl_AnyThread(FComponentSpacePo
 
 void FLKAnimNode_AnimVerlet::InitializeBoneReferences(const FBoneContainer& RequiredBones)
 {
+	const int32 CurrentLOD = RequiredBones.GetCalculatedForLOD();
+	if (CachedSimulationLOD != INDEX_NONE && CurrentLOD != CachedSimulationLOD && bRebuildSimulationOnLODChange && SimulateBones.Num() > 0)
+		bPendingSimulationLODRebuild = true;
+	CachedSimulationLOD = CurrentLOD;
+
 	for (FLKAnimVerletBoneSetting& CurBoneSetting : VerletBones)
 	{
 		CurBoneSetting.RootBone.Initialize(RequiredBones);
@@ -793,6 +811,84 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 
 	/// LocalCollision(Contact) constraints
 	InitializeLocalCollisionConstraints(BoneContainer);
+}
+
+void FLKAnimNode_AnimVerlet::RebuildSimulationForLOD(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer)
+{
+	struct FLkPreservedBoneState
+	{
+		FName BoneName = NAME_None;
+		FName ParentBoneName = NAME_None;
+		FVector Location = FVector::ZeroVector;
+		FVector PrevLocation = FVector::ZeroVector;
+		FQuat Rotation = FQuat::Identity;
+		FQuat PrevRotation = FQuat::Identity;
+		FVector MoveDelta = FVector::ZeroVector;
+		FVector Velocity = FVector::ZeroVector;
+		bool bFakeBone = false;
+		bool bTipBone = false;
+		bool bSleep = false;
+		float SleepTriggerElapsedTime = 0.0f;
+		bool bUsed = false;
+	};
+
+	TArray<FLkPreservedBoneState, TInlineAllocator<64>> PreservedStates;
+	TMultiMap<FName, int32, TInlineSetAllocator<64>> PreservedStateIndexesByBoneName;
+	PreservedStates.Reserve(SimulateBones.Num());
+	for (const FLKAnimVerletBone& Bone : SimulateBones)
+	{
+		if (Bone.Location.ContainsNaN() || Bone.PrevLocation.ContainsNaN() || Bone.Rotation.ContainsNaN() || Bone.PrevRotation.ContainsNaN())
+			continue;
+
+		const int32 StateIndex = PreservedStates.Emplace();
+		FLkPreservedBoneState& State = PreservedStates[StateIndex];
+		{
+			State.BoneName = Bone.BoneReference.BoneName;
+			State.ParentBoneName = (Bone.HasParentBone() && SimulateBones.IsValidIndex(Bone.ParentVerletBoneIndex) ? SimulateBones[Bone.ParentVerletBoneIndex].BoneReference.BoneName : NAME_None);
+			State.Location = Bone.Location;
+			State.PrevLocation = Bone.PrevLocation;
+			State.Rotation = Bone.Rotation;
+			State.PrevRotation = Bone.PrevRotation;
+			State.MoveDelta = Bone.MoveDelta.ContainsNaN() ? FVector::ZeroVector : Bone.MoveDelta;
+			State.Velocity = Bone.Velocity.ContainsNaN() ? FVector::ZeroVector : Bone.Velocity;
+			State.bFakeBone = Bone.bFakeBone;
+			State.bTipBone = Bone.bTipBone;
+			State.bSleep = Bone.bSleep;
+			State.SleepTriggerElapsedTime = Bone.SleepTriggerElapsedTime;
+		}
+		PreservedStateIndexesByBoneName.Emplace(State.BoneName, StateIndex);
+	}
+
+	ClearSimulateBones();
+	InitializeSimulateBones(PoseContext, BoneContainer);
+
+	for (FLKAnimVerletBone& Bone : SimulateBones)
+	{
+		const FName ParentBoneName = (Bone.HasParentBone() && SimulateBones.IsValidIndex(Bone.ParentVerletBoneIndex) ? SimulateBones[Bone.ParentVerletBoneIndex].BoneReference.BoneName : NAME_None);
+		FLkPreservedBoneState* MatchingState = nullptr;
+		for (auto StateIt = PreservedStateIndexesByBoneName.CreateKeyIterator(Bone.BoneReference.BoneName); StateIt; ++StateIt)
+		{
+			FLkPreservedBoneState& State = PreservedStates[StateIt.Value()];
+			if (State.bUsed == false && State.ParentBoneName == ParentBoneName 
+				&& State.bFakeBone == Bone.bFakeBone && State.bTipBone == Bone.bTipBone)
+			{
+				MatchingState = &State;
+				break;
+			}
+		}
+		if (MatchingState == nullptr)
+			continue;
+
+		Bone.Location = MatchingState->Location;
+		Bone.PrevLocation = MatchingState->PrevLocation;
+		Bone.Rotation = MatchingState->Rotation;
+		Bone.PrevRotation = MatchingState->PrevRotation;
+		Bone.MoveDelta = MatchingState->MoveDelta;
+		Bone.Velocity = MatchingState->Velocity;
+		Bone.bSleep = MatchingState->bSleep;
+		Bone.SleepTriggerElapsedTime = MatchingState->SleepTriggerElapsedTime;
+		MatchingState->bUsed = true;
+	}
 }
 
 void FLKAnimNode_AnimVerlet::InitializeCustomDistanceConstraints(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer)
@@ -2382,6 +2478,7 @@ void FLKAnimNode_AnimVerlet::SyncFromOtherAnimVerletNode(const FLKAnimNode_AnimV
 
 	bSubDivideBones = Other.bSubDivideBones;
 	NumSubDividedBone = Other.NumSubDividedBone;
+	bRebuildSimulationOnLODChange = Other.bRebuildSimulationOnLODChange;
 	bActivate = Other.bActivate;
 	bSkipUpdateOnDedicatedServer = Other.bSkipUpdateOnDedicatedServer;
 	bPause = Other.bPause;

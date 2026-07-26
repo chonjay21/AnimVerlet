@@ -42,6 +42,7 @@ protected:
 
 private:
 	void InitializeSimulateBones(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer);
+	void RebuildSimulationForLOD(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer);
 	void InitializeCustomDistanceConstraints(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer);
 	struct FLKAnimVerletBone* FindOrAddCustomDistanceConstraintBone(const FBoneReference& BoneReference, FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer);
 	void InitializeBroadphase();
@@ -114,6 +115,9 @@ public:
 	bool bSubDivideBones = false;
 	UPROPERTY(EditAnywhere, Category = "Setup", meta = (EditCondition = "bSubDivideBones", EditConditionHides, ClampMin = "0"))
 	uint8 NumSubDividedBone = 1;
+	/** Rebuild topology, constraints, broadphase, and collisions when the required-bone LOD changes. Matching bone states are preserved. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Setup")
+	bool bRebuildSimulationOnLODChange = false;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Setup", meta = (PinShownByDefault))
 	bool bActivate = true;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Setup")
@@ -479,6 +483,8 @@ private:
 
 private:
 	bool bLocalColliderDirty = false;
+	bool bPendingSimulationLODRebuild = false;
+	int32 CachedSimulationLOD = INDEX_NONE;
 	float DeltaTime = 0.0f;
 	FTransform PrevComponentT = FTransform::Identity;
 };
