@@ -100,6 +100,11 @@ void FLKAnimNode_AnimVerlet::EvaluateSkeletalControl_AnyThread(FComponentSpacePo
 	
 
 	/// Initialize simulate bones
+	const int32 CurrentLOD = Output.AnimInstanceProxy->GetLODLevel();
+	if (CachedSimulationLOD != INDEX_NONE && CurrentLOD != CachedSimulationLOD && bRebuildSimulationOnLODChange && SimulateBones.Num() > 0)
+		bPendingSimulationLODRebuild = true;
+	CachedSimulationLOD = CurrentLOD;
+
 	const FTransform CurComponentT = Output.AnimInstanceProxy->GetComponentTransform();
 	bool bInitializedThisFrame = false;
 	if (bPendingSimulationLODRebuild)
@@ -181,11 +186,6 @@ void FLKAnimNode_AnimVerlet::EvaluateSkeletalControl_AnyThread(FComponentSpacePo
 
 void FLKAnimNode_AnimVerlet::InitializeBoneReferences(const FBoneContainer& RequiredBones)
 {
-	const int32 CurrentLOD = RequiredBones.GetCalculatedForLOD();
-	if (CachedSimulationLOD != INDEX_NONE && CurrentLOD != CachedSimulationLOD && bRebuildSimulationOnLODChange && SimulateBones.Num() > 0)
-		bPendingSimulationLODRebuild = true;
-	CachedSimulationLOD = CurrentLOD;
-
 	for (FLKAnimVerletBoneSetting& CurBoneSetting : VerletBones)
 	{
 		CurBoneSetting.RootBone.Initialize(RequiredBones);
