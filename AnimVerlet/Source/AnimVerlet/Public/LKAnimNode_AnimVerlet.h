@@ -55,6 +55,7 @@ private:
 	void MakeFakeBoneTransform(OUT FTransform& OutTransform, int32 ParentSimulateBoneIndex) const;
 
 	void UpdateDeltaTime(float InDeltaTime, float InTimeDilation);
+	FQuat CalculateGravityAlignmentRotation(const FTransform& ComponentTransform) const;
 	void PrepareSimulation(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer, const FTransform& ComponentTransform);
 	void PrepareLocalCollisionConstraints(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer, const FTransform& ComponentTransform);
 	void ConvertPhysicsAssetToShape(OUT FLKAnimVerletCollisionShapeList& OutShapeList, const class UPhysicsAsset& InPhysicsAsset, const FBoneContainer* BoneContainerNullable) const;
@@ -168,6 +169,9 @@ public:
 	/** Ignores animation poses and only applies cloth simulation results. */
 	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Settings")
 	bool bIgnoreAnimationPose = false;
+	/** Rotates the animation pose from AnimationPoseReferenceDirection toward the current gravity direction before applying it. */
+	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Settings", meta = (EditCondition = "bIgnoreAnimationPose == false", EditConditionHides))
+	bool bAlignAnimationPoseToGravity = false;
 	/** The magnitude of inertia to the animation pose position.(Pulls the cloth simulation result into the animation pose position) */
 	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Settings", meta = (EditCondition = "bIgnoreAnimationPose == false", EditConditionHides, ClampMin = "0.0", ClampMax = "1.0"))
 	float AnimationPoseInertia = 0.03f;
@@ -176,6 +180,10 @@ public:
 	bool bApplyAnimationPoseInertiaCorrection = true;
 	UPROPERTY(EditAnywhere, AdvancedDisplay, Category = "Settings", meta = (EditCondition = "bIgnoreAnimationPose == false && bApplyAnimationPoseInertiaCorrection", EditConditionHides, ClampMin = "0.0"))
 	float AnimationPoseInertiaTargetFrameRate = 60.0f;
+
+	/** Component-space direction that represents gravity in the authored animation pose. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Settings", meta = (PinHiddenByDefault))
+	FVector AnimationPoseReferenceDirection = FVector::DownVector;
 
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Solve", meta = (ClampMin = "0.0", ClampMax = "1.0"))
@@ -404,12 +412,18 @@ public:
 	/** Adjust force to stretch the cloth from it`s parent */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Forces", meta = (PinHiddenByDefault, ForceUnits = "cm/s"))
 	float StretchForce = 0.0f;
+	/** Rotates the animation-pose stretch direction from AnimationPoseReferenceDirection toward the current gravity direction. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Forces", meta = (PinHiddenByDefault))
+	bool bAlignStretchForceToGravity = false;
 	/** Adjust force to stretch the cloth by referencing positional relationship between the roots of each bone chain.(A type of side way gravity applied to stretch the cloth from side to side) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Forces", meta = (PinHiddenByDefault, ForceUnits = "cm/s"))
 	float SideStraightenForce = 0.0f;
 	/** Adjust force to return to the original animation pose(different from below inertia factor) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Forces", meta = (PinHiddenByDefault, ForceUnits = "cm/s"))
 	float ShapeMemoryForce = 0.0f;
+	/** Uses the gravity-aligned animation pose(by AnimationPoseReferenceDirection) as the ShapeMemoryForce target. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Forces", meta = (PinHiddenByDefault))
+	bool bAlignShapeMemoryForceToGravity = false;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Forces", meta = (PinHiddenByDefault, ForceUnits = "cm/s"))
 	FVector ExternalForce = FVector::ZeroVector;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Forces", meta = (PinHiddenByDefault))

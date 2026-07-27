@@ -1326,6 +1326,26 @@ void FLKAnimNode_AnimVerlet::PrepareSimulation(FComponentSpacePoseContext& PoseC
 		CurSimulateBone.PrepareSimulation(CurBonePoseT, PoseDirFromParent);
 	}
 
+	const FQuat GravityAlignmentRotation = CalculateGravityAlignmentRotation(ComponentTransform);
+	for (FLKAnimVerletBone& CurSimulateBone : SimulateBones)
+	{
+		CurSimulateBone.GravityAlignedPoseDiff = GravityAlignmentRotation.RotateVector(CurSimulateBone.PoseLocation - CurSimulateBone.PrevPoseLocation);
+		if (CurSimulateBone.HasParentBone())
+		{
+			const FLKAnimVerletBone& ParentSimulateBone = SimulateBones[CurSimulateBone.ParentVerletBoneIndex];
+			const FVector PoseVectorFromParent = CurSimulateBone.PoseLocation - ParentSimulateBone.PoseLocation;
+			const FVector GravityAlignedPoseVectorFromParent = GravityAlignmentRotation.RotateVector(PoseVectorFromParent);
+			CurSimulateBone.GravityAlignedPoseLocation = ParentSimulateBone.GravityAlignedPoseLocation + GravityAlignedPoseVectorFromParent;
+			CurSimulateBone.GravityAlignedPoseDirFromParent = GravityAlignedPoseVectorFromParent.GetSafeNormal();
+		}
+		else
+		{
+			/// Keep each simulated chain anchored at its original animation-pose root.
+			CurSimulateBone.GravityAlignedPoseLocation = CurSimulateBone.PoseLocation;
+			CurSimulateBone.GravityAlignedPoseDirFromParent = FVector::ZeroVector;
+		}
+	}
+
 	for (int32 ExcludedBoneIndex = 0; ExcludedBoneIndex < ExcludedBones.Num(); ++ExcludedBoneIndex)
 	{
 		FLKAnimVerletExcludedBone& CurExcludedBone = ExcludedBones[ExcludedBoneIndex];
@@ -1350,6 +1370,20 @@ void FLKAnimNode_AnimVerlet::PrepareSimulation(FComponentSpacePoseContext& PoseC
 	}
 
 	PrepareLocalCollisionConstraints(PoseContext, BoneContainer, ComponentTransform);
+}
+
+FQuat FLKAnimNode_AnimVerlet::CalculateGravityAlignmentRotation(const FTransform& ComponentTransform) const
+{
+	const FVector ReferenceDirection = AnimationPoseReferenceDirection.GetSafeNormal();
+	if (ReferenceDirection.IsNearlyZero(KINDA_SMALL_NUMBER))
+		return FQuat::Identity;
+
+	const FVector GravityVector = bGravityInWorldSpace ? ComponentTransform.InverseTransformVectorNoScale(Gravity) : Gravity;
+	if (GravityVector.IsNearlyZero(KINDA_SMALL_NUMBER))
+		return FQuat::Identity;
+
+	const FVector GravityDirection = GravityVector.GetSafeNormal();
+	return FQuat::FindBetweenNormals(ReferenceDirection, GravityDirection).GetNormalized();
 }
 
 void FLKAnimNode_AnimVerlet::PrepareLocalCollisionConstraints(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer, const FTransform& ComponentTransform)
@@ -1774,8 +1808,10 @@ bool FLKAnimNode_AnimVerlet::PreUpdateBones(const UWorld* World, float InDeltaTi
 
 		VerletUpdateParam.bUseSquaredDeltaTime = bUseSquaredDeltaTime;
 		VerletUpdateParam.StretchForce = StretchForce;
+		VerletUpdateParam.bAlignStretchForceToGravity = bAlignStretchForceToGravity;
 		VerletUpdateParam.SideStraightenForce = SideStraightenForce;
 		VerletUpdateParam.ShapeMemoryForce = ShapeMemoryForce;
+		VerletUpdateParam.bAlignShapeMemoryForceToGravity = bAlignShapeMemoryForceToGravity;
 		VerletUpdateParam.Gravity = (bGravityInWorldSpace == false || Gravity.IsNearlyZero(KINDA_SMALL_NUMBER)) ? Gravity : ComponentTransform.InverseTransformVector(Gravity);
 		VerletUpdateParam.ExternalForce = (bExternalForceInWorldSpace == false || ExternalForce.IsNearlyZero(KINDA_SMALL_NUMBER)) ? ExternalForce : ComponentTransform.InverseTransformVector(ExternalForce);
 
@@ -1832,7 +1868,9 @@ bool FLKAnimNode_AnimVerlet::PreUpdateBones(const UWorld* World, float InDeltaTi
 			///const float AnimPoseDeltaInertiaScaled = bApplyAnimationPoseInertiaCorrection ? (AnimationPoseDeltaInertia * AnimationPoseDeltaInertiaScale * AnimationPoseInertiaTargetFrameRate / ClampedAverageFPS) : AnimationPoseDeltaInertia * AnimationPoseDeltaInertiaScale;
 			const float AnimPoseDeltaInertiaScaled = AnimationPoseDeltaInertia * AnimationPoseDeltaInertiaScale;
 			const float TargetAnimationPoseInertia = bApplyAnimationPoseInertiaCorrection ? (AnimationPoseInertia * AnimationPoseInertiaTargetFrameRate / ClampedAverageFPS) : AnimationPoseInertia;
-			CurVerletBone.AdjustPoseTransform(InDeltaTime, ParentVerletBone.Location, ParentVerletBone.PoseLocation, TargetAnimationPoseInertia, AnimPoseDeltaInertiaScaled, bClampAnimationPoseDeltaInertia, AnimationPoseDeltaInertiaClampMax);
+			CurVerletBone.AdjustPoseTransform(InDeltaTime, ParentVerletBone.Location, ParentVerletBone.PoseLocation, ParentVerletBone.GravityAlignedPoseLocation,
+											 bAlignAnimationPoseToGravity, TargetAnimationPoseInertia, AnimPoseDeltaInertiaScaled,
+											 bClampAnimationPoseDeltaInertia, AnimationPoseDeltaInertiaClampMax);
 		}
 	}
 
@@ -2562,6 +2600,7 @@ void FLKAnimNode_AnimVerlet::SyncFromOtherAnimVerletNode(const FLKAnimNode_AnimV
 	bClampAnimationPoseDeltaInertia = Other.bClampAnimationPoseDeltaInertia;
 	AnimationPoseDeltaInertiaClampMax = Other.AnimationPoseDeltaInertiaClampMax;
 	bIgnoreAnimationPose = Other.bIgnoreAnimationPose;
+	bAlignAnimationPoseToGravity = Other.bAlignAnimationPoseToGravity;
 	AnimationPoseInertia = Other.AnimationPoseInertia;
 	bApplyAnimationPoseInertiaCorrection = Other.bApplyAnimationPoseInertiaCorrection;
 	AnimationPoseInertiaTargetFrameRate = Other.AnimationPoseInertiaTargetFrameRate;
@@ -2654,10 +2693,13 @@ void FLKAnimNode_AnimVerlet::SyncFromOtherAnimVerletNode(const FLKAnimNode_AnimV
 
 	Gravity = Other.Gravity;
 	bGravityInWorldSpace = Other.bGravityInWorldSpace;
+	AnimationPoseReferenceDirection = Other.AnimationPoseReferenceDirection;
 
 	StretchForce = Other.StretchForce;
+	bAlignStretchForceToGravity = Other.bAlignStretchForceToGravity;
 	SideStraightenForce = Other.SideStraightenForce;
 	ShapeMemoryForce = Other.ShapeMemoryForce;
+	bAlignShapeMemoryForceToGravity = Other.bAlignShapeMemoryForceToGravity;
 	ExternalForce = Other.ExternalForce;
 	bExternalForceInWorldSpace = Other.bExternalForceInWorldSpace;
 

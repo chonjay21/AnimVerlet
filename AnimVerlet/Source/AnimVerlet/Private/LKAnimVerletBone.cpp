@@ -9,6 +9,8 @@ void FLKAnimVerletBone::InitializeTransform(const FTransform& InitialT)
 {
 	PoseLocation = InitialT.GetLocation();
 	PrevPoseLocation = PoseLocation;
+	GravityAlignedPoseLocation = PoseLocation;
+	GravityAlignedPoseDiff = FVector::ZeroVector;
 	Location = PoseLocation;
 	PrevLocation = PoseLocation;
 
@@ -91,7 +93,8 @@ void FLKAnimVerletBone::Update(float DeltaTime, const FLKAnimVerletUpdateParam& 
 	Location += InParam.Gravity * CurDeltaTime;
 
 	/// StretchForce
-	Location += (PoseDirFromParent * InParam.StretchForce) * (CurDeltaTime * ForceMassScale);
+	const FVector& StretchDirection = InParam.bAlignStretchForceToGravity ? GravityAlignedPoseDirFromParent : PoseDirFromParent;
+	Location += (StretchDirection * InParam.StretchForce) * (CurDeltaTime * ForceMassScale);
 
 	/// SideStraightenForce
 	Location += (Rotation.RotateVector(SideStraightenDirInLocal) * InParam.SideStraightenForce) * (CurDeltaTime * ForceMassScale);
@@ -112,7 +115,8 @@ void FLKAnimVerletBone::Update(float DeltaTime, const FLKAnimVerletUpdateParam& 
 	}
 
 	/// ShapeMemoryForce
-	Location += ((PoseLocation - Location).GetSafeNormal() * InParam.ShapeMemoryForce) * (CurDeltaTime * ForceMassScale);
+	const FVector& ShapeMemoryPoseLocation = InParam.bAlignShapeMemoryForceToGravity ? GravityAlignedPoseLocation : PoseLocation;
+	Location += ((ShapeMemoryPoseLocation - Location).GetSafeNormal() * InParam.ShapeMemoryForce) * (CurDeltaTime * ForceMassScale);
 }
 
 void FLKAnimVerletBone::PostUpdate(float DeltaTime)
@@ -120,15 +124,18 @@ void FLKAnimVerletBone::PostUpdate(float DeltaTime)
 	Velocity = FMath::IsNearlyZero(DeltaTime) ? FVector::ZeroVector : (Location - PrevLocation) / DeltaTime;
 }
 
-void FLKAnimVerletBone::AdjustPoseTransform(float DeltaTime, const FVector& ParentLocation, const FVector& ParentPoseLocation,
-											float AnimationPoseInertia, float AnimationPoseDeltaInertia, bool bClampAnimationPoseDeltaInertia, float AnimationPoseDeltaInertiaClampMax)
+void FLKAnimVerletBone::AdjustPoseTransform(float DeltaTime, const FVector& ParentLocation, const FVector& ParentPoseLocation, const FVector& ParentGravityAlignedPoseLocation,
+											bool bAlignAnimationPoseToGravity, float AnimationPoseInertia, float AnimationPoseDeltaInertia, bool bClampAnimationPoseDeltaInertia, float AnimationPoseDeltaInertiaClampMax)
 {
+	const FVector& TargetPoseLocation = bAlignAnimationPoseToGravity ? GravityAlignedPoseLocation : PoseLocation;
+	const FVector& TargetParentPoseLocation = bAlignAnimationPoseToGravity ? ParentGravityAlignedPoseLocation : ParentPoseLocation;
+
 	/// To Pose
-	const FVector CurPoseVecFromParent = PoseLocation - ParentPoseLocation;
+	const FVector CurPoseVecFromParent = TargetPoseLocation - TargetParentPoseLocation;
 	Location += (ParentLocation + CurPoseVecFromParent - Location) * AnimationPoseInertia;
 
 	/// Pose delta from last frame
-	const FVector PoseDiff = PoseLocation - PrevPoseLocation;
+	const FVector PoseDiff = bAlignAnimationPoseToGravity ? GravityAlignedPoseDiff : PoseLocation - PrevPoseLocation;
 	if (bClampAnimationPoseDeltaInertia)
 	{
 		FVector PoseDiffDir = FVector::ZeroVector;

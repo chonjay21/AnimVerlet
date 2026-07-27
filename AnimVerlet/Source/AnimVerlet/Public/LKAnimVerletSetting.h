@@ -133,8 +133,10 @@ struct FLKAnimVerletUpdateParam
 	FVector ComponentMoveDiff = FVector::ZeroVector;
 	FQuat ComponentRotDiff = FQuat::Identity;
 	float StretchForce = 0.0f;
+	bool bAlignStretchForceToGravity = false;
 	float SideStraightenForce = 0.0f;
 	float ShapeMemoryForce = 0.0f;
+	bool bAlignShapeMemoryForceToGravity = false;
 	FVector Gravity = FVector::ZeroVector;
 	FVector ExternalForce = FVector::ZeroVector;
 	FLKAnimVerletRandomForceSetting RandomWind;

@@ -46,11 +46,14 @@ public:
 
 	FVector PrevPoseLocation = FVector::ZeroVector;
 	FVector PrevLocation = FVector::ZeroVector;
+	FVector GravityAlignedPoseLocation = FVector::ZeroVector;
+	FVector GravityAlignedPoseDiff = FVector::ZeroVector;
 
 	FQuat PrevPoseRotation = FQuat::Identity;
 	FQuat PrevRotation = FQuat::Identity;
 
 	FVector PoseDirFromParent = FVector::ZeroVector;
+	FVector GravityAlignedPoseDirFromParent = FVector::ZeroVector;
 
 	FVector MoveDelta = FVector::ZeroVector;
 	FVector Velocity = FVector::ZeroVector;		///for XPBD
@@ -89,8 +92,8 @@ public:
 	void PrepareSimulation(const FTransform& PoseT, const FVector& InPoseDirFromParent);
 	void Update(float DeltaTime, const struct FLKAnimVerletUpdateParam& InParam);
 	void PostUpdate(float DeltaTime);
-	void AdjustPoseTransform(float DeltaTime, const FVector& ParentLocation, const FVector& ParentPoseLocation,
-							 float AnimationPoseInertia, float AnimationPoseDeltaInertia, bool bClampAnimationPoseDeltaInertia, float AnimationPoseDeltaInertiaClampMax);
+	void AdjustPoseTransform(float DeltaTime, const FVector& ParentLocation, const FVector& ParentPoseLocation, const FVector& ParentGravityAlignedPoseLocation,
+							 bool bAlignAnimationPoseToGravity, float AnimationPoseInertia, float AnimationPoseDeltaInertia, bool bClampAnimationPoseDeltaInertia, float AnimationPoseDeltaInertiaClampMax);
 
 	void Sleep();
 	void WakeUp();
