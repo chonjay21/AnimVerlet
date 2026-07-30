@@ -54,6 +54,7 @@ The UnrealEngine versions supported by this plugin are:
 2. Put the "AnimVerlet" directory to your Project`s "Plugins" directory
 3. Use AnimVerlet Animation Node in Animation Blueprint
 4. You can choose preset in AnimVerlet Node(AnimationPose, Physics_XPBD, Physics_PBD) or customize each settings
+5. For detailed usage instructions, please refer to the following links: [English](https://github.com/chonjay21/AnimVerlet/blob/main/LKAnimNode_AnimVerlet_Tutorial.md) [Korean](https://github.com/chonjay21/AnimVerlet/blob/main/LKAnimNode_AnimVerlet_Tutorial_KO.md)
 
 <br />
 
