@@ -233,6 +233,8 @@ strap_root -> strap_01 -> strap_twist_helper -> strap_02 -> strap_03
 | `bConstrainConeAngleFromParent` | `false` | 오버라이드 시 애니메이션 포즈 방향 대신 조부모→부모 방향을 원뿔 기준으로 사용합니다. |
 | `bOverrideConeAngle` | `false` | 이 본의 로컬 원뿔 제한을 활성화합니다. |
 | `ConeAngle` | `0 degrees` | 로컬 Ball-Socket 원뿔 각도이며 `0–90`도로 제한됩니다. 양수인 로컬 값은 글로벌 값보다 우선합니다. |
+| `bOverrideConeAngleOffset` | `false` | 이 본에서 노드의 글로벌 원뿔 중심 회전 오프셋을 대체합니다. 로컬 Cone Angle 오버라이드와 독립적으로 활성화할 수 있습니다. |
+| `ConeAngleOffset` | Zero Rotator | 이 본의 원뿔 중심 방향에 적용할 로컬 회전입니다. 부모 파티클(`BoneA`)의 애니메이션 포즈 로컬 공간을 사용합니다. |
 | `bOverrideThickness` | `false` | 로컬 충돌 반경 오버라이드를 활성화합니다. |
 | `Thickness` | `0.3 cm` | 로컬 파티클, 캡슐 또는 표면 두께입니다. |
 | `bOverrideToUseSphereCollisionForChain` | `false` | 노드가 캡슐/삼각형 체인 충돌을 사용하더라도 이 유닛은 구 접촉을 사용합니다. 글로벌 체인 캡슐 충돌이 꺼져 있으면 효과가 없습니다. |
@@ -246,6 +248,7 @@ strap_root -> strap_01 -> strap_twist_helper -> strap_02 -> strap_03
 - 헤어 장식 주변의 충돌 두께만 확대
 - 문제가 있는 캡슐/삼각형 세그먼트를 구로 교체
 - 루트 근처의 원뿔 제한은 좁게, 팁은 느슨하게 설정
+- 제작된 스켈레톤 포즈를 바꾸지 않고 특정 본의 원뿔을 뒤쪽이나 옆쪽으로 편향
 
 ## 7. Setup 파라미터
 
@@ -379,7 +382,22 @@ strap_root -> strap_01 -> strap_twist_helper -> strap_02 -> strap_03
 |---|---:|---|
 | `bConstrainConeAngleFromParent` | `false` | 움직이는 조부모→부모 방향을 글로벌 원뿔 축으로 사용합니다. false이면 제작된 애니메이션 포즈 방향을 사용합니다. |
 | `ConeAngle` | `0 degrees` | 글로벌 Ball-Socket 원뿔 제한입니다. 0은 비활성화이며 에디터 범위는 `0–90`도입니다. |
+| `ConeAngleOffset` | Zero Rotator | 원뿔 중심 방향에 적용하는 글로벌 회전 오프셋입니다. `bOverrideConeAngleOffset`이 활성화되지 않은 본은 이 값을 상속합니다. |
 | `CustomDistanceConstraints` | 비어 있음 | 수동 본 쌍 최소/최대 거리 제약조건입니다. |
+
+`ConeAngleOffset`은 허용 원뿔의 중심축을 바꾸며 시뮬레이션 본을 직접 회전시키거나 `ConeAngle` 값을 변경하지 않습니다. 런타임은 먼저 애니메이션 포즈 방향 또는 조부모→부모 방향에서 기본 원뿔 방향을 구합니다. 그 방향을 부모 파티클(`BoneA`)의 애니메이션 포즈 로컬 공간으로 변환하고 Offset Rotator를 적용한 뒤 다시 원래 공간으로 변환합니다. 따라서 오프셋은 컴포넌트 또는 월드 축에 고정되지 않고 스켈레탈 방향을 따라갑니다.
+
+글로벌 오프셋은 시뮬레이션 구성 시 실제 파티클과 생성된 Fake Tip 파티클에 복사됩니다. Bone Unit Offset Override는 선택된 실제 본과 해당 Leaf에서 생성된 Fake Tip의 글로벌 값을 대체합니다. 유효한 글로벌 또는 본별 Cone Angle이 0보다 클 때만 오프셋이 제약조건에 시각적인 영향을 줍니다.
+
+### 튜토리얼: 망토 원뿔을 등 바깥쪽으로 편향
+
+1. `ConeAngle`을 `45`도와 같은 양수로 설정합니다.
+2. 프리뷰에서 `bShowConstraints`와 `bShowSimulatingBallSocketConstraints`를 활성화합니다.
+3. 자홍색 Wire Cone이 원하는 방향으로 열릴 때까지 글로벌 `ConeAngleOffset`을 작은 단위로 조정합니다.
+4. 바깥쪽 또는 어깨 체인만 다른 방향이 필요하면 해당 Root나 상단 본을 `BoneUnitSettingOverride`에 추가하고 `bOverrideConeAngleOffset`을 활성화한 뒤 로컬 `ConeAngleOffset`을 설정합니다.
+5. 프리뷰 시뮬레이션을 리셋하고 여러 애니메이션 포즈에서 테스트합니다.
+
+Pitch, Yaw, Roll은 각 부모 본의 애니메이션 포즈 로컬 축을 기준으로 해석되므로 유용한 값은 스켈레톤 제작 방향에 따라 달라집니다. 특정 Euler 성분이 항상 캐릭터의 앞이나 뒤를 의미한다고 가정하지 말고 Wire Cone 프리뷰를 사용하십시오.
 
 각 `FLKAnimVerletCustomDistanceConstraintSetting`은 다음 값을 가집니다.
 
@@ -609,6 +627,7 @@ AnimVerlet이 데이터를 소비하는 Animation Blueprint 평가 전에 목록
 | `bShowSleep` | `true` | Sleep 상태 시각화를 사용합니다. |
 | `bShowBoneBounds` | `false` | Broadphase Bound를 그립니다. |
 | `bShowConstraints` | `true` | 활성 제약조건 시각화의 마스터 옵션입니다. |
+| `bShowDistanceConstraintLengths` | `true` | 모든 활성 `FLKAnimVerletConstraint_Distance`의 현재 끝점 거리를 중간 지점에 cm 단위 소수점 둘째 자리로 표시합니다. `bShowConstraints`가 false이면 숨겨집니다. |
 | `bShowFixedPoints` | `true` | 고정점과 루트를 그립니다. |
 | `bShowSimulatingBallSocketConstraints` | `true` | Cone/Ball-Socket 제약조건을 그립니다. |
 | `bShowSimulatingSphereCollisionConstraints` | `false` | 활성 Sphere 충돌 제약조건을 그립니다. |
@@ -621,6 +640,8 @@ AnimVerlet이 데이터를 소비하는 Animation Blueprint 평가 전에 목록
 | `bShowIsometricBendingConstraints` | `false` | Bending 관계를 그립니다. |
 
 파라미터 변경 뒤 이전 Momentum이 남았거나 같은 초기 포즈에서 두 설정을 비교하려면 **Preview > Reset Simulation**을 사용하십시오.
+
+모든 구조적 부모-자식 제약조건, 다중 체인의 측면/대각선 제약조건, 유효한 Custom Distance Constraint가 런타임 Distance Constraint 목록에 저장되므로 거리 오버레이에는 이들이 모두 포함됩니다. 현재 간격을 제작된 거리 또는 Custom Min/Max 목표와 비교할 때 사용하십시오. 조밀한 천 그리드에서 라벨이 다른 디버그 표시를 가린다면 끌 수 있습니다. 에디터 전용 표시이므로 런타임 시뮬레이션 결과에는 영향을 주지 않습니다.
 
 ## 14. Preset 레퍼런스
 
@@ -689,6 +710,15 @@ AnimVerlet이 데이터를 소비하는 Animation Blueprint 평가 전에 목록
 - `bPreserveSideLength`를 활성화합니다.
 - 접힘 동작에는 Isometric Bending을 사용합니다.
 - 프리뷰에서 Side 및 Bending Constraint를 확인합니다.
+- `bShowDistanceConstraintLengths`를 활성화하여 현재 간격이 비정상적인 행이나 대각선을 찾습니다.
+
+### 원뿔 제한이 잘못된 방향을 가리킴
+
+- `bShowSimulatingBallSocketConstraints`를 활성화하고 자홍색 원뿔을 확인합니다.
+- `bConstrainConeAngleFromParent`가 움직이는 부모 방향을 사용해야 하는지, 제작된 포즈 방향을 사용해야 하는지 확인합니다.
+- `ConeAngleOffset`을 조정합니다. 부모 본의 애니메이션 포즈 로컬 축을 사용한다는 점에 주의하십시오.
+- `BoneUnitSettingOverride`에 의도하지 않은 `bOverrideConeAngleOffset`이 있는지 확인합니다.
+- 제약조건 설정을 변경한 뒤 프리뷰를 리셋합니다.
 
 ### 충돌을 놓침
 

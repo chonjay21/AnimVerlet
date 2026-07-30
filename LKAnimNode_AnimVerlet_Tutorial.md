@@ -233,6 +233,8 @@ Add an element to `BoneUnitSettingOverride`, select its `Bone`, then enable only
 | `bConstrainConeAngleFromParent` | `false` | When overridden, uses the grandparent-to-parent direction as the cone reference instead of the animation-pose direction. |
 | `bOverrideConeAngle` | `false` | Enables this bone's local cone limit. |
 | `ConeAngle` | `0 degrees` | Local ball-socket cone angle, clamped to `0–90` degrees. A positive local value takes precedence over the global value. |
+| `bOverrideConeAngleOffset` | `false` | Replaces the node's global cone-center rotation offset for this bone. It can be enabled independently of the local cone-angle override. |
+| `ConeAngleOffset` | Zero Rotator | Local rotation applied to this bone's cone center direction. The rotation uses the parent particle (`BoneA`) animation-pose local space. |
 | `bOverrideThickness` | `false` | Enables a local collision-radius override. |
 | `Thickness` | `0.3 cm` | Local particle, capsule, or surface thickness. |
 | `bOverrideToUseSphereCollisionForChain` | `false` | Uses sphere contact for this unit when the node is otherwise using capsule/triangle chain collision. It has no effect if global chain-capsule collision is disabled. |
@@ -245,7 +247,8 @@ Useful applications:
 - make a broad tip lighter or heavier;
 - enlarge collision only around a hair ornament;
 - replace a problematic capsule/triangle segment with a sphere;
-- tighten the cone limit near the root while leaving the tip loose.
+- tighten the cone limit near the root while leaving the tip loose;
+- bias an individual cone backward or sideways without changing the authored skeleton pose.
 
 ## 7. Setup parameters
 
@@ -379,7 +382,22 @@ The internal flat-bending fields are currently not exposed as editable `UPROPERT
 |---|---:|---|
 | `bConstrainConeAngleFromParent` | `false` | Uses the moving grandparent-to-parent direction as the global cone axis. False uses the authored animation-pose direction. |
 | `ConeAngle` | `0 degrees` | Global ball-socket cone limit. Zero disables it. Valid editor range is `0–90` degrees. |
+| `ConeAngleOffset` | Zero Rotator | Global rotation offset for the cone center direction. Individual bones inherit it unless `bOverrideConeAngleOffset` is enabled. |
 | `CustomDistanceConstraints` | Empty | Manual bone-pair minimum/maximum distance constraints. |
+
+`ConeAngleOffset` changes the center axis of the permitted cone; it does not directly rotate a simulated bone or change `ConeAngle`. The runtime first obtains the normal cone direction from either the animation pose or the grandparent-to-parent direction. It then converts that direction into the parent particle's (`BoneA`) animation-pose local space, applies the offset rotator, and converts the direction back. The offset therefore follows the skeletal orientation instead of remaining fixed to component or world axes.
+
+The global offset is copied to real particles and generated fake-tip particles when the simulation is built. A bone-unit offset override replaces it for the selected real bone and for a fake tip generated from that leaf. The offset has a visible constraint effect only when the effective global or per-bone cone angle is greater than zero.
+
+### Tutorial: biasing a cape cone away from the back
+
+1. Set a positive `ConeAngle`, for example `45` degrees.
+2. Enable `bShowConstraints` and `bShowSimulatingBallSocketConstraints` in the preview.
+3. Adjust the global `ConeAngleOffset` in small increments until the magenta wire cones open in the intended direction.
+4. If only an outer or shoulder chain needs a different direction, add its root or upper bone to `BoneUnitSettingOverride`, enable `bOverrideConeAngleOffset`, and set its local `ConeAngleOffset`.
+5. Reset the preview simulation and test several animation poses.
+
+Pitch, yaw, and roll are interpreted around each parent bone's animation-pose local axes, so the useful values depend on the skeleton's authored orientation. Use the wire-cone preview instead of assuming that a particular Euler component always means character forward or backward.
 
 Each `FLKAnimVerletCustomDistanceConstraintSetting` has:
 
@@ -608,6 +626,7 @@ These properties belong to the editor graph node and affect visualization, not r
 | `bShowSleep` | `true` | Uses the sleep-state visualization. |
 | `bShowBoneBounds` | `false` | Draws broadphase bounds. |
 | `bShowConstraints` | `true` | Master display for active constraint visuals. |
+| `bShowDistanceConstraintLengths` | `true` | Displays the current endpoint distance of every active `FLKAnimVerletConstraint_Distance` at its midpoint, formatted to two decimal places in centimeters. Hidden when `bShowConstraints` is false. |
 | `bShowFixedPoints` | `true` | Draws pinned/root points. |
 | `bShowSimulatingBallSocketConstraints` | `true` | Draws cone/ball-socket constraints. |
 | `bShowSimulatingSphereCollisionConstraints` | `false` | Draws active sphere collision constraints. |
@@ -620,6 +639,8 @@ These properties belong to the editor graph node and affect visualization, not r
 | `bShowIsometricBendingConstraints` | `false` | Draws bending relationships. |
 
 Use **Preview > Reset Simulation** whenever a parameter change leaves old momentum in the preview or when comparing two settings from the same initial pose.
+
+The distance overlay includes structural parent-child constraints, multi-chain side/diagonal constraints, and valid custom distance constraints because all of them are stored in the runtime distance-constraint list. Use it to compare current spacing with authored or custom Min/Max targets. Disable it on dense cloth grids when the labels obscure the other debug visuals; it is an editor-only display and does not change runtime simulation.
 
 ## 14. Preset reference
 
@@ -688,6 +709,15 @@ Tune in this order to avoid compensating for a topology problem with excessive s
 - Keep `bPreserveSideLength` enabled.
 - Use isometric bending for fold behavior.
 - Inspect side and bending constraints in the preview.
+- Enable `bShowDistanceConstraintLengths` to locate rows or diagonals whose current spacing is abnormal.
+
+### A cone limit points in the wrong direction
+
+- Enable `bShowSimulatingBallSocketConstraints` and inspect the magenta cone.
+- Confirm whether `bConstrainConeAngleFromParent` should use the moving parent direction or the authored pose direction.
+- Adjust `ConeAngleOffset`; remember that it uses the parent bone's animation-pose local axes.
+- Check `BoneUnitSettingOverride` for an unintended `bOverrideConeAngleOffset`.
+- Reset the preview after changing the constraint setup.
 
 ### Collision is missed
 
