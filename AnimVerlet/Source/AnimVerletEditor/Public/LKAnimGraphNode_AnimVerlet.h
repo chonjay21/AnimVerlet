@@ -79,6 +79,9 @@ public:
 	/** Show simulating(applying) constraints */
 	UPROPERTY(EditAnywhere, Category = "Preview")
 	bool bShowConstraints = true;
+	/** Show the current distance between the bones of each DistanceConstraint in centimeters. */
+	UPROPERTY(EditAnywhere, Category = "Preview", meta = (EditCondition = "bShowConstraints", EditConditionHides))
+	bool bShowDistanceConstraintLengths = true;
 	UPROPERTY(EditAnywhere, Category = "Preview", meta = (EditCondition = "bShowConstraints", EditConditionHides))
 	bool bShowFixedPoints = true;
 	UPROPERTY(EditAnywhere, Category = "Preview", meta = (EditCondition = "bShowConstraints", EditConditionHides))

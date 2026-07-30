@@ -381,12 +381,28 @@ void FLKAnimVerletEditMode::DrawHUD(FEditorViewportClient* ViewportClient, FView
 	
 	if (CachedAnimVerletGraphNode == nullptr)
 		return;
-	
-	if (CachedAnimVerletGraphNode->bShowCollisionAssetSource == false)
-		return;
 
 	const USkeletalMeshComponent* PreviewMeshComponent = GetAnimPreviewScene().GetPreviewMeshComponent();
 	if (PreviewMeshComponent == nullptr || PreviewMeshComponent->GetSkeletalMeshAsset() == nullptr)
+		return;
+
+	if (CachedAnimVerletGraphNode->bShowConstraints && CachedAnimVerletGraphNode->bShowDistanceConstraintLengths && CachedAnimVerletNode != nullptr)
+	{
+		const FTransform& ComponentTransform = PreviewMeshComponent->GetComponentTransform();
+		for (const FLKAnimVerletConstraint_Distance& CurConstraint : CachedAnimVerletNode->GetDistanceConstraints())
+		{
+			if (CurConstraint.BoneA == nullptr || CurConstraint.BoneB == nullptr)
+				continue;
+
+			const FVector ConstraintMidpoint = (CurConstraint.BoneA->Location + CurConstraint.BoneB->Location) * 0.5f;
+			const FVector WorldMidpoint = ComponentTransform.TransformPosition(ConstraintMidpoint);
+			const float CurrentDistance = FVector::Distance(CurConstraint.BoneA->Location, CurConstraint.BoneB->Location);
+			const FText DistanceText = FText::FromString(FString::Printf(TEXT("%.2f cm"), CurrentDistance));
+			RenderText(Viewport, View, Canvas, WorldMidpoint, DistanceText);
+		}
+	}
+
+	if (CachedAnimVerletGraphNode->bShowCollisionAssetSource == false)
 		return;
 
 	if (CachedAnimVerletGraphNode->Node.CollisionDataAsset != nullptr)
