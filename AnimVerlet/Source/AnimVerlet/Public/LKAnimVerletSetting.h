@@ -26,6 +26,11 @@ public:
 	/** each bones`s angle to use when constraining using a cone.(Ball - Socket joint constraints, override global cone angle) */
 	UPROPERTY(EditAnywhere, Category = "Constraint", meta = (EditCondition = "bOverrideConeAngle", ClampMin = "0.0", ClampMax = "90.0", ForceUnits = "deg"))
 	float ConeAngle = 0.0f;
+	UPROPERTY(EditAnywhere, Category = "Constraint")
+	bool bOverrideConeAngleOffset = false;
+	/** Local rotation offset applied to this bone's cone center direction. */
+	UPROPERTY(EditAnywhere, Category = "Constraint", meta = (EditCondition = "bOverrideConeAngleOffset"))
+	FRotator ConeAngleOffset = FRotator::ZeroRotator;
 
 	UPROPERTY(EditAnywhere, Category = "Collision")
 	bool bOverrideThickness = false;

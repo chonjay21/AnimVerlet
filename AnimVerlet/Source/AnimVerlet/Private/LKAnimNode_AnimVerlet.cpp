@@ -375,7 +375,7 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 				}
 
 				const FLKAnimVerletConstraint_BallSocket BallSocketConstraint(&ParentSimulateBone, &CurSimulateBone, GrandParentBoneNullable, ParentBoneNullable,
-																			  CurSimulateBone.ConeAngleConstraint, bUseXPBDSolver, Compliance);
+																			  CurSimulateBone.ConeAngleConstraint, CurSimulateBone.ConeAngleOffset, bUseXPBDSolver, Compliance);
 				BallSocketConstraints.Emplace(BallSocketConstraint);
 			}
 			else if (ConeAngle > 0.0f)
@@ -389,7 +389,7 @@ void FLKAnimNode_AnimVerlet::InitializeSimulateBones(FComponentSpacePoseContext&
 				}
 
 				const FLKAnimVerletConstraint_BallSocket BallSocketConstraint(&ParentSimulateBone, &CurSimulateBone, GrandParentBoneNullable, ParentBoneNullable,
-																			  ConeAngle, bUseXPBDSolver, Compliance);
+																			  ConeAngle, CurSimulateBone.ConeAngleOffset, bUseXPBDSolver, Compliance);
 				BallSocketConstraints.Emplace(BallSocketConstraint);
 			}
 
@@ -1082,6 +1082,7 @@ bool FLKAnimNode_AnimVerlet::MakeSimulateBones(FComponentSpacePoseContext& PoseC
 		NewSimulateBone.bFakeBone = BoneSetting.bFakeBone;
 		NewSimulateBone.bUseXPBDSolver = bUseXPBDSolver;
 		NewSimulateBone.bConstrainConeAngleFromParent = bConstrainConeAngleFromParent;
+		NewSimulateBone.ConeAngleOffset = ConeAngleOffset;
 		NewSimulateBone.InvMass = 1.0f / FMath::Max(BoneSetting.Mass, 0.01f);
 		NewSimulateBone.Thickness = Thickness;
 		if (FoundBoneUnitSettingNullable != nullptr)
@@ -1090,6 +1091,8 @@ bool FLKAnimNode_AnimVerlet::MakeSimulateBones(FComponentSpacePoseContext& PoseC
 				NewSimulateBone.bConstrainConeAngleFromParent = FoundBoneUnitSettingNullable->bConstrainConeAngleFromParent;
 			if (FoundBoneUnitSettingNullable->bOverrideConeAngle)
 				NewSimulateBone.ConeAngleConstraint = FoundBoneUnitSettingNullable->ConeAngle;
+			if (FoundBoneUnitSettingNullable->bOverrideConeAngleOffset)
+				NewSimulateBone.ConeAngleOffset = FoundBoneUnitSettingNullable->ConeAngleOffset;
 			if (FoundBoneUnitSettingNullable->bOverrideMass)
 				NewSimulateBone.InvMass = 1.0f / FMath::Max(FoundBoneUnitSettingNullable->Mass, 0.01f);
 			if (FoundBoneUnitSettingNullable->bOverrideThickness)
@@ -1200,6 +1203,7 @@ bool FLKAnimNode_AnimVerlet::MakeSimulateBones(FComponentSpacePoseContext& PoseC
 			FakeSimulateBone.bTipBone = true;
 			FakeSimulateBone.bUseXPBDSolver = bUseXPBDSolver;
 			FakeSimulateBone.bConstrainConeAngleFromParent = bConstrainConeAngleFromParent;
+			FakeSimulateBone.ConeAngleOffset = ConeAngleOffset;
 			FakeSimulateBone.InvMass = 1.0f / FMath::Max(BoneSetting.Mass, 0.01f);
 			FakeSimulateBone.Thickness = Thickness;
 			if (FoundBoneUnitSettingNullable != nullptr)
@@ -1208,6 +1212,8 @@ bool FLKAnimNode_AnimVerlet::MakeSimulateBones(FComponentSpacePoseContext& PoseC
 					FakeSimulateBone.bConstrainConeAngleFromParent = FoundBoneUnitSettingNullable->bConstrainConeAngleFromParent;
 				if (FoundBoneUnitSettingNullable->bOverrideConeAngle)
 					FakeSimulateBone.ConeAngleConstraint = FoundBoneUnitSettingNullable->ConeAngle;
+				if (FoundBoneUnitSettingNullable->bOverrideConeAngleOffset)
+					FakeSimulateBone.ConeAngleOffset = FoundBoneUnitSettingNullable->ConeAngleOffset;
 				if (FoundBoneUnitSettingNullable->bOverrideMass)
 					FakeSimulateBone.InvMass = 1.0f / FMath::Max(FoundBoneUnitSettingNullable->Mass, 0.01f);
 				if (FoundBoneUnitSettingNullable->bOverrideThickness)
@@ -2671,6 +2677,7 @@ void FLKAnimNode_AnimVerlet::SyncFromOtherAnimVerletNode(const FLKAnimNode_AnimV
 
 	bConstrainConeAngleFromParent = Other.bConstrainConeAngleFromParent;
 	ConeAngle = Other.ConeAngle;
+	ConeAngleOffset = Other.ConeAngleOffset;
 	bUseBroadphase = Other.bUseBroadphase;
 	Thickness = Other.Thickness;
 	FrictionCoefficient = Other.FrictionCoefficient;
@@ -2891,23 +2898,9 @@ void FLKAnimNode_AnimVerlet::DebugDrawAnimVerlet(const FComponentSpacePoseContex
 		for (const FLKAnimVerletConstraint_BallSocket& CurConstraint : BallSocketConstraints)
 		{
 			const FVector WorldLocationA = ComponentToWorld.TransformPosition(CurConstraint.BoneA->Location);
-			FVector WorldLocationATarget = FVector::ZeroVector;
-			FVector WorldLocationBTarget = FVector::ZeroVector;
-
-			if (CurConstraint.GrandParentBoneNullable != nullptr && CurConstraint.ParentBoneNullable != nullptr)
-			{
-				WorldLocationATarget = ComponentToWorld.TransformPosition(CurConstraint.GrandParentBoneNullable->Location);
-				WorldLocationBTarget = ComponentToWorld.TransformPosition(CurConstraint.ParentBoneNullable->Location);
-			}
-			else
-			{
-				WorldLocationATarget = ComponentToWorld.TransformPosition(CurConstraint.BoneA->PoseLocation);
-				WorldLocationBTarget = ComponentToWorld.TransformPosition(CurConstraint.BoneB->PoseLocation);
-			}
-
-			FVector Dir = FVector::ZeroVector;
-			float Length = 0.0f;
-			(WorldLocationBTarget - WorldLocationATarget).ToDirectionAndLength(OUT Dir, OUT Length);
+			const FVector ConstraintDirection = CurConstraint.GetConstraintDirection();
+			const FVector Dir = ComponentToWorld.TransformVectorNoScale(ConstraintDirection).GetSafeNormal();
+			const float Length = (CurConstraint.BoneB->PoseLocation - CurConstraint.BoneA->PoseLocation).Size();
 			AnimInstanceProxy->AnimDrawDebugCone(WorldLocationA, Length, Dir, FMath::DegreesToRadians(CurConstraint.AngleDegrees), FMath::DegreesToRadians(CurConstraint.AngleDegrees), 16, FColor::Magenta, false, -1.0f, SDPG_Foreground);
 		}
 	}

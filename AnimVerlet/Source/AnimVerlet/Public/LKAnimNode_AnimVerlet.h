@@ -339,6 +339,9 @@ public:
 	/** Global angle to use when constraining using a cone.(Ball - Socket joint constraints) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Constraint", meta = (PinHiddenByDefault, ClampMin = "0.0", ClampMax = "90.0", ForceUnits = "deg"))
 	float ConeAngle = 0.0f;
+	/** Local rotation offset applied to the center direction of the cone angle constraint. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Constraint", meta = (PinHiddenByDefault))
+	FRotator ConeAngleOffset = FRotator::ZeroRotator;
 
 	/** Additional distance constraints created from explicitly selected bone pairs.(Bones outside VerletBones follow their animation pose as pinned anchors.) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Constraint")

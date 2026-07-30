@@ -65,6 +65,7 @@ public:
 	float PinMargin = 0.0f;
 	bool bConstrainConeAngleFromParent = false;
 	float ConeAngleConstraint = 0.0f;
+	FRotator ConeAngleOffset = FRotator::ZeroRotator;
 	float Thickness = 0.0f;
 	bool bOverrideToUseSphereCollisionForChain = false;
 

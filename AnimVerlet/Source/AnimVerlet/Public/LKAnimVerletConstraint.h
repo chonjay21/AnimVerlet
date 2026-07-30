@@ -250,6 +250,7 @@ public:
 
 
 	float AngleDegrees = 0.0f;
+	FRotator AngleOffset = FRotator::ZeroRotator;
 
 	bool bUseXPBDSolver = false;
 	double Compliance = 0.0;		///for XPBD
@@ -257,7 +258,10 @@ public:
 
 public:
 	FLKAnimVerletConstraint_BallSocket(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, struct FLKAnimVerletBone* InGrandParentNullable, struct FLKAnimVerletBone* InParentNullable,
+									   float InAngleDegrees, const FRotator& InAngleOffset, bool bInUseXPBDSolver, double InCompliance);
+	FLKAnimVerletConstraint_BallSocket(struct FLKAnimVerletBone* InBoneA, struct FLKAnimVerletBone* InBoneB, struct FLKAnimVerletBone* InGrandParentNullable, struct FLKAnimVerletBone* InParentNullable,
 									   float InAngleDegrees, bool bInUseXPBDSolver, double InCompliance);
+	FVector GetConstraintDirection() const;
 	virtual void Update(float DeltaTime, bool bInitialUpdate, bool bFinalize) override;
 	virtual void PostUpdate(float DeltaTime) override { Lambda = 0.0; }
 	virtual void ResetSimulation() override { Lambda = 0.0; }

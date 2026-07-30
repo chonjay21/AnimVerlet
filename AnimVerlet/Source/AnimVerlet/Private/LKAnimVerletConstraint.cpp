@@ -1112,18 +1112,44 @@ void FLKAnimVerletConstraint_FixedDistance::BackwardUpdate(float DeltaTime, bool
 ///=========================================================================================================================================
 /// FLKAnimVerletConstraint_BallSocket
 ///=========================================================================================================================================
-FLKAnimVerletConstraint_BallSocket::FLKAnimVerletConstraint_BallSocket(FLKAnimVerletBone* InBoneA, FLKAnimVerletBone* InBoneB, FLKAnimVerletBone* InGrandParentNullable, FLKAnimVerletBone* InParentNullable
-																	   , float InAngleDegrees, bool bInUseXPBDSolver, double InCompliance)
+FLKAnimVerletConstraint_BallSocket::FLKAnimVerletConstraint_BallSocket(FLKAnimVerletBone* InBoneA, FLKAnimVerletBone* InBoneB, FLKAnimVerletBone* InGrandParentNullable, FLKAnimVerletBone* InParentNullable, 
+																	   float InAngleDegrees, const FRotator& InAngleOffset, bool bInUseXPBDSolver, double InCompliance)
 	: BoneA(InBoneA)
 	, BoneB(InBoneB)
 	, GrandParentBoneNullable(InGrandParentNullable)
 	, ParentBoneNullable(InParentNullable)
 	, AngleDegrees(InAngleDegrees)
+	, AngleOffset(InAngleOffset)
 	, bUseXPBDSolver(bInUseXPBDSolver)
 	, Compliance(InCompliance)
 {
 	verify(BoneA != nullptr);
 	verify(BoneB != nullptr);
+}
+
+FLKAnimVerletConstraint_BallSocket::FLKAnimVerletConstraint_BallSocket(FLKAnimVerletBone* InBoneA, FLKAnimVerletBone* InBoneB, FLKAnimVerletBone* InGrandParentNullable, FLKAnimVerletBone* InParentNullable
+																	   , float InAngleDegrees, bool bInUseXPBDSolver, double InCompliance)
+	: FLKAnimVerletConstraint_BallSocket(InBoneA, InBoneB, InGrandParentNullable, InParentNullable, InAngleDegrees, FRotator::ZeroRotator, bInUseXPBDSolver, InCompliance)
+{
+}
+
+FVector FLKAnimVerletConstraint_BallSocket::GetConstraintDirection() const
+{
+	verify(BoneA != nullptr);
+	verify(BoneB != nullptr);
+
+	FVector ConstraintDirection = FVector::ZeroVector;
+	if (GrandParentBoneNullable != nullptr && ParentBoneNullable != nullptr)
+		ConstraintDirection = (ParentBoneNullable->Location - GrandParentBoneNullable->Location).GetSafeNormal();
+	else
+		ConstraintDirection = (BoneB->PoseLocation - BoneA->PoseLocation).GetSafeNormal();
+
+	if (ConstraintDirection.IsNearlyZero() || AngleOffset.IsNearlyZero())
+		return ConstraintDirection;
+
+	/// Apply the offset in BoneA's animation-pose local space, so it follows the skeletal orientation instead of the component or world axes.
+	const FVector LocalConstraintDirection = BoneA->PoseRotation.UnrotateVector(ConstraintDirection);
+	return BoneA->PoseRotation.RotateVector(AngleOffset.RotateVector(LocalConstraintDirection)).GetSafeNormal();
 }
 
 void FLKAnimVerletConstraint_BallSocket::Update(float DeltaTime, bool bInitialUpdate, bool bFinalize)
@@ -1135,17 +1161,7 @@ void FLKAnimVerletConstraint_BallSocket::Update(float DeltaTime, bool bInitialUp
 	float BoneAToBoneBSize = 0.0f;
 	(BoneB->Location - BoneA->Location).ToDirectionAndLength(OUT BoneAToBoneB, OUT BoneAToBoneBSize);
 
-	FVector ConstraintDirection = FVector::ZeroVector;
-	if (GrandParentBoneNullable != nullptr && ParentBoneNullable != nullptr)
-	{
-		const FVector GrandParentToParent = (ParentBoneNullable->Location - GrandParentBoneNullable->Location).GetSafeNormal();
-		ConstraintDirection = GrandParentToParent;
-	}
-	else
-	{
-		const FVector PoseAToPoseB = (BoneB->PoseLocation - BoneA->PoseLocation).GetSafeNormal();
-		ConstraintDirection = PoseAToPoseB;
-	}
+	const FVector ConstraintDirection = GetConstraintDirection();
 
 	const FVector RotationAxis = FVector::CrossProduct(ConstraintDirection, BoneAToBoneB);
 	const float RotationAngle = FMath::Acos(FVector::DotProduct(ConstraintDirection, BoneAToBoneB));
