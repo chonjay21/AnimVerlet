@@ -201,7 +201,7 @@ cape_r_03_root
 |---|---:|---|
 | `RootBone` | None | 재귀적으로 포함할 첫 스켈레탈 본입니다. 루트 파티클은 자동으로 고정됩니다. |
 | `ExcludeBones` | 비어 있음 | 시뮬레이션 파티클에서 제외할 본입니다. 제외된 본의 하위 본도 계속 방문합니다. |
-| `BoneUnitSettingOverride` | 비어 있음 | 선택적인 본별 고정, 관절, 두께, 충돌 모드, 질량 오버라이드입니다. |
+| `BoneUnitSettingOverride` | 비어 있음 | 선택적인 본별 Subdivision, 고정, 관절, 두께, 충돌 모드, 질량 오버라이드입니다. |
 | `bStraightenExcludedBonesByParent` | `true` | 제외된 본을 원래 포즈 위치에만 두지 않고 시뮬레이션된 부모/자식 방향을 따라 재배치합니다. |
 | `bFakeBone` | `false` | 이 본들을 기준으로 오프셋 프록시 체인을 시뮬레이션합니다. 주로 가상 보조 토폴로지이며 표시된 파티클을 일반 실제 본 트랜스폼처럼 직접 출력하지 않습니다. |
 | `FakeBoneOffsetDir` | Forward `(1,0,0)` | `bFakeBone` 사용 시의 오프셋 방향입니다. 사용 전에 정규화됩니다. |
@@ -227,6 +227,9 @@ strap_root -> strap_01 -> strap_twist_helper -> strap_02 -> strap_03
 | 프로퍼티 | 기본값 | 설명 |
 |---|---:|---|
 | `Bone` | None | 오버라이드할 실제 스켈레탈 본입니다. |
+| `bOverrideSubDivideBones` | `false` | 이 본에서 시작하여 각 시뮬레이션 자식으로 이어지는 모든 세그먼트의 Subdivision을 오버라이드합니다. Terminal Bone에서는 자동 Fake Tip 세그먼트를 세분화할 수 있는 유일한 방법이기도 합니다. |
+| `bSubDivideBones` | `false` | Subdivision Override가 활성화된 경우에만 유효합니다. true이면 담당 세그먼트에 가상 파티클을 삽입하고, false이면 노드 기본값이 켜져 있어도 해당 세그먼트의 Subdivision을 명시적으로 막습니다. |
+| `NumSubDividedBone` | `1` | 이 오버라이드가 담당하는 각 세그먼트에 삽입할 가상 파티클 수입니다. 0이면 삽입하지 않습니다. |
 | `bLockBone` | `false` | 파티클을 애니메이션 포즈 위치에 고정합니다. |
 | `LockMargin` | `0 cm` | 고정 목표에서 허용되는 거리입니다. 0은 정확한 위치 고정입니다. |
 | `bOverrideConstrainConeAngleFromParent` | `false` | 글로벌 원뿔 기준 모드의 로컬 오버라이드를 활성화합니다. |
@@ -243,6 +246,9 @@ strap_root -> strap_01 -> strap_twist_helper -> strap_02 -> strap_03
 
 활용 예시:
 
+- 하나의 긴 세그먼트에만 충돌 해상도를 추가
+- 노드 기본 Subdivision은 유지하면서 짧거나 성능에 민감한 세그먼트만 비활성화
+- 자동 Fake Tip을 여러 개의 짧은 충돌 세그먼트로 분할
 - 중간 부착점 고정
 - 넓은 팁을 더 가볍거나 무겁게 설정
 - 헤어 장식 주변의 충돌 두께만 확대
@@ -255,8 +261,8 @@ strap_root -> strap_01 -> strap_twist_helper -> strap_02 -> strap_03
 | 프로퍼티 | 기본값 | 사용 방법 |
 |---|---:|---|
 | `VerletBones` | 비어 있음 | 시뮬레이션할 루트 계층의 정렬된 목록입니다. 한 항목은 단일 체인, 여러 항목은 천 형태의 측면 관계를 만듭니다. |
-| `bSubDivideBones` | `false` | 각 실제 부모-자식 사이에 가상 파티클을 삽입합니다. 스켈레톤을 바꾸지 않고 충돌 해상도와 부드러움을 높입니다. |
-| `NumSubDividedBone` | `1` | 세그먼트마다 삽입할 파티클 수입니다. 수가 많을수록 비용과 필요한 반복 횟수가 늘 수 있습니다. |
+| `bSubDivideBones` | `false` | 실제 부모-자식 세그먼트에 적용할 기본 Subdivision 설정입니다. 부모 본의 Bone Unit Setting으로 해당 부모가 담당하는 세그먼트만 오버라이드할 수 있습니다. |
+| `NumSubDividedBone` | `1` | 세분화된 세그먼트마다 삽입할 기본 가상 파티클 수입니다. 수가 많을수록 비용과 필요한 반복 횟수가 늘 수 있습니다. |
 | `bRebuildSimulationOnLODChange` | `false` | Required Bone LOD가 바뀌면 토폴로지, 제약조건, Broadphase, 충돌 상태를 재구성합니다. 가능한 경우 일치하는 파티클 상태를 보존합니다. |
 | `bActivate` | `true` | false이면 노드 평가를 완전히 비활성화합니다. 기본 그래프 핀으로 노출됩니다. |
 | `bSkipUpdateOnDedicatedServer` | `true` | Dedicated Server에서 평가를 건너뜁니다. 서버 측 시뮬레이션 트랜스폼이 실제로 필요할 때만 끄십시오. |
@@ -271,6 +277,24 @@ strap_root -> strap_01 -> strap_twist_helper -> strap_02 -> strap_03
 | `bLockTipBone` | `false` | 실제 Leaf 파티클을 고정합니다. 활성화하면 가상 팁을 만들지 않습니다. |
 | `TipBoneLockMargin` | `0 cm` | 고정된 팁의 허용 이동 반경입니다. |
 | `StartBoneLockMargin` | `0 cm` | 자동 고정되는 각 체인 루트의 허용 이동 반경입니다. |
+
+### 세그먼트별 Subdivision 워크플로
+
+Subdivision의 소유 기준은 부모 본입니다. `hair_01`의 `BoneUnitSettingOverride`는 `hair_01`에서 각 시뮬레이션 자식으로 이어지는 세그먼트를 제어하며, `hair_root`에서 `hair_01`로 이어지는 세그먼트는 제어하지 않습니다.
+
+일반적인 실제 본 세그먼트는 다음 순서로 설정을 결정합니다.
+
+1. 노드 레벨의 `bSubDivideBones`와 `NumSubDividedBone`을 기본값으로 사용합니다.
+2. 세그먼트의 시뮬레이션 부모에 Bone Unit Setting이 있는지 찾습니다.
+3. 해당 설정에서 `bOverrideSubDivideBones`가 활성화되어 있으면 기본값 둘을 로컬 `bSubDivideBones`와 `NumSubDividedBone`으로 대체합니다.
+
+따라서 글로벌 기준을 유지하면서 일부 세그먼트만 다르게 설정할 수 있습니다. 예를 들어 글로벌 Subdivision을 끈 상태에서 `cape_center_02`를 `BoneUnitSettingOverride`에 추가하고 `bOverrideSubDivideBones`와 로컬 `bSubDivideBones`를 모두 활성화한 뒤 `NumSubDividedBone = 2`로 설정하면, `cape_center_02`에서 시작하는 세그먼트에만 중간 파티클 두 개가 추가됩니다.
+
+자동 Fake Tip은 글로벌 Subdivision 설정과 관계없이 기존의 단일 세그먼트 동작을 유지합니다. Fake Tip을 세분화하려면 Terminal Real Bone을 `BoneUnitSettingOverride`에 추가하고 Subdivision Override를 명시적으로 활성화해야 합니다. Terminal Override가 `NumSubDividedBone = 2`이면 전체 `FakeTipBoneLength`가 같은 길이의 세 세그먼트로 나뉩니다. 즉, 중간 가상 파티클 두 개와 최종 Fake Tip 파티클이 만들어집니다.
+
+다중 체인 망토에서는 비대칭 토폴로지가 의도된 경우가 아니라면 좌우 대응 체인에 같은 Subdivision Override를 적용하십시오. Side, Diagonal, Bending, Triangle 관계는 체인 배열 순서와 파티클 깊이를 기준으로 생성되므로 서로 다른 Subdivision 개수는 대응하지 않는 행을 연결하거나 불균일한 표면을 만들 수 있습니다.
+
+`bPreserveLengthFromParentBetweenRealBones`와 `bPreserveSideLengthBetweenRealBones`는 실제로 삽입된 파티클을 감지하므로 Bone Unit Override로 일부 세그먼트에만 Subdivision을 적용한 경우에도 동작합니다.
 
 ### Activate, Pause, Reset, Warmup의 차이
 
@@ -723,7 +747,7 @@ AnimVerlet이 데이터를 소비하는 Animation Blueprint 평가 전에 목록
 ### 충돌을 놓침
 
 - `Thickness` 또는 본별 Thickness Override를 올립니다.
-- 긴 세그먼트에 Subdivision을 추가합니다.
+- 긴 세그먼트에 Subdivision을 추가합니다. 선택한 세그먼트나 Fake Tip에만 추가 파티클이 필요하다면 `bOverrideSubDivideBones`를 사용합니다.
 - 현재 LOD에서 Collider가 유효한 본에 부착되었는지 확인합니다.
 - Absolute World Transform이 실제 월드 트랜스폼인지 확인합니다.
 - 해당 파티클이 Collider의 `ExcludeBones`에 포함되지 않았는지 확인합니다.
@@ -759,7 +783,7 @@ AnimVerlet이 데이터를 소비하는 Animation Blueprint 평가 전에 목록
 - `bUseBroadphase`를 활성화합니다.
 - 소수의 Primitive로 충분하다면 World Sweep보다 로컬 캐릭터 Collider를 우선합니다.
 - `SolveIteration = 2–4`에서 시작합니다.
-- 충돌 해상도 또는 부드러운 곡률이 필요한 세그먼트에만 Subdivision을 추가합니다.
+- 충돌 해상도 또는 부드러운 곡률이 필요한 세그먼트에만 Subdivision을 추가하고, 노드 전체의 파티클 수를 올리기보다 세그먼트별 오버라이드를 우선합니다.
 - 시각적으로 필요할 때만 Self Collision을 활성화합니다.
 - 차이가 비용을 정당화하지 않는다면 다중 체인에서 Triangle-Triangle보다 Sphere-Triangle Self Collision을 우선합니다.
 - 오랫동안 정지하는 액세서리에는 Sleep을 사용합니다.

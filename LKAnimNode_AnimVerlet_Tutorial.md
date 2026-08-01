@@ -201,7 +201,7 @@ Each `VerletBones` element contains:
 |---|---:|---|
 | `RootBone` | None | First skeletal bone recursively included in this simulated hierarchy. The root particle is automatically pinned. |
 | `ExcludeBones` | Empty | Bones skipped as simulated particles. Their descendants are still visited. |
-| `BoneUnitSettingOverride` | Empty | Optional per-bone lock, joint, thickness, collision-mode, and mass overrides. |
+| `BoneUnitSettingOverride` | Empty | Optional per-bone subdivision, lock, joint, thickness, collision-mode, and mass overrides. |
 | `bStraightenExcludedBonesByParent` | `true` | Repositions excluded bones along the simulated parent/child direction instead of leaving only their original pose placement. |
 | `bFakeBone` | `false` | Simulates an offset proxy chain based on these bones. This entry is primarily a virtual helper topology and does not directly output its marked particles as normal real-bone transforms. |
 | `FakeBoneOffsetDir` | Forward `(1,0,0)` | Offset direction used when `bFakeBone` is enabled. It is normalized before use. |
@@ -227,6 +227,9 @@ Add an element to `BoneUnitSettingOverride`, select its `Bone`, then enable only
 | Property | Default | Explanation |
 |---|---:|---|
 | `Bone` | None | Real skeletal bone to override. |
+| `bOverrideSubDivideBones` | `false` | Overrides subdivision for every segment that starts at this bone and ends at one of its simulated children. On a terminal bone, this is also the only way to subdivide the automatic fake-tip segment. |
+| `bSubDivideBones` | `false` | Effective only when the subdivision override is enabled. True inserts virtual particles on the owned segment; false explicitly prevents subdivision even if the node default is enabled. |
+| `NumSubDividedBone` | `1` | Number of virtual particles inserted into each segment controlled by this override. Zero inserts none. |
 | `bLockBone` | `false` | Pins this particle to its animation-pose location. |
 | `LockMargin` | `0 cm` | Permitted distance from the pin target. Zero is an exact positional pin. |
 | `bOverrideConstrainConeAngleFromParent` | `false` | Enables a local override of the global cone-reference mode. |
@@ -243,6 +246,9 @@ Add an element to `BoneUnitSettingOverride`, select its `Bone`, then enable only
 
 Useful applications:
 
+- add collision resolution only to one long segment;
+- disable subdivision on a short or performance-sensitive segment while the node default remains enabled;
+- divide an automatic fake tip into several shorter collision segments;
 - lock an intermediate attachment point;
 - make a broad tip lighter or heavier;
 - enlarge collision only around a hair ornament;
@@ -255,8 +261,8 @@ Useful applications:
 | Property | Default | How to use it |
 |---|---:|---|
 | `VerletBones` | Empty | Ordered list of simulated root hierarchies. One entry is a single-chain setup; multiple entries enable cloth-like side relationships. |
-| `bSubDivideBones` | `false` | Inserts virtual particles between each real parent-child pair. This improves collision resolution and softness without changing the skeleton. |
-| `NumSubDividedBone` | `1` | Number of inserted particles per segment. More particles increase cost and may require additional solve iterations. |
+| `bSubDivideBones` | `false` | Default subdivision setting for real parent-child segments. A parent bone's unit setting can override it for the segments owned by that parent. |
+| `NumSubDividedBone` | `1` | Default number of virtual particles inserted per subdivided segment. More particles increase cost and may require additional solve iterations. |
 | `bRebuildSimulationOnLODChange` | `false` | Rebuilds topology, constraints, broadphase, and collision state when the required-bone LOD changes. Matching particle state is preserved where possible. Enable it when simulated bones differ between LODs. |
 | `bActivate` | `true` | Completely disables node evaluation when false. Exposed as a default graph pin. |
 | `bSkipUpdateOnDedicatedServer` | `true` | Skips evaluation on a dedicated server. Disable only if server-side simulated transforms are genuinely required. |
@@ -271,6 +277,24 @@ Useful applications:
 | `bLockTipBone` | `false` | Pins real leaf particles. Enabling it prevents fake-tip creation. |
 | `TipBoneLockMargin` | `0 cm` | Allowed movement radius for pinned tips. |
 | `StartBoneLockMargin` | `0 cm` | Allowed movement radius for every automatically pinned chain root. |
+
+### Per-segment subdivision workflow
+
+Subdivision ownership is parent-based. A `BoneUnitSettingOverride` for `hair_01` controls the segment from `hair_01` to each of its simulated children; it does not control the segment from `hair_root` to `hair_01`.
+
+For ordinary real-bone segments, the decision order is:
+
+1. Start with the node-level `bSubDivideBones` and `NumSubDividedBone` defaults.
+2. Look for a unit setting on the segment's simulated parent.
+3. If that setting enables `bOverrideSubDivideBones`, replace both defaults with its local `bSubDivideBones` and `NumSubDividedBone` values.
+
+This allows a global baseline with localized exceptions. For example, leave global subdivision off, add `cape_center_02` to `BoneUnitSettingOverride`, enable both `bOverrideSubDivideBones` and its local `bSubDivideBones`, and set `NumSubDividedBone = 2`. Only segments that start at `cape_center_02` receive two intermediate particles.
+
+Automatic fake tips deliberately keep the legacy one-segment behavior regardless of the global subdivision setting. To subdivide a fake tip, add the terminal real bone to `BoneUnitSettingOverride` and explicitly enable its subdivision override. If the terminal override uses `NumSubDividedBone = 2`, the full `FakeTipBoneLength` is split into three equal segments: two intermediate virtual particles plus the final fake-tip particle.
+
+For a multi-chain cape, keep subdivision overrides consistent across corresponding left-to-right chains unless an asymmetric topology is intentional. Side, diagonal, bending, and triangle relationships are created by chain order and particle depth; mismatched subdivision counts can connect non-corresponding rows or leave an uneven surface.
+
+The `bPreserveLengthFromParentBetweenRealBones` and `bPreserveSideLengthBetweenRealBones` options detect the actual inserted particles, so they also work when subdivision is enabled only through a bone-unit override.
 
 ### Activate, pause, reset, and warmup are different
 
@@ -722,7 +746,7 @@ Tune in this order to avoid compensating for a topology problem with excessive s
 ### Collision is missed
 
 - Increase `Thickness` or a per-bone thickness override.
-- Add subdivision to long segments.
+- Add subdivision to long segments. Use `bOverrideSubDivideBones` when only selected segments or fake tips need the extra particles.
 - Confirm the collider is attached to a valid bone at the current LOD.
 - Confirm absolute-world transforms are truly world transforms.
 - Confirm the particle is not in the collider's `ExcludeBones`.
@@ -758,7 +782,7 @@ Tune in this order to avoid compensating for a topology problem with excessive s
 - Keep `bUseBroadphase` enabled.
 - Prefer local character colliders over world sweeps when a few primitives are sufficient.
 - Start with `SolveIteration = 2–4`.
-- Add subdivisions only to segments that need collision resolution or softer curvature.
+- Add subdivisions only to segments that need collision resolution or softer curvature; prefer per-segment overrides over raising particle counts across the entire node.
 - Enable self-collision only when visually necessary.
 - Prefer sphere-triangle over triangle-triangle self collision for multi-chain cloth unless the visual difference justifies the cost.
 - Use sleep for accessories that remain still for long periods.
