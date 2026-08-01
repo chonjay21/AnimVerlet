@@ -2316,13 +2316,69 @@ void FLKAnimNode_AnimVerlet::PostUpdateBones(float InDeltaTime)
 		float ParentToCurPoseSize = 0.0f;
 		ParentToCurPose.ToDirectionAndLength(OUT ParentToCurPoseDir, OUT ParentToCurPoseSize);
 
-		/// Calculate rotation
-		const FQuat DeltaRotation = FQuat::FindBetweenNormals(ParentToCurPoseDir, ParentToCurVerletDir);
-		///const FVector RotationAxis = FVector::CrossProduct(ParentToCurPoseDir, ParentToCurVerletDir).GetSafeNormal();
-		///const float RotationAngle = FMath::Acos(FVector::DotProduct(ParentToCurPoseDir, ParentToCurVerletDir));
-		///const FQuat DeltaRotation = FQuat(RotationAxis, RotationAngle);
-		ParentBone->Rotation = DeltaRotation * ParentBone->PoseRotation;
-		ParentBone->Rotation.Normalize();
+		/// Calculate rotation. Transport the previous simulated orientation to the new segment direction so roll stays continuous even when the segment points opposite its pose.
+		FQuat ReferenceRotation = ParentBone->PoseRotation;
+		FVector ReferenceDirection = ParentToCurPoseDir;
+		if (CurBoneIndicator.HasParentSimulateBone())
+		{
+			const FLKAnimVerletBone& ParentSimulateBone = SimulateBones[CurBoneIndicator.ParentAnimVerletBoneIndex];
+			ReferenceRotation = ParentSimulateBone.PrevRotation;
+
+			/// The segment's local aim axis is stable across animation poses. Recreate the previous frame's aim direction from it instead of comparing against the pose.
+			const FVector LocalAimDirection = ParentBone->PoseRotation.UnrotateVector(ParentToCurPoseDir).GetSafeNormal();
+			ReferenceDirection = ReferenceRotation.RotateVector(LocalAimDirection).GetSafeNormal();
+		}
+
+		if (ReferenceDirection.IsNearlyZero() || ParentToCurVerletDir.IsNearlyZero())
+		{
+			ParentBone->Rotation = ReferenceRotation;
+			continue;
+		}
+
+		FQuat DeltaRotation = FQuat::Identity;
+		const float DirectionDot = FMath::Clamp(FVector::DotProduct(ReferenceDirection, ParentToCurVerletDir), -1.0f, 1.0f);
+		if (DirectionDot < -1.0f + KINDA_SMALL_NUMBER)
+		{
+			/// Exactly opposite directions have no unique rotation axis. Select the axis of the previous orientation that is most perpendicular to the aim direction.
+			/// This makes the fallback deterministic and preserves roll continuity.
+			FVector StableRotationAxis = ReferenceRotation.GetAxisX();
+			float StableAxisAlignment = FMath::Abs(FVector::DotProduct(StableRotationAxis, ReferenceDirection));
+
+			const FVector CandidateAxisY = ReferenceRotation.GetAxisY();
+			const float CandidateAxisYAlignment = FMath::Abs(FVector::DotProduct(CandidateAxisY, ReferenceDirection));
+			if (CandidateAxisYAlignment < StableAxisAlignment)
+			{
+				StableRotationAxis = CandidateAxisY;
+				StableAxisAlignment = CandidateAxisYAlignment;
+			}
+
+			const FVector CandidateAxisZ = ReferenceRotation.GetAxisZ();
+			if (FMath::Abs(FVector::DotProduct(CandidateAxisZ, ReferenceDirection)) < StableAxisAlignment)
+				StableRotationAxis = CandidateAxisZ;
+
+			StableRotationAxis = FVector::VectorPlaneProject(StableRotationAxis, ReferenceDirection).GetSafeNormal();
+			DeltaRotation = FQuat(StableRotationAxis, PI);
+		}
+		else
+		{
+			DeltaRotation = FQuat::FindBetweenNormals(ReferenceDirection, ParentToCurVerletDir);
+		}
+
+		const FQuat TransportedRotation = (DeltaRotation * ReferenceRotation).GetNormalized();
+		ParentBone->Rotation = TransportedRotation;
+
+		/// Parallel transport preserves roll continuity, but its roll is path-dependent and can drift away from the animation pose. 
+		/// Away from the pose-opposite singularity, blend toward the pose-based solution. Both rotations align the same local aim axis to ParentToCurVerletDir, so this interpolation acts as a twist-only correction.
+		constexpr float NoRollRecoveryDot = -0.98480775f;	/// cos(170 degrees)
+		constexpr float FullRollRecoveryDot = -0.86602540f;	/// cos(150 degrees)
+		const float PoseDirectionDot = FMath::Clamp(FVector::DotProduct(ParentToCurPoseDir, ParentToCurVerletDir), -1.0f, 1.0f);
+		const float RollRecoveryAlpha = FMath::SmoothStep(NoRollRecoveryDot, FullRollRecoveryDot, PoseDirectionDot);
+		if (RollRecoveryAlpha > KINDA_SMALL_NUMBER)
+		{
+			const FQuat PoseDeltaRotation = FQuat::FindBetweenNormals(ParentToCurPoseDir, ParentToCurVerletDir);
+			const FQuat PoseBasedRotation = (PoseDeltaRotation * ParentBone->PoseRotation).GetNormalized();
+			ParentBone->Rotation = FQuat::Slerp(TransportedRotation, PoseBasedRotation, RollRecoveryAlpha).GetNormalized();
+		}
 	}
 }
 
