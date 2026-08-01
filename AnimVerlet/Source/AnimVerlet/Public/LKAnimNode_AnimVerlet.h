@@ -52,7 +52,7 @@ private:
 						   int32 ParentSimulateBoneIndex, int32 RootSimulateBoneIndex, const FLKAnimVerletBoneSetting& BoneSetting, bool bParentExcluded, int32 ParentExcludedBoneIndex);
 	bool WalkChildsAndMakeSimulateBones(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer, const FReferenceSkeleton& ReferenceSkeleton, int32 BoneIndex, 
 										int32 ParentSimulateBoneIndex, int32 RootSimulateBoneIndex, const FLKAnimVerletBoneSetting& BoneSetting, bool bParentExcluded, int32 ParentExcludedBoneIndex);
-	void MakeFakeBoneTransform(OUT FTransform& OutTransform, int32 ParentSimulateBoneIndex) const;
+	void MakeFakeBoneTransform(OUT FTransform& OutTransform, int32 ParentSimulateBoneIndex, float InFakeBoneLength) const;
 
 	void UpdateDeltaTime(float InDeltaTime, float InTimeDilation);
 	FQuat CalculateGravityAlignmentRotation(const FTransform& ComponentTransform) const;
@@ -113,7 +113,7 @@ public:
 	/** Input the starting bone of the cloth sequentially. */
 	UPROPERTY(EditAnywhere, Category = "Setup", meta = (DisplayPriority = "1"))
 	TArray<FLKAnimVerletBoneSetting> VerletBones;
-	/** Insert a fake(virtual) bone in the middle of the chain.(It can affect the softness of the cloth or the collision reaction)  */
+	/** Default setting for inserting fake(virtual) bones between skeletal bones. Bone unit settings can override it per segment. */
 	UPROPERTY(EditAnywhere, Category = "Setup")
 	bool bSubDivideBones = false;
 	UPROPERTY(EditAnywhere, Category = "Setup", meta = (EditCondition = "bSubDivideBones", EditConditionHides, ClampMin = "0"))

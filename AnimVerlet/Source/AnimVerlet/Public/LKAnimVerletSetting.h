@@ -11,6 +11,14 @@ public:
 	UPROPERTY(EditAnywhere)
 	FBoneReference Bone;
 
+	/** Overrides subdivision for segments from this bone to each simulated child. On a terminal bone, only this override can subdivide the automatic fake tip segment. */
+	UPROPERTY(EditAnywhere, Category = "SubDivide")
+	bool bOverrideSubDivideBones = false;
+	UPROPERTY(EditAnywhere, Category = "SubDivide", meta = (EditCondition = "bOverrideSubDivideBones", EditConditionHides))
+	bool bSubDivideBones = false;
+	UPROPERTY(EditAnywhere, Category = "SubDivide", meta = (EditCondition = "bOverrideSubDivideBones && bSubDivideBones", EditConditionHides, ClampMin = "0"))
+	uint8 NumSubDividedBone = 1;
+
 	UPROPERTY(EditAnywhere, Category = "Constraint")
 	bool bLockBone = false;
 	UPROPERTY(EditAnywhere, Category = "Constraint", meta = (EditCondition = "bLockBone", ClampMin = "0.0", ForceUnits = "cm"))

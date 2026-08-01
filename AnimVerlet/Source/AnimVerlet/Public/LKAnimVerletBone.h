@@ -39,9 +39,11 @@ public:
 	TSet<int32, DefaultKeyFuncs<int32>, TInlineSetAllocator<8>> ChildVerletBoneIndexes;
 	bool bTipBone = false;
 	bool bFakeBone = false;
+	bool bSubDividedBone = false;
 	bool bUseXPBDSolver = false;
 	float InvMass = 1.0f;
 	FVector FakeBoneLocationOffset = FVector::ZeroVector;
+	float FakeBoneLengthFromParent = 0.0f;
 	FVector SideStraightenDirInLocal = FVector::ZeroVector;
 
 	FVector PrevPoseLocation = FVector::ZeroVector;

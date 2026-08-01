@@ -206,7 +206,7 @@ void ULKAnimGraphNode_AnimVerlet::Draw(FPrimitiveDrawInterface* PDI, USkeletalMe
 					DrawWireCapsule(PDI, (AVerletBone.Location + CVerletBone.Location) * 0.5f, ACCapsuleRotation.GetAxisX(), ACCapsuleRotation.GetAxisY(), ACCapsuleRotation.GetAxisZ(), FColor::Emerald, TriThickness * BoneThicknessRenderScale, ((AVerletBone.Location - CVerletBone.Location).Size() * 0.5f) + TriThickness * BoneThicknessRenderScale, 16, SDPG_Foreground);
 
 					const FQuat BCCapsuleRotation = FRotationMatrix::MakeFromZ(BVerletBone.Location - CVerletBone.Location).ToQuat();
-					DrawWireCapsule(PDI, (BVerletBone.Location + CVerletBone.Location) * 0.5f, BCCapsuleRotation.GetAxisX(), BCCapsuleRotation.GetAxisY(), BCCapsuleRotation.GetAxisZ(), FColor::Emerald, TriThickness * BoneThicknessRenderScale, ((AVerletBone.Location - CVerletBone.Location).Size() * 0.5f) + TriThickness * BoneThicknessRenderScale, 16, SDPG_Foreground);
+					DrawWireCapsule(PDI, (BVerletBone.Location + CVerletBone.Location) * 0.5f, BCCapsuleRotation.GetAxisX(), BCCapsuleRotation.GetAxisY(), BCCapsuleRotation.GetAxisZ(), FColor::Emerald, TriThickness * BoneThicknessRenderScale, ((BVerletBone.Location - CVerletBone.Location).Size() * 0.5f) + TriThickness * BoneThicknessRenderScale, 16, SDPG_Foreground);
 
 					const FQuat ABCapsuleRotation = FRotationMatrix::MakeFromZ(AVerletBone.Location - BVerletBone.Location).ToQuat();
 					DrawWireCapsule(PDI, (AVerletBone.Location + BVerletBone.Location) * 0.5f, ABCapsuleRotation.GetAxisX(), ABCapsuleRotation.GetAxisY(), ABCapsuleRotation.GetAxisZ(), FColor::Emerald, TriThickness * BoneThicknessRenderScale, ((AVerletBone.Location - BVerletBone.Location).Size() * 0.5f) + TriThickness * BoneThicknessRenderScale, 16, SDPG_Foreground);
