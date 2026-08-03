@@ -266,7 +266,7 @@ strap_root -> strap_01 -> strap_twist_helper -> strap_02 -> strap_03
 | `bRebuildSimulationOnLODChange` | `false` | Required Bone LOD가 바뀌면 토폴로지, 제약조건, Broadphase, 충돌 상태를 재구성합니다. 가능한 경우 일치하는 파티클 상태를 보존합니다. |
 | `bActivate` | `true` | false이면 노드 평가를 완전히 비활성화합니다. 기본 그래프 핀으로 노출됩니다. |
 | `bSkipUpdateOnDedicatedServer` | `true` | Dedicated Server에서 평가를 건너뜁니다. 서버 측 시뮬레이션 트랜스폼이 실제로 필요할 때만 끄십시오. |
-| `bPause` | `false` | 현재 시뮬레이션 상태를 유지하고 출력하면서 적분만 중지합니다. 리셋하지 않습니다. 기본 그래프 핀입니다. |
+| `bPause` | `false` | 현재 시뮬레이션 상태를 유지하고 출력하면서 적분만 중지합니다. 리셋하지 않지만 대기 중인 Fixed Step 누적량은 지웁니다. 기본 그래프 핀입니다. |
 | `PlaySpeedRate` | `1.0` | 업데이트 델타 타임과 Time Dilation을 스케일합니다. 명시적인 일시정지는 `bPause`를 권장합니다. |
 | `bUseWarmup` | `true` | 초기화 또는 `ResetPhysics` 뒤 결과를 공개하기 전에 고정 서브스텝을 수행합니다. |
 | `WarmupStepCount` | `8` | 워밍업 서브스텝 횟수입니다. 다음 평가되는 비일시정지 프레임에서 수행됩니다. |
@@ -300,10 +300,12 @@ Subdivision의 소유 기준은 부모 본입니다. `hair_01`의 `BoneUnitSetti
 
 - **Deactivate**: 스켈레탈 컨트롤 자체가 평가되지 않습니다.
 - **Pause**: 유지된 상태를 계속 출력하지만 적분하지 않습니다.
-- 에디터의 **Reset Simulation**: 움직임을 지우고 파티클을 현재 포즈에 동기화합니다.
-- Unreal 애니메이션 다이내믹스 흐름의 **Reset Physics**: 현재 포즈/컴포넌트 트랜스폼 기준 리셋을 예약합니다. 워밍업이 활성화되어 있으면 다음 평가 프레임에 워밍업합니다.
+- 에디터의 **Reset Simulation**: 움직임과 Fixed Step 누산기를 지운 뒤 파티클을 현재 포즈에 동기화합니다.
+- Unreal 애니메이션 다이내믹스 흐름의 **Reset Physics**: 현재 포즈/컴포넌트 트랜스폼 기준 리셋을 예약하고, 실제 리셋 시 Fixed Step 누산기도 지웁니다. 워밍업이 활성화되어 있으면 다음 평가 프레임에 워밍업합니다.
 
-워밍업은 모든 서브스텝에 같은 컴포넌트 트랜스폼을 사용하므로 컴포넌트 이동 및 회전 관성을 의도적으로 무시합니다.
+워밍업은 모든 서브스텝에 같은 컴포넌트 트랜스폼을 사용하므로 컴포넌트 이동 및 회전 관성을 의도적으로 무시합니다. 워밍업 스텝 사이에는 입력 포즈를 다시 준비하므로 하나의 오래된 준비 상태를 반복 사용하지 않고 포즈 이력이 일관되게 진행됩니다.
+
+결과를 적용할 때 `OutputBlendDuration`은 이전 시뮬레이션 스텝에 캐시된 포즈가 아니라 **현재** 입력 컴포넌트 공간 포즈부터 블렌딩합니다. 시뮬레이션 위치/회전에는 현재 입력 포즈의 스케일이 결합됩니다. 따라서 Fixed Step 누산기가 어떤 렌더 프레임에 시뮬레이션 스텝을 예약하지 않아도 애니메이션 스케일 변경은 최신 상태로 유지됩니다.
 
 ## 8. 애니메이션 포즈 설정
 
@@ -318,7 +320,7 @@ Subdivision의 소유 기준은 부모 본입니다. `hair_01`의 `BoneUnitSetti
 | `bIgnoreAnimationPose` | `false` | 포즈 추종 보정을 비활성화하고 제약조건과 힘이 주로 형상을 결정하게 합니다. |
 | `bAlignAnimationPoseToGravity` | `false` | 애니메이션 포즈를 `AnimationPoseReferenceDirection`에서 현재 중력 방향으로 회전시킨 뒤 목표로 사용합니다. |
 | `AnimationPoseInertia` | `0.03` | 현재 부모 상대 애니메이션 포즈 위치로 직접 당기는 정도입니다. 높을수록 애니메이션을 더 밀착 추종합니다. |
-| `bApplyAnimationPoseInertiaCorrection` | `true` | 목표 프레임레이트와 제한된 평균 FPS로 `AnimationPoseInertia`를 보정합니다. |
+| `bApplyAnimationPoseInertiaCorrection` | `true` | 자체 목표 프레임레이트를 사용해 `AnimationPoseInertia`를 보정합니다. 분모는 Variable Step 모드에서 제한된 평균 FPS이고, 보정된 Fixed Step 시뮬레이션이 활성화된 동안에는 `DeltaTimeCorrectionTargetFrameRate`입니다. |
 | `AnimationPoseInertiaTargetFrameRate` | `60` | 포즈 관성 보정의 기준 프레임레이트입니다. |
 | `AnimationPoseReferenceDirection` | Down `(0,0,-1)` | 제작된 애니메이션 포즈에서 중력을 나타내는 컴포넌트 공간 방향입니다. 중력 정렬 옵션에 사용됩니다. |
 
@@ -331,7 +333,7 @@ Subdivision의 소유 기준은 부모 본입니다. `hair_01`의 `BoneUnitSetti
 | 프로퍼티 | 기본값 | 사용 방법 |
 |---|---:|---|
 | `Damping` | `0.9` | 이전 Verlet 변위 중 유지할 비율입니다. `1`은 모두 유지하고 낮을수록 움직임을 빨리 제거합니다. |
-| `bApplyDampingCorrection` | `false` | 평균 FPS를 기준으로 Damping을 보정하여 감쇠 속도를 더 일정하게 만듭니다. |
+| `bApplyDampingCorrection` | `false` | 감쇠 속도를 더 일정하게 보정합니다. Variable Step 모드에서는 제한된 평균 FPS를 사용하고, 보정된 Fixed Step 시뮬레이션이 활성화된 동안에는 `DeltaTimeCorrectionTargetFrameRate`를 사용합니다. |
 | `DampingCorrectionTargetFrameRate` | `60` | Damping 보정 기준 FPS입니다. |
 | `bUseXPBDSolver` | `false` | XPBD 제약조건 Solver를 선택합니다. false이면 PBD입니다. |
 | `InvCompliance` | `100000000` | XPBD 역 컴플라이언스입니다. 높을수록 거리 제약조건이 단단합니다. 실제 컴플라이언스는 `1 / InvCompliance`이므로 0으로 두지 마십시오. |
@@ -392,13 +394,24 @@ Subdivision의 소유 기준은 부모 본입니다. `hair_01`의 `BoneUnitSetti
 
 | 프로퍼티 | 기본값 | 사용 방법 |
 |---|---:|---|
-| `FixedDeltaTime` | `0 s` | 양수이면 실제 델타 타임을 대체합니다. 0이면 업데이트 델타를 사용합니다. |
-| `bApplyDeltaTimeCorrection` | `true` | Fixed Delta 사용 시 프레임레이트, Time Dilation, 목표 프레임레이트로 값을 보정합니다. |
-| `DeltaTimeCorrectionTargetFrameRate` | `60` | Fixed Delta 보정 기준 FPS입니다. |
-| `MinDeltaTime` | `KINDA_SMALL_NUMBER` | 최종 시뮬레이션 델타에 적용되는 하한입니다. |
-| `MaxDeltaTime` | `0.05 s` | 프레임 Hitch 뒤 불안정성을 제한하는 상한입니다. |
+| `FixedDeltaTime` | `0.01666 s` | 각 Fixed Step이 사용하는 시뮬레이션 델타입니다. `0`으로 설정하면 업데이트 델타 기반 Variable Step을 프레임마다 한 번 사용합니다. |
+| `bApplyDeltaTimeCorrection` | `true` | Fixed Delta가 양수일 때 경과 시간 누산기로 목표 빈도에 맞춰 Fixed Step을 0회, 1회 또는 여러 번 예약합니다. 비활성화하면 평가되는 비일시정지 프레임마다 정확히 한 번의 Fixed Step을 실행합니다. |
+| `DeltaTimeCorrectionTargetFrameRate` | `60` | 누산기가 Fixed Step을 예약하는 빈도입니다. `FixedDeltaTime > 0`이고 보정이 활성화된 경우에만 표시되며 최솟값은 `1`입니다. |
+| `MaxSubStep` | `3` | 한 렌더 프레임에서 실행할 수 있는 최대 Fixed Step 수입니다. 따라잡기 연산이 폭증하지 않도록 이 한도를 넘는 누적 시간은 버립니다. Target Frame Rate와 같은 조건에서 표시되며 최솟값은 `1`입니다. |
+| `MinDeltaTime` | `KINDA_SMALL_NUMBER` | Variable Delta 또는 `FixedDeltaTime * TimeDilation`에 적용하는 하한입니다. |
+| `MaxDeltaTime` | `0.05 s` | 해당 스텝별 델타에 적용하는 상한입니다. Fixed Step 실행 횟수는 이 값이 아니라 `MaxSubStep`이 제한합니다. |
 
 `PlaySpeedRate`는 입력 델타 타임과 Time Dilation 양쪽에 관여합니다. 게임플레이 시스템이 Global 또는 Custom Time Dilation을 변경한다면 Slow Motion과 Fast Forward를 직접 테스트하십시오.
+
+실행 방식은 세 가지입니다.
+
+1. **Variable Step** — `FixedDeltaTime = 0`: `MinDeltaTime–MaxDeltaTime` 범위로 Clamp한 업데이트 델타를 사용하여 한 번 실행합니다.
+2. **프레임당 한 번의 Fixed Step** — `FixedDeltaTime`은 양수이고 보정은 비활성화: 평가되는 비일시정지 프레임마다 `FixedDeltaTime * TimeDilation`을 같은 범위로 Clamp하여 한 번 실행합니다. 이 방식은 여전히 렌더/평가 빈도에 의존합니다.
+3. **누산기 기반 Fixed Step** — `FixedDeltaTime`은 양수이고 보정은 활성화: 음수가 아닌 경과 업데이트 시간을 `DeltaTimeCorrectionTargetFrameRate` 기준으로 누적합니다. 빠른 렌더 프레임에는 스텝이 없을 수 있고 느린 프레임에는 `MaxSubStep`까지 여러 번 실행할 수 있습니다. 정수 스텝에 못 미치는 나머지는 다음 프레임에 보존하지만 최대 누적 한도를 넘는 시간은 버립니다.
+
+Fixed Step을 여러 번 실행할 때 노드는 이전 렌더 프레임과 현재 렌더 프레임 사이의 컴포넌트 트랜스폼을 보간하고, 각 서브스텝마다 포즈를 다시 준비합니다. 따라서 컴포넌트 이동/회전 관성이 여러 서브스텝에 분산되고 Verlet 포즈 이력이 올바르게 진행됩니다. `OutputBlendDuration`도 렌더 프레임마다 한 번이 아니라 전체 시뮬레이션 시간(`스텝별 델타 × 실행한 스텝 수`)만큼 진행됩니다.
+
+실시간 속도를 맞추려면 일반적으로 `FixedDeltaTime = 0.01666`, `DeltaTimeCorrectionTargetFrameRate = 60`처럼 서로 역수 관계인 값을 사용하십시오. 두 값의 곱이 Time Dilation 적용 전 초당 진행할 시뮬레이션 시간을 결정합니다. 목표가 60 Hz라면 `MaxSubStep = 2`는 30 FPS 프레임까지, `3`은 20 FPS 프레임까지 따라잡을 수 있습니다. 예상 프레임 저하를 감당하는 가장 작은 예산을 선택하십시오.
 
 ### Cone 및 Custom Distance 제약조건
 
@@ -712,7 +725,8 @@ AnimVerlet이 데이터를 소비하는 Animation Blueprint 평가 전에 목록
 
 ### Hitch 또는 Teleport 뒤 체인이 폭발함
 
-- `MaxDeltaTime`을 낮춥니다.
+- 보정된 Fixed Step 사용 시 일반적인 짧은 프레임 저하는 따라잡되 연산량은 제한하도록 `MaxSubStep`을 설정합니다. 한도를 넘는 누적량은 자동으로 버립니다.
+- Variable Step 또는 높은 Time Dilation에서 **스텝별** 델타가 너무 커질 수 있다면 `MaxDeltaTime`을 낮춥니다. 이 값은 Fixed Step 횟수를 제한하지 않습니다.
 - 텔레포트 후 Unreal의 `ResetPhysics` 동작을 호출합니다.
 - Sudden Move/Rotation Ignore 옵션을 활성화합니다.
 - 이동 및 회전 Clamp를 켜 둡니다.
@@ -766,10 +780,11 @@ AnimVerlet이 데이터를 소비하는 Animation Blueprint 평가 전에 목록
 ### 프레임레이트에 따라 물리가 달라짐
 
 - 가속도 형태의 동작에는 제곱 델타 타임을 사용하는 Physics Preset을 사용합니다.
-- Fixed Delta Time과 Correction을 검토합니다.
+- 프레임레이트와 독립적인 스텝 예약에는 보정된 Fixed Step을 사용합니다. `FixedDeltaTime = 0.01666`, `DeltaTimeCorrectionTargetFrameRate = 60`처럼 서로 역수 관계인 값을 함께 사용하십시오.
+- 누적 시간을 버리지 않고 복구해야 하는 최저 프레임레이트에 맞춰 `MaxSubStep`을 정합니다. 예를 들어 목표가 60 Hz이고 30 FPS까지 따라잡으려면 최소 `2`를 사용합니다.
 - 적절한 경우 Damping 및 Animation Pose Inertia Correction을 활성화합니다.
 - `MaxDeltaTime` 상한을 유지합니다.
-- 실제 프로젝트 프레임레이트 범위를 테스트합니다. 이 노드는 반복 제약조건, 제한된 평균 FPS 보정, 선택적 Fixed Delta를 함께 사용합니다.
+- 실제 프로젝트 프레임레이트 범위를 테스트합니다. Variable Step은 Damping/Pose Inertia 보정에 제한된 평균 FPS를 사용하고, 보정된 Fixed Step은 `DeltaTimeCorrectionTargetFrameRate`를 사용합니다.
 
 ### LOD 전환 시 체인이 깨짐
 
@@ -783,6 +798,7 @@ AnimVerlet이 데이터를 소비하는 Animation Blueprint 평가 전에 목록
 - `bUseBroadphase`를 활성화합니다.
 - 소수의 Primitive로 충분하다면 World Sweep보다 로컬 캐릭터 Collider를 우선합니다.
 - `SolveIteration = 2–4`에서 시작합니다.
+- 느린 렌더 프레임에는 완전한 시뮬레이션 업데이트가 `MaxSubStep` 횟수만큼 실행될 수 있습니다. 실제 복구에 필요한 가장 작은 값으로 유지하십시오.
 - 충돌 해상도 또는 부드러운 곡률이 필요한 세그먼트에만 Subdivision을 추가하고, 노드 전체의 파티클 수를 올리기보다 세그먼트별 오버라이드를 우선합니다.
 - 시각적으로 필요할 때만 Self Collision을 활성화합니다.
 - 차이가 비용을 정당화하지 않는다면 다중 체인에서 Triangle-Triangle보다 Sphere-Triangle Self Collision을 우선합니다.

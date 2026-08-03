@@ -266,7 +266,7 @@ Useful applications:
 | `bRebuildSimulationOnLODChange` | `false` | Rebuilds topology, constraints, broadphase, and collision state when the required-bone LOD changes. Matching particle state is preserved where possible. Enable it when simulated bones differ between LODs. |
 | `bActivate` | `true` | Completely disables node evaluation when false. Exposed as a default graph pin. |
 | `bSkipUpdateOnDedicatedServer` | `true` | Skips evaluation on a dedicated server. Disable only if server-side simulated transforms are genuinely required. |
-| `bPause` | `false` | Stops integration while retaining and outputting the current simulation state. It does not perform a reset. Exposed as a default graph pin. |
+| `bPause` | `false` | Stops integration while retaining and outputting the current simulation state. It does not perform a reset, but it clears any pending fixed-step backlog. Exposed as a default graph pin. |
 | `PlaySpeedRate` | `1.0` | Scales update delta time and time dilation. `0` effectively freezes time after clamping behavior; prefer `bPause` for an explicit pause. |
 | `bUseWarmup` | `true` | After initialization or `ResetPhysics`, performs fixed substeps before exposing the result. |
 | `WarmupStepCount` | `8` | Number of warmup substeps. Warmup runs on the next evaluated, unpaused frame. |
@@ -300,10 +300,12 @@ The `bPreserveLengthFromParentBetweenRealBones` and `bPreserveSideLengthBetweenR
 
 - **Deactivate**: the skeletal control does not evaluate.
 - **Pause**: the node continues to output its retained state but does not integrate.
-- **Reset Simulation** in the editor: clears motion and synchronizes particles with the current pose.
-- **Reset Physics** from Unreal's animation dynamics flow: schedules a reset against the current pose/component transform. If warmup is enabled, warmup occurs on the following evaluated frame.
+- **Reset Simulation** in the editor: clears motion and the fixed-step accumulator, then synchronizes particles with the current pose.
+- **Reset Physics** from Unreal's animation dynamics flow: schedules a reset against the current pose/component transform and clears the fixed-step accumulator when that reset is performed. If warmup is enabled, warmup occurs on the following evaluated frame.
 
-Warmup deliberately ignores component movement and rotation inertia by using the same component transform for every warmup substep.
+Warmup deliberately ignores component movement and rotation inertia by using the same component transform for every warmup substep. The input pose is prepared again between warmup steps so the pose history advances consistently instead of reusing one stale preparation.
+
+When the result is applied, `OutputBlendDuration` blends from the **current** incoming component-space pose, not from a pose cached by an earlier simulation step. The simulated location and rotation are combined with the current input-pose scale. This keeps animated scale changes current even on a rendered frame where the fixed-step accumulator schedules no simulation step.
 
 ## 8. Animation-pose settings
 
@@ -318,7 +320,7 @@ These parameters are active only when `bIgnoreAnimationPose` is false unless sta
 | `bIgnoreAnimationPose` | `false` | Disables pose-following corrections and leaves shape primarily to constraints and forces. |
 | `bAlignAnimationPoseToGravity` | `false` | Rotates the authored pose from `AnimationPoseReferenceDirection` toward current gravity before using it as the pose target. |
 | `AnimationPoseInertia` | `0.03` | Direct pull toward the current parent-relative animation-pose location. Higher values follow animation more tightly. |
-| `bApplyAnimationPoseInertiaCorrection` | `true` | Scales `AnimationPoseInertia` using the target frame rate and clamped average FPS. |
+| `bApplyAnimationPoseInertiaCorrection` | `true` | Scales `AnimationPoseInertia` using its target frame rate. The denominator is clamped average FPS in variable-step mode, or `DeltaTimeCorrectionTargetFrameRate` while corrected fixed-step simulation is active. |
 | `AnimationPoseInertiaTargetFrameRate` | `60` | Reference frame rate for pose-inertia correction. |
 | `AnimationPoseReferenceDirection` | Down `(0,0,-1)` | Component-space direction representing gravity in the authored animation pose. Used by the gravity-alignment options. |
 
@@ -331,7 +333,7 @@ Gravity alignment is useful when an asset was authored hanging in one component-
 | Property | Default | How to use it |
 |---|---:|---|
 | `Damping` | `0.9` | Fraction of previous Verlet displacement retained. `1` retains all; lower values remove motion faster. |
-| `bApplyDampingCorrection` | `false` | Adjusts damping against average FPS for more consistent decay. |
+| `bApplyDampingCorrection` | `false` | Adjusts damping for more consistent decay. It uses clamped average FPS in variable-step mode and `DeltaTimeCorrectionTargetFrameRate` while corrected fixed-step simulation is active. |
 | `DampingCorrectionTargetFrameRate` | `60` | Reference FPS for damping correction. |
 | `bUseXPBDSolver` | `false` | Selects XPBD constraint solving. False selects PBD. |
 | `InvCompliance` | `100000000` | XPBD inverse compliance. Higher values mean a more rigid distance constraint; actual compliance is `1 / InvCompliance`. Do not set it to zero. |
@@ -392,13 +394,24 @@ The internal flat-bending fields are currently not exposed as editable `UPROPERT
 
 | Property | Default | How to use it |
 |---|---:|---|
-| `FixedDeltaTime` | `0 s` | A positive value replaces real delta time. Zero uses the update delta. |
-| `bApplyDeltaTimeCorrection` | `true` | When fixed delta is active, adjusts it using frame rate, time dilation, and the target frame rate. |
-| `DeltaTimeCorrectionTargetFrameRate` | `60` | Reference FPS for fixed-delta correction. |
-| `MinDeltaTime` | `KINDA_SMALL_NUMBER` | Lower clamp applied to the final simulation delta. |
-| `MaxDeltaTime` | `0.05 s` | Upper clamp that limits instability after a frame hitch. |
+| `FixedDeltaTime` | `0.01666 s` | Simulation delta used by every fixed step. Set it to `0` to use one variable step based on the update delta instead. |
+| `bApplyDeltaTimeCorrection` | `true` | With a positive fixed delta, uses an elapsed-time accumulator to schedule zero, one, or multiple fixed steps at the target rate. If disabled, the node runs exactly one fixed step per evaluated, unpaused frame. |
+| `DeltaTimeCorrectionTargetFrameRate` | `60` | Frequency at which the accumulator schedules fixed steps. It is shown only when `FixedDeltaTime > 0` and correction is enabled; minimum is `1`. |
+| `MaxSubStep` | `3` | Maximum fixed steps evaluated in one rendered frame. Accumulated time beyond this budget is discarded to prevent a catch-up spiral. It has the same visibility conditions as the target frame rate; minimum is `1`. |
+| `MinDeltaTime` | `KINDA_SMALL_NUMBER` | Lower clamp applied to the variable delta or to `FixedDeltaTime * TimeDilation`. |
+| `MaxDeltaTime` | `0.05 s` | Upper clamp applied to that per-step delta. It does not limit how many fixed steps run; `MaxSubStep` does. |
 
 `PlaySpeedRate` participates in both input delta time and time dilation. Test slow motion and fast-forward states explicitly if a gameplay system changes global or custom time dilation.
+
+The three execution modes are:
+
+1. **Variable step** — `FixedDeltaTime = 0`: one step uses the update delta clamped to `MinDeltaTime–MaxDeltaTime`.
+2. **One fixed step per frame** — positive `FixedDeltaTime`, correction disabled: every evaluated, unpaused frame runs one step using `FixedDeltaTime * TimeDilation`, clamped to the same range. This mode still depends on render/evaluation frequency.
+3. **Accumulator-driven fixed steps** — positive `FixedDeltaTime`, correction enabled: nonnegative elapsed update time is accumulated at `DeltaTimeCorrectionTargetFrameRate`. A fast rendered frame may run no step; a slow frame may run several, up to `MaxSubStep`. Fractional step time remains for the next frame, while time exceeding the maximum backlog is dropped.
+
+During multiple fixed steps, the node interpolates the component transform from the previous rendered frame to the current one and prepares the pose again for every substep. This distributes component movement/rotation inertia across the substeps and advances Verlet pose history correctly. `OutputBlendDuration` also advances by the total simulated time (`per-step delta × executed steps`), not merely once per rendered frame.
+
+For real-time pacing, normally pair reciprocal values such as `FixedDeltaTime = 0.01666` and `DeltaTimeCorrectionTargetFrameRate = 60`. Their product determines how much simulation time advances per second before time dilation. With a 60 Hz target, `MaxSubStep = 2` can catch up to a 30 FPS frame and `3` can catch up to a 20 FPS frame; choose the smallest budget that covers the expected frame-rate dip.
 
 ### Cone and custom distance constraints
 
@@ -711,7 +724,8 @@ Tune in this order to avoid compensating for a topology problem with excessive s
 
 ### The chain explodes after a hitch or teleport
 
-- Reduce `MaxDeltaTime`.
+- With corrected fixed stepping, set `MaxSubStep` high enough for ordinary short frame drops but low enough to bound catch-up work. Excess backlog is discarded automatically.
+- Reduce `MaxDeltaTime` when the **per-step** delta can become too large, especially with variable stepping or high time dilation. It does not cap fixed-step count.
 - Trigger Unreal's `ResetPhysics` behavior after a teleport.
 - Enable sudden-move and sudden-rotation ignore options.
 - Keep movement and rotation clamps enabled.
@@ -765,10 +779,11 @@ Tune in this order to avoid compensating for a topology problem with excessive s
 ### Physics changes with frame rate
 
 - Use the physics preset with squared delta time for acceleration-like behavior.
-- Consider fixed delta time and correction.
+- Use corrected fixed stepping for frame-rate-independent scheduling. Pair reciprocal values such as `FixedDeltaTime = 0.01666` and `DeltaTimeCorrectionTargetFrameRate = 60`.
+- Size `MaxSubStep` for the lowest frame rate that should recover without dropping accumulated time; for example, use at least `2` for a 60 Hz target at 30 FPS.
 - Enable damping and animation-pose inertia corrections where appropriate.
 - Keep `MaxDeltaTime` bounded.
-- Test the actual project frame-rate range; this node uses a mixture of iterative constraints, clamped average FPS correction, and optional fixed delta behavior.
+- Test the actual project frame-rate range. Variable stepping uses clamped average FPS for damping/pose-inertia correction, while corrected fixed stepping uses `DeltaTimeCorrectionTargetFrameRate`.
 
 ### LOD switching breaks the chain
 
@@ -782,6 +797,7 @@ Tune in this order to avoid compensating for a topology problem with excessive s
 - Keep `bUseBroadphase` enabled.
 - Prefer local character colliders over world sweeps when a few primitives are sufficient.
 - Start with `SolveIteration = 2–4`.
+- Remember that a slow rendered frame can execute up to `MaxSubStep` complete simulation updates. Keep the value to the smallest practical recovery budget.
 - Add subdivisions only to segments that need collision resolution or softer curvature; prefer per-segment overrides over raising particle counts across the entire node.
 - Enable self-collision only when visually necessary.
 - Prefer sphere-triangle over triangle-triangle self collision for multi-chain cloth unless the visual difference justifies the cost.
