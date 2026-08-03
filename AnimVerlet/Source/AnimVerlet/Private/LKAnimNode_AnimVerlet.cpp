@@ -64,6 +64,8 @@ void FLKAnimNode_AnimVerlet::Initialize_AnyThread(const FAnimationInitializeCont
 	bPendingDynamicsReset = false;
 	bWarmupPending = false;
 	CachedSimulationLOD = INDEX_NONE;
+	FixedStepAccumulator = 0.0f;
+	NumPendingSimulationSteps = 0;
 	ResetOutputBlend();
 
 	FBoneContainer& RequiredBones = Context.AnimInstanceProxy->GetRequiredBones();
@@ -124,12 +126,10 @@ void FLKAnimNode_AnimVerlet::EvaluateSkeletalControl_AnyThread(FComponentSpacePo
 		bInitializedThisFrame = true;
 	}
 
-	/// Prepare each SimulateBones
-	PrepareSimulation(Output, BoneContainer, CurComponentT);
-
 	const USkeletalMeshComponent* SkeletalMeshComponent = Output.AnimInstanceProxy->GetSkelMeshComponent();
 	const UWorld* World = SkeletalMeshComponent->GetWorld();
 	bool bAdvanceOutputBlend = false;
+	float OutputBlendDeltaTime = 0.0f;
 	if (bUseWarmup == false)
 		bWarmupPending = false;
 
@@ -137,6 +137,8 @@ void FLKAnimNode_AnimVerlet::EvaluateSkeletalControl_AnyThread(FComponentSpacePo
 	/// Warmup is intentionally deferred until the next evaluated frame.
 	if (bInitializedThisFrame || bPendingDynamicsReset)
 	{
+		/// Prepare each SimulateBones
+		PrepareSimulation(Output, BoneContainer, CurComponentT);
 		ResetSimulation();
 
 		PrevComponentT = CurComponentT;
@@ -147,12 +149,15 @@ void FLKAnimNode_AnimVerlet::EvaluateSkeletalControl_AnyThread(FComponentSpacePo
 	else if (bWarmupPending && bPause == false)
 	{
 		/// The animation pose may have changed during the deferred frame. Start warmup from the pose prepared on this frame, with no inherited velocity.
+		PrepareSimulation(Output, BoneContainer, CurComponentT);
 		ResetSimulation();
 
 		const int32 ClampedWarmupStepCount = FMath::Max(WarmupStepCount, 0);
 		const float ClampedWarmupDeltaTime = FMath::Max(WarmupFixedDeltaTime, UE_SMALL_NUMBER);
 		for (int32 WarmupStep = 0; WarmupStep < ClampedWarmupStepCount; ++WarmupStep)
 		{
+			if (WarmupStep > 0)
+				PrepareSimulation(Output, BoneContainer, CurComponentT);
 			/// Using the current component transform for both frames prevents component movement/rotation inertia from entering the warmup.
 			SimulateVerlet(World, ClampedWarmupDeltaTime, CurComponentT, CurComponentT);
 		}
@@ -160,21 +165,37 @@ void FLKAnimNode_AnimVerlet::EvaluateSkeletalControl_AnyThread(FComponentSpacePo
 		bWarmupPending = false;
 		PrevComponentT = CurComponentT;
 		bAdvanceOutputBlend = true;
+		OutputBlendDeltaTime = DeltaTime;
 	}
 	/// Simulate verlet integration
-	else if (DeltaTime > 0.0f && bPause == false)
+	else if (DeltaTime > 0.0f && NumPendingSimulationSteps > 0 && bPause == false)
 	{
-		SimulateVerlet(World, DeltaTime, CurComponentT, PrevComponentT);
+		const int32 SimulationStepCount = NumPendingSimulationSteps;
+		for (int32 SimulationStep = 0; SimulationStep < SimulationStepCount; ++SimulationStep)
+		{
+			const float PrevStepAlpha = static_cast<float>(SimulationStep) / static_cast<float>(SimulationStepCount);
+			const float CurStepAlpha = static_cast<float>(SimulationStep + 1) / static_cast<float>(SimulationStepCount);
+			FTransform PrevStepComponentT;
+			FTransform CurStepComponentT;
+			PrevStepComponentT.Blend(PrevComponentT, CurComponentT, PrevStepAlpha);
+			CurStepComponentT.Blend(PrevComponentT, CurComponentT, CurStepAlpha);
+
+			/// Prepare every fixed step so Verlet history advances correctly between substeps.
+			PrepareSimulation(Output, BoneContainer, CurStepComponentT);
+			SimulateVerlet(World, DeltaTime, CurStepComponentT, PrevStepComponentT);
+		}
+		FixedStepAccumulator = FMath::Max(FixedStepAccumulator - static_cast<float>(SimulationStepCount), 0.0f);
+		NumPendingSimulationSteps = 0;
+		PrevComponentT = CurComponentT;
 		bAdvanceOutputBlend = true;
+		OutputBlendDeltaTime = DeltaTime * static_cast<float>(SimulationStepCount);
 	}
 
 	if (bAdvanceOutputBlend)
-		AdvanceOutputBlend(DeltaTime);
+		AdvanceOutputBlend(OutputBlendDeltaTime);
 
 	/// Apply simulation to bone
-	ApplyResult(OutBoneTransforms, BoneContainer);
-
-	PrevComponentT = CurComponentT;
+	ApplyResult(OutBoneTransforms, Output, BoneContainer);
 
 #if LK_ENABLE_ANIMVERLET_DEBUG
 	if (CVarAnimNodeAnimVerletDebug.GetValueOnAnyThread())
@@ -1333,20 +1354,38 @@ void FLKAnimNode_AnimVerlet::MakeFakeBoneTransform(OUT FTransform& OutTransform,
 
 void FLKAnimNode_AnimVerlet::UpdateDeltaTime(float InDeltaTime, float InTimeDilation)
 {
-	float TargetDeltaTime = InDeltaTime;
-	if (FMath::IsNearlyZero(FixedDeltaTime, KINDA_SMALL_NUMBER) == false)
+	const float PositiveFrameDeltaTime = FMath::Max(InDeltaTime, 0.0f);
+	const float ClampedFrameDeltaTime = FMath::Clamp(InDeltaTime, MinDeltaTime, MaxDeltaTime);
+	const bool bUseFixedDeltaTime = FMath::IsNearlyZero(FixedDeltaTime, KINDA_SMALL_NUMBER) == false;
+	NumPendingSimulationSteps = 0;
+
+	if (bPause)
 	{
-		if (bApplyDeltaTimeCorrection)
-		{
-			const float TargetFPS = (60.0f * InDeltaTime) / 0.0166f;
-			TargetDeltaTime = ((FixedDeltaTime * InTimeDilation) * TargetFPS / FMath::Max(KINDA_SMALL_NUMBER, DeltaTimeCorrectionTargetFrameRate));
-		}
-		else
-		{
-			TargetDeltaTime = FixedDeltaTime * InTimeDilation;
-		}
+		FixedStepAccumulator = 0.0f;
+		DeltaTime = bUseFixedDeltaTime ? FMath::Clamp(FixedDeltaTime * InTimeDilation, MinDeltaTime, MaxDeltaTime) : ClampedFrameDeltaTime;
+		return;
 	}
-	DeltaTime = FMath::Clamp(TargetDeltaTime, MinDeltaTime, MaxDeltaTime);
+
+	if (bUseFixedDeltaTime == false)
+	{
+		FixedStepAccumulator = 0.0f;
+		DeltaTime = ClampedFrameDeltaTime;
+		NumPendingSimulationSteps = DeltaTime > 0.0f ? 1 : 0;
+		return;
+	}
+
+	DeltaTime = FMath::Clamp(FixedDeltaTime * InTimeDilation, MinDeltaTime, MaxDeltaTime);
+	if (bApplyDeltaTimeCorrection == false)
+	{
+		FixedStepAccumulator = 0.0f;
+		NumPendingSimulationSteps = DeltaTime > 0.0f ? 1 : 0;
+		return;
+	}
+
+	const int32 ClampedMaxSubStep = FMath::Max(MaxSubStep, 1);
+	const float TargetFrameRate = FMath::Max(DeltaTimeCorrectionTargetFrameRate, 1.0f);
+	FixedStepAccumulator = FMath::Min(FixedStepAccumulator + PositiveFrameDeltaTime * TargetFrameRate, static_cast<float>(ClampedMaxSubStep));
+	NumPendingSimulationSteps = FMath::Min(FMath::FloorToInt(FixedStepAccumulator + UE_SMALL_NUMBER), ClampedMaxSubStep);
 }
 
 void FLKAnimNode_AnimVerlet::PrepareSimulation(FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer, const FTransform& ComponentTransform)
@@ -1354,10 +1393,6 @@ void FLKAnimNode_AnimVerlet::PrepareSimulation(FComponentSpacePoseContext& PoseC
 #if LK_ENABLE_STAT
 	SCOPE_CYCLE_COUNTER(STAT_AnimVerlet_PrepareSimulation);
 #endif
-
-	/// Just make sure
-	if (DeltaTime <= 0.0f)
-		UpdateDeltaTime(KINDA_SMALL_NUMBER, 1.0f);
 
 	for (int32 SimulateBoneIndex = 0; SimulateBoneIndex < SimulateBones.Num(); ++SimulateBoneIndex)
 	{
@@ -1815,11 +1850,12 @@ bool FLKAnimNode_AnimVerlet::PreUpdateBones(const UWorld* World, float InDeltaTi
 	SCOPE_CYCLE_COUNTER(STAT_AnimVerlet_PreUpdateBones);
 #endif
 
+	extern ENGINE_API float GAverageFPS;
+	const bool bUseCorrectedFixedStep = FMath::IsNearlyZero(FixedDeltaTime, KINDA_SMALL_NUMBER) == false && bApplyDeltaTimeCorrection;
+	const float CorrectionFrameRate = bUseCorrectedFixedStep ? FMath::Max(DeltaTimeCorrectionTargetFrameRate, 1.0f) : FMath::Clamp(GAverageFPS, LKG_MINFPS, LKG_MAXFPS);
 	const bool bUseWindComponentInWorld = (bAdjustWindComponent && World->Scene != nullptr);
 	FLKAnimVerletUpdateParam VerletUpdateParam;
 	{
-		extern ENGINE_API float GAverageFPS;
-		const float ClampedAverageFPS = FMath::Clamp(GAverageFPS, LKG_MINFPS, LKG_MAXFPS);
 		/// Clamp Move Intertia
 		{
 			const FVector PrevComponentLocation = PrevComponentTransform.GetLocation();
@@ -1885,7 +1921,7 @@ bool FLKAnimNode_AnimVerlet::PreUpdateBones(const UWorld* World, float InDeltaTi
 			NewWind.RandomForceSizeMax = CurWind.RandomForceSizeMax;
 			NewWind.bRandomForceDirectionInWorldSpace = CurWind.bRandomForceDirectionInWorldSpace;
 		}
-		VerletUpdateParam.Damping = bApplyDampingCorrection ? FMath::Clamp(FMath::Pow(Damping, (DampingCorrectionTargetFrameRate / ClampedAverageFPS)), 0.0f, 1.0f) : Damping;
+		VerletUpdateParam.Damping = bApplyDampingCorrection ? FMath::Clamp(FMath::Pow(Damping, (DampingCorrectionTargetFrameRate / CorrectionFrameRate)), 0.0f, 1.0f) : Damping;
 	}
 	const bool bComponentFrameMoved = VerletUpdateParam.ComponentMoveDiff.IsNearlyZero(KINDA_SMALL_NUMBER) == false || VerletUpdateParam.ComponentRotDiff.Equals(FQuat::Identity, KINDA_SMALL_NUMBER) == false;
 
@@ -1918,13 +1954,10 @@ bool FLKAnimNode_AnimVerlet::PreUpdateBones(const UWorld* World, float InDeltaTi
 		/// Adjust animation pose transform
 		if (bIgnoreAnimationPose == false && CurVerletBone.HasParentBone())
 		{
-			extern ENGINE_API float GAverageFPS;
-			const float ClampedAverageFPS = FMath::Clamp(GAverageFPS, LKG_MINFPS, LKG_MAXFPS);
-
 			FLKAnimVerletBone& ParentVerletBone = SimulateBones[CurVerletBone.ParentVerletBoneIndex];
-			///const float AnimPoseDeltaInertiaScaled = bApplyAnimationPoseInertiaCorrection ? (AnimationPoseDeltaInertia * AnimationPoseDeltaInertiaScale * AnimationPoseInertiaTargetFrameRate / ClampedAverageFPS) : AnimationPoseDeltaInertia * AnimationPoseDeltaInertiaScale;
+			///const float AnimPoseDeltaInertiaScaled = bApplyAnimationPoseInertiaCorrection ? (AnimationPoseDeltaInertia * AnimationPoseDeltaInertiaScale * AnimationPoseInertiaTargetFrameRate / CorrectionFrameRate) : AnimationPoseDeltaInertia * AnimationPoseDeltaInertiaScale;
 			const float AnimPoseDeltaInertiaScaled = AnimationPoseDeltaInertia * AnimationPoseDeltaInertiaScale;
-			const float TargetAnimationPoseInertia = bApplyAnimationPoseInertiaCorrection ? (AnimationPoseInertia * AnimationPoseInertiaTargetFrameRate / ClampedAverageFPS) : AnimationPoseInertia;
+			const float TargetAnimationPoseInertia = bApplyAnimationPoseInertiaCorrection ? (AnimationPoseInertia * AnimationPoseInertiaTargetFrameRate / CorrectionFrameRate) : AnimationPoseInertia;
 			CurVerletBone.AdjustPoseTransform(InDeltaTime, ParentVerletBone.Location, ParentVerletBone.PoseLocation, ParentVerletBone.GravityAlignedPoseLocation,
 											 bAlignAnimationPoseToGravity, TargetAnimationPoseInertia, AnimPoseDeltaInertiaScaled,
 											 bClampAnimationPoseDeltaInertia, AnimationPoseDeltaInertiaClampMax);
@@ -2433,7 +2466,7 @@ void FLKAnimNode_AnimVerlet::PostUpdateBones(float InDeltaTime)
 	}
 }
 
-void FLKAnimNode_AnimVerlet::ApplyResult(OUT TArray<FBoneTransform>& OutBoneTransforms, const FBoneContainer& BoneContainer)
+void FLKAnimNode_AnimVerlet::ApplyResult(OUT TArray<FBoneTransform>& OutBoneTransforms, FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer)
 {
 #if LK_ENABLE_STAT
 	SCOPE_CYCLE_COUNTER(STAT_AnimVerlet_ApplyResult);
@@ -2463,8 +2496,8 @@ void FLKAnimNode_AnimVerlet::ApplyResult(OUT TArray<FBoneTransform>& OutBoneTran
 		/// LOD case?
 		if (BonePoseIndex != INDEX_NONE)
 		{
-			const FTransform PoseBoneT(CurBone->PoseRotation, CurBone->PoseLocation, CurBone->PoseScale);
-			const FTransform SimulatedBoneT(CurBone->Rotation, CurBone->Location, CurBone->PoseScale);
+			const FTransform& PoseBoneT = PoseContext.Pose.GetComponentSpaceTransform(BonePoseIndex);
+			const FTransform SimulatedBoneT(CurBone->Rotation, CurBone->Location, PoseBoneT.GetScale3D());
 			FTransform ResultBoneT;
 			ResultBoneT.Blend(PoseBoneT, SimulatedBoneT, FMath::Clamp(OutputBlendAlpha, 0.0f, 1.0f));
 			OutBoneTransforms.Emplace(FBoneTransform(BonePoseIndex, ResultBoneT));
@@ -2524,6 +2557,9 @@ void FLKAnimNode_AnimVerlet::ClearSimulateBones()
 
 void FLKAnimNode_AnimVerlet::ResetSimulation()
 {
+	FixedStepAccumulator = 0.0f;
+	NumPendingSimulationSteps = 0;
+
 	for (int32 i = 0; i < SimulateBones.Num(); ++i)
 	{
 		FLKAnimVerletBone& CurVerletBone = SimulateBones[i];
@@ -2778,6 +2814,7 @@ void FLKAnimNode_AnimVerlet::SyncFromOtherAnimVerletNode(const FLKAnimNode_AnimV
 	FixedDeltaTime = Other.FixedDeltaTime;
 	bApplyDeltaTimeCorrection = Other.bApplyDeltaTimeCorrection;
 	DeltaTimeCorrectionTargetFrameRate = Other.DeltaTimeCorrectionTargetFrameRate;
+	MaxSubStep = Other.MaxSubStep;
 	MinDeltaTime = Other.MinDeltaTime;
 	MaxDeltaTime = Other.MaxDeltaTime;
 	bUseSquaredDeltaTime = Other.bUseSquaredDeltaTime;

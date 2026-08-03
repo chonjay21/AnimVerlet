@@ -66,7 +66,7 @@ private:
 	void ApplyComponentInertiaTangentialDamping(float InDeltaTime);
 	void UpdateSleep(float InDeltaTime);
 	void PostUpdateBones(float InDeltaTime);
-	void ApplyResult(OUT TArray<FBoneTransform>& OutBoneTransforms, const FBoneContainer& BoneContainer);
+	void ApplyResult(OUT TArray<FBoneTransform>& OutBoneTransforms, FComponentSpacePoseContext& PoseContext, const FBoneContainer& BoneContainer);
 	void ResetOutputBlend();
 	void AdvanceOutputBlend(float InDeltaTime);
 	void ClearSimulateBones();
@@ -315,12 +315,15 @@ public:
 
 	/** Use a fixed DeltaTime instead of real delta time if > 0. (It can help to obtain a consistent result regardless of the frame rate.) */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = "Solve", meta = (ClampMin = "0.0", ForceUnits = "s"))
-	float FixedDeltaTime = 0.0f;
-	/** When using FixedDeltaTime, DeltaTime is corrected based on FixedDeltaTime in the current FrameRate. (It can help to obtain a consistent result regardless of the frame rate.) */
+	float FixedDeltaTime = 0.01666f;
+	/** Run FixedDeltaTime at DeltaTimeCorrectionTargetFrameRate using a fixed-step accumulator, making the simulation independent of the actual frame rate. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = "Solve")
 	bool bApplyDeltaTimeCorrection = true;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = "Solve", meta = (EditCondition = "bApplyDeltaTimeCorrection", ClampMin = "0.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = "Solve", meta = (EditCondition = "FixedDeltaTime > 0.0 && bApplyDeltaTimeCorrection", EditConditionHides, ClampMin = "1.0"))
 	float DeltaTimeCorrectionTargetFrameRate = 60.0f;
+	/** Maximum number of fixed simulation steps evaluated in one frame. Excess accumulated time is discarded to avoid a simulation spiral. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = "Solve", meta = (EditCondition = "FixedDeltaTime > 0.0 && bApplyDeltaTimeCorrection", EditConditionHides, ClampMin = "1"))
+	int32 MaxSubStep = 3;
 
 	/** Limit delta time in situations where the frame rate fluctuates. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, AdvancedDisplay, Category = "Solve", meta = (ClampMin = "0.0", ForceUnits = "s"))
@@ -519,6 +522,8 @@ private:
 	bool bWarmupPending = false;
 	int32 CachedSimulationLOD = INDEX_NONE;
 	float DeltaTime = 0.0f;
+	float FixedStepAccumulator = 0.0f;
+	int32 NumPendingSimulationSteps = 0;
 	float OutputBlendAlpha = 0.0f;
 	FTransform PrevComponentT = FTransform::Identity;
 };
